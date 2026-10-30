@@ -41,24 +41,15 @@ App: [http://localhost:3456](http://localhost:3456)
 
 ## Public deploy (iPhone / Safari)
 
-SLOP needs **Vercel** (free Hobby) because of Next.js API routes — not a static host.
+**Open this in Safari now** (Cloudflare tunnel — avoids Vercel anonymous 403):
 
-| | |
-| --- | --- |
-| **Public HTTPS (live)** | https://prompt-gold-o5sbpw9.tmp.now |
-| **Claim for permanent free URL** | https://vercel.com/claim-deployment?code=a8f2942f-60b6-4e9d-b857-cb44416b7e6e |
+**https://valves-scientist-spray-consumers.trycloudflare.com**
 
-1. Open the claim link → free Vercel account → keep the site.
-2. You will get a stable `*.vercel.app` URL for Safari on your iPhone.
-3. Connect GitHub (Create repo in Cursor, then import in Vercel) so pushes to `main` auto-deploy.
-
-Full steps: [`docs/DEPLOY.md`](docs/DEPLOY.md)
+Anonymous Vercel `*.tmp.now` URLs often show `403 FORBIDDEN` / “This request was blocked” on mobile networks. Use the tunnel above for testing; for a permanent free URL, create a free [Vercel](https://vercel.com/signup) account and import this repo (details in [`docs/DEPLOY.md`](docs/DEPLOY.md)).
 
 ```bash
-npm run build
-npx vercel deploy --temporary --yes   # anonymous; claim to keep
-# or, after login:
-npx vercel --prod
+npm run build && npm run start          # production on :3456
+npx vercel login && npx vercel --prod   # permanent *.vercel.app after free signup
 ```
 
 ## Product surfaces
