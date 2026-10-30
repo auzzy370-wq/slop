@@ -94,6 +94,9 @@ export interface Video {
   publishedAt: string | null;
   scheduledAt: string | null;
   commentsDisabled: boolean;
+  /** Cinematic subtitled original — driven by episode scripts, not MP4. */
+  playback?: "video" | "scripted";
+  scriptSeriesId?: string;
 }
 
 export interface Comment {

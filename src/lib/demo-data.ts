@@ -7,6 +7,10 @@ import type {
   Profile,
   Video,
 } from "./types";
+import {
+  FORGOTTEN_WIFE_DRAMA,
+  FORGOTTEN_WIFE_VIDEOS,
+} from "./series/forgotten-wife/catalog";
 
 export const DEMO_CATEGORIES: Category[] = [
   {
@@ -73,6 +77,7 @@ export const DEMO_CATEGORIES: Category[] = [
 
 /** Full AI drama episodes — see docs/CONTENT_SOURCES.md */
 export const DEMO_DRAMAS: Drama[] = [
+  FORGOTTEN_WIFE_DRAMA,
   {
     id: "drm_second_key",
     slug: "the-second-key",
@@ -85,7 +90,7 @@ export const DEMO_DRAMAS: Drama[] = [
     tags: ["apartment", "secrets", "AI original", "full episodes"],
     status: "published",
     featured: true,
-    trendingRank: 1,
+    trendingRank: 2,
     episodeCount: 4,
     viewCount: 0,
     likeCount: 0,
@@ -105,7 +110,7 @@ export const DEMO_DRAMAS: Drama[] = [
     tags: ["sci-fi", "AI original", "full episodes"],
     status: "published",
     featured: true,
-    trendingRank: 2,
+    trendingRank: 3,
     episodeCount: 3,
     viewCount: 0,
     likeCount: 0,
@@ -125,7 +130,7 @@ export const DEMO_DRAMAS: Drama[] = [
     tags: ["sisters", "family", "AI original"],
     status: "published",
     featured: true,
-    trendingRank: 3,
+    trendingRank: 4,
     episodeCount: 2,
     viewCount: 0,
     likeCount: 0,
@@ -145,7 +150,7 @@ export const DEMO_DRAMAS: Drama[] = [
     tags: ["vertical", "AI original", "mood"],
     status: "published",
     featured: false,
-    trendingRank: 4,
+    trendingRank: 5,
     episodeCount: 1,
     viewCount: 0,
     likeCount: 0,
@@ -165,7 +170,7 @@ export const DEMO_DRAMAS: Drama[] = [
     tags: ["domestic", "Seedance", "AI original"],
     status: "published",
     featured: false,
-    trendingRank: 5,
+    trendingRank: 6,
     episodeCount: 1,
     viewCount: 0,
     likeCount: 0,
@@ -192,6 +197,7 @@ function ep(
 }
 
 export const DEMO_VIDEOS: Video[] = [
+  ...FORGOTTEN_WIFE_VIDEOS.map((v) => ep(v)),
   ep({
     id: "ep_second_1",
     slug: "the-second-key-ep-1",
@@ -458,12 +464,12 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   adPlacementEvery: 4,
   premiumPriceLabel: "$7.99/mo",
   premiumMonthlyPriceCents: 799,
-  featuredVideoIds: ["ep_second_1", "ep_execute_1", "ep_unsent_1"],
+  featuredVideoIds: ["ep_bfw_01", "ep_bfw_02", "ep_second_1", "ep_execute_1"],
   featuredDramaIds: [
+    "drm_forgotten_wife",
     "drm_second_key",
     "drm_execute",
     "drm_unsent",
-    "drm_neon",
   ],
 };
 

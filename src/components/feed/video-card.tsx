@@ -26,8 +26,10 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { CommentsSheet } from "@/components/feed/comments-sheet";
+import { ScriptedPlayer } from "@/components/feed/scripted-player";
 import Link from "next/link";
 import { track } from "@/lib/analytics/client";
+import { getForgottenWifeScript } from "@/lib/series/forgotten-wife/scripts";
 
 interface VideoCardProps {
   video: Video;
@@ -45,11 +47,16 @@ export function VideoCard({
   categoryNames,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const isScripted = video.playback === "scripted";
+  const script =
+    isScripted && video.scriptSeriesId === "forgotten-wife"
+      ? getForgottenWifeScript(video.episodeNumber)
+      : undefined;
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(false);
   const [failed, setFailed] = useState(false);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!isScripted);
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -90,6 +97,52 @@ export function VideoCard({
   );
 
   useEffect(() => {
+    if (isScripted) {
+      if (active && !paused) {
+        if (!viewed.current) {
+          viewed.current = true;
+          recordView(video.id);
+        }
+        if (!started.current) {
+          started.current = true;
+          void track("video_playback_started", {
+            userId: user?.id,
+            episodeId: video.id,
+            dramaId: video.dramaId,
+            playbackSessionId: playbackId.current,
+            idempotencyKey: `pbstart:${playbackId.current}`,
+            playback: {
+              durationMs: video.durationSeconds * 1000,
+              currentMs: progress * video.durationSeconds * 1000,
+              event: "start",
+            },
+          });
+          void track("episode_selected", {
+            userId: user?.id,
+            episodeId: video.id,
+            dramaId: video.dramaId,
+          });
+        }
+      } else if (!active && started.current) {
+        const pct = progress;
+        void track(pct >= 0.95 ? "video_completed" : "video_abandoned", {
+          userId: user?.id,
+          episodeId: video.id,
+          dramaId: video.dramaId,
+          playbackSessionId: playbackId.current,
+          playback: {
+            durationMs: video.durationSeconds * 1000,
+            currentMs: progress * video.durationSeconds * 1000,
+            event: pct >= 0.95 ? "complete" : "abandon",
+          },
+        });
+        started.current = false;
+        playbackId.current = uid("pb");
+        lastProgressSent.current = 0;
+      }
+      return;
+    }
+
     const el = videoRef.current;
     if (!el) return;
     el.muted = muted;
@@ -160,7 +213,7 @@ export function VideoCard({
         lastProgressSent.current = 0;
       }
     }
-  }, [active, muted, paused, recordView, video.id, video.dramaId, video.durationSeconds, user?.id]);
+  }, [active, muted, paused, recordView, video.id, video.dramaId, video.durationSeconds, user?.id, isScripted, progress]);
 
   useEffect(() => {
     if (!active) {
@@ -269,21 +322,31 @@ export function VideoCard({
     return `${m}:${s.toString().padStart(2, "0")}`;
   };
 
-  const seekToClientX = useCallback((clientX: number) => {
-    const el = videoRef.current;
-    const bar = scrubRef.current;
-    if (!el || !bar || !el.duration) return;
-    const rect = bar.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
-    el.currentTime = ratio * el.duration;
-    setProgress(ratio);
-  }, []);
+  const seekToClientX = useCallback(
+    (clientX: number) => {
+      const bar = scrubRef.current;
+      if (!bar) return;
+      const rect = bar.getBoundingClientRect();
+      const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+      if (isScripted) {
+        setProgress(ratio);
+        return;
+      }
+      const el = videoRef.current;
+      if (!el || !el.duration) return;
+      el.currentTime = ratio * el.duration;
+      setProgress(ratio);
+    },
+    [isScripted],
+  );
 
   const onScrubPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     e.preventDefault();
     e.stopPropagation();
     const el = videoRef.current;
-    wasPlayingBeforeScrub.current = !!el && !el.paused && !paused;
+    wasPlayingBeforeScrub.current = isScripted
+      ? !paused
+      : !!el && !el.paused && !paused;
     setScrubbing(true);
     setPaused(true);
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -398,7 +461,50 @@ export function VideoCard({
 
   return (
     <article className="relative h-full w-full snap-start overflow-hidden bg-[var(--slop-black)]">
-      {!failed ? (
+      {script ? (
+        <ScriptedPlayer
+          script={script}
+          active={active}
+          paused={paused || scrubbing}
+          progress={progress}
+          onProgress={(ratio) => {
+            if (scrubbing) return;
+            setProgress(ratio);
+            const now = Date.now();
+            if (now - lastProgressSent.current > 5000) {
+              lastProgressSent.current = now;
+              void track("video_progress", {
+                userId: user?.id,
+                episodeId: video.id,
+                dramaId: video.dramaId,
+                playbackSessionId: playbackId.current,
+                properties: { pct: Math.round(ratio * 100) },
+                playback: {
+                  durationMs: video.durationSeconds * 1000,
+                  currentMs: ratio * video.durationSeconds * 1000,
+                  event: "progress",
+                },
+              });
+            }
+            if (ratio >= 0.95) {
+              void track("video_completed", {
+                userId: user?.id,
+                episodeId: video.id,
+                dramaId: video.dramaId,
+                playbackSessionId: playbackId.current,
+                idempotencyKey: `pbcomplete:${playbackId.current}`,
+                playback: {
+                  durationMs: video.durationSeconds * 1000,
+                  currentMs: ratio * video.durationSeconds * 1000,
+                  event: "complete",
+                },
+              });
+            }
+          }}
+          onDuration={(sec) => setDuration(sec)}
+          onTap={onVideoSurfaceTap}
+        />
+      ) : !failed ? (
         <video
           ref={videoRef}
           className="absolute inset-0 h-full w-full object-cover"
@@ -538,19 +644,21 @@ export function VideoCard({
         >
           <Share2 className="fill-transparent" />
         </RailButton>
-        <RailButton
-          onClick={() => {
-            revealChrome();
-            onToggleMute();
-          }}
-          ariaLabel={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? (
-            <VolumeX className="fill-transparent" />
-          ) : (
-            <Volume2 className="fill-transparent" />
-          )}
-        </RailButton>
+        {!isScripted ? (
+          <RailButton
+            onClick={() => {
+              revealChrome();
+              onToggleMute();
+            }}
+            ariaLabel={muted ? "Unmute" : "Mute"}
+          >
+            {muted ? (
+              <VolumeX className="fill-transparent" />
+            ) : (
+              <Volume2 className="fill-transparent" />
+            )}
+          </RailButton>
+        ) : null}
         <RailButton
           onClick={() => {
             revealChrome();
