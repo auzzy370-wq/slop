@@ -444,3 +444,19 @@ a {
 .row-scroll > * {
   scroll-snap-align: start;
 }
+
+/* Keep sonner toasts clear of notches / home indicator */
+[data-sonner-toaster][data-y-position="top"] {
+  top: max(0.75rem, env(safe-area-inset-top, 0px)) !important;
+}
+
+[data-sonner-toaster][data-y-position="bottom"] {
+  bottom: max(5.25rem, calc(env(safe-area-inset-bottom, 0px) + 4.25rem)) !important;
+}
+
+.slop-toast [data-button],
+.slop-toast button[data-button] {
+  min-height: 2.25rem;
+  padding-inline: 0.85rem;
+  font-weight: 600;
+}

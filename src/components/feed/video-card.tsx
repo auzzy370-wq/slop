@@ -394,8 +394,11 @@ export function VideoCard({
   }, [chromeVisible, revealChrome, togglePlay]);
 
   const requireAuth = (action: string) => {
+    // Bottom placement — clear of Dynamic Island / status bar and in thumb reach.
     toast.message(`Sign in to ${action}`, {
       description: "Guests can watch and share. Accounts unlock social features.",
+      position: "bottom-center",
+      duration: 6000,
       action: {
         label: "Sign in",
         onClick: () => {

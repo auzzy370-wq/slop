@@ -79,7 +79,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Toaster
           theme="dark"
           position="top-center"
+          offset={{ top: "max(0.75rem, env(safe-area-inset-top))" }}
+          mobileOffset={{
+            top: "max(0.75rem, env(safe-area-inset-top))",
+            bottom: "max(5.5rem, calc(env(safe-area-inset-bottom) + 4.5rem))",
+          }}
           toastOptions={{
+            className: "slop-toast",
             style: {
               background: "#18181f",
               border: "1px solid rgba(255,255,255,0.1)",
