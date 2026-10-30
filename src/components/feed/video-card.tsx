@@ -483,10 +483,10 @@ export function VideoCard({
         </button>
       )}
 
-      {/* TikTok-style right action rail */}
+      {/* Instagram Reels–style right action rail */}
       <div
-        className={`slop-action-rail absolute right-2 z-30 flex flex-col items-center gap-3.5 transition-[bottom] duration-300 ease-out sm:right-3 sm:gap-4 ${
-          chromeVisible ? "bottom-[7.25rem]" : "bottom-[3.5rem]"
+        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-6 ${
+          chromeVisible ? "bottom-[7.5rem]" : "bottom-[3.75rem]"
         }`}
       >
         <RailButton
@@ -500,9 +500,7 @@ export function VideoCard({
         >
           <Heart
             className={
-              liked
-                ? "fill-[var(--slop-violet)] text-[var(--slop-violet)]"
-                : ""
+              liked ? "fill-[#ff3040] text-[#ff3040]" : "fill-transparent"
             }
           />
         </RailButton>
@@ -514,7 +512,7 @@ export function VideoCard({
           ariaLabel="Comments"
           label={formatCount(video.commentCount)}
         >
-          <MessageCircle />
+          <MessageCircle className="fill-transparent" />
         </RailButton>
         <RailButton
           active={saved}
@@ -523,9 +521,10 @@ export function VideoCard({
             onSave();
           }}
           ariaLabel="Save"
-          label={saved ? "Saved" : "Save"}
         >
-          <Bookmark className={saved ? "fill-[var(--slop-lavender)] text-[var(--slop-lavender)]" : ""} />
+          <Bookmark
+            className={saved ? "fill-white text-white" : "fill-transparent"}
+          />
         </RailButton>
         <RailButton
           onClick={() => {
@@ -533,9 +532,8 @@ export function VideoCard({
             setShareOpen(true);
           }}
           ariaLabel="Share"
-          label="Share"
         >
-          <Share2 />
+          <Share2 className="fill-transparent" />
         </RailButton>
         <RailButton
           onClick={() => {
@@ -543,9 +541,12 @@ export function VideoCard({
             onToggleMute();
           }}
           ariaLabel={muted ? "Unmute" : "Mute"}
-          label={muted ? "Mute" : "Sound"}
         >
-          {muted ? <VolumeX /> : <Volume2 />}
+          {muted ? (
+            <VolumeX className="fill-transparent" />
+          ) : (
+            <Volume2 className="fill-transparent" />
+          )}
         </RailButton>
         <RailButton
           onClick={() => {
@@ -553,7 +554,6 @@ export function VideoCard({
             setReportOpen(true);
           }}
           ariaLabel="More"
-          label="More"
         >
           <MoreHorizontal />
         </RailButton>
@@ -778,19 +778,19 @@ function RailButton({
       onClick={onClick}
       aria-label={ariaLabel}
       aria-pressed={active}
-      className="slop-rail-btn group flex flex-col items-center gap-1.5 text-white"
+      className="slop-rail-btn group flex flex-col items-center gap-1 text-white"
     >
       <span
-        className={`slop-rail-orb flex h-12 w-12 items-center justify-center sm:h-[3.35rem] sm:w-[3.35rem] ${
+        className={`slop-rail-orb flex h-11 w-11 items-center justify-center ${
           active ? "is-active" : ""
         }`}
       >
-        <span className="relative z-[1] text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)] [&>svg]:h-[20px] [&>svg]:w-[20px] [&>svg]:stroke-[1.6] sm:[&>svg]:h-[21px] sm:[&>svg]:w-[21px]">
+        <span className="[&>svg]:h-[28px] [&>svg]:w-[28px] [&>svg]:stroke-[1.75]">
           {children}
         </span>
       </span>
-      {label ? (
-        <span className="slop-rail-label max-w-[3.5rem] truncate text-center font-display text-[9px] font-semibold uppercase tracking-[0.12em]">
+      {label != null && label !== "" ? (
+        <span className="slop-rail-label text-center text-[12px] font-semibold leading-none tabular-nums">
           {label}
         </span>
       ) : null}
