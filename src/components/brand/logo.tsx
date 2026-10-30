@@ -4,14 +4,18 @@ import Link from "next/link";
 import { useId } from "react";
 import { cn } from "@/lib/utils";
 
+/** Bold S path drawn around origin (0,0) for easy centering. */
+const S_PATH =
+  "M12.4-14.8c-2.3-3.55-6.25-5.7-11.55-5.7-8.1 0-14.15 4.95-14.15 12.2 0 5.45 2.95 8.85 9.9 11.3l6.55 2.2c3.55 1.2 5.15 2.6 5.15 5.05 0 3.05-2.75 4.95-6.9 4.95-3.95 0-7-1.5-9.1-4.45l-6.2 4.45c3.15 4.55 8.4 7.05 15.15 7.05 9.05 0 15.25-4.95 15.25-12.55 0-5.65-3.15-9.25-10.4-11.75l-6.3-2.15c-3.25-1.1-4.65-2.5-4.65-4.75 0-2.75 2.4-4.45 6.05-4.45 3.25 0 5.65 1.4 7.25 3.7l6-4.05z";
+
 /**
- * SLOP mark — violet gradient tile + centered geometric S.
- * Restored after the frame/play experiment; optically centered.
+ * Dark tile + violet S (colors flipped from the light-tile version).
+ * Glyph is translated to the exact tile center.
  */
 export function SlopMark({ className }: { className?: string }) {
   const uid = useId().replace(/:/g, "");
   const bg = `slopBg-${uid}`;
-  const sheen = `slopSheen-${uid}`;
+  const letter = `slopLetter-${uid}`;
 
   return (
     <svg
@@ -23,35 +27,40 @@ export function SlopMark({ className }: { className?: string }) {
         <linearGradient
           id={bg}
           x1="8"
-          y1="2"
+          y1="4"
           x2="56"
-          y2="62"
+          y2="60"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#7A5CFF" />
-          <stop offset="0.5" stopColor="#B99AFF" />
-          <stop offset="1" stopColor="#E9DEFF" />
+          <stop stopColor="#1A1528" />
+          <stop offset="1" stopColor="#0E0C14" />
         </linearGradient>
         <linearGradient
-          id={sheen}
-          x1="14"
-          y1="4"
-          x2="36"
-          y2="28"
+          id={letter}
+          x1="18"
+          y1="12"
+          x2="46"
+          y2="52"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#fff" stopOpacity="0.35" />
-          <stop offset="1" stopColor="#fff" stopOpacity="0" />
+          <stop stopColor="#E9DEFF" />
+          <stop offset="0.55" stopColor="#B99AFF" />
+          <stop offset="1" stopColor="#9B7AFF" />
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="16" fill={`url(#${bg})`} />
-      <rect width="64" height="64" rx="16" fill={`url(#${sheen})`} />
-      {/* Geometric S — shifted to optical center of the tile */}
-      <path
-        fill="#111116"
-        transform="translate(1.2 0)"
-        d="M42.6 19.8c-2.15-3.4-5.9-5.45-11-5.45-7.7 0-13.5 4.7-13.5 11.65 0 5.2 2.8 8.45 9.45 10.8l6.25 2.1c3.4 1.15 4.9 2.5 4.9 4.85 0 2.9-2.6 4.7-6.55 4.7-3.75 0-6.65-1.45-8.65-4.25l-5.9 4.25c3 4.35 8 6.75 14.45 6.75 8.65 0 14.55-4.7 14.55-12 0-5.4-3-8.85-9.9-11.25l-6-2.05c-3.1-1.05-4.45-2.4-4.45-4.55 0-2.6 2.3-4.25 5.8-4.25 3.1 0 5.4 1.35 6.95 3.55l5.7-4z"
+      <rect
+        x="1.25"
+        y="1.25"
+        width="61.5"
+        height="61.5"
+        rx="14.75"
+        fill="none"
+        stroke="rgba(185,154,255,0.28)"
+        strokeWidth="1.5"
       />
+      {/* Center of tile is (32, 32) */}
+      <path d={S_PATH} fill={`url(#${letter})`} transform="translate(32 32)" />
     </svg>
   );
 }
@@ -59,6 +68,7 @@ export function SlopMark({ className }: { className?: string }) {
 export function SlopMarkMini({ className }: { className?: string }) {
   const uid = useId().replace(/:/g, "");
   const bg = `slopMiniBg-${uid}`;
+  const letter = `slopMiniLetter-${uid}`;
 
   return (
     <svg
@@ -70,21 +80,28 @@ export function SlopMarkMini({ className }: { className?: string }) {
         <linearGradient
           id={bg}
           x1="8"
-          y1="2"
+          y1="4"
           x2="56"
-          y2="62"
+          y2="60"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#7A5CFF" />
-          <stop offset="1" stopColor="#C9B4FF" />
+          <stop stopColor="#1A1528" />
+          <stop offset="1" stopColor="#0E0C14" />
+        </linearGradient>
+        <linearGradient
+          id={letter}
+          x1="18"
+          y1="12"
+          x2="46"
+          y2="52"
+          gradientUnits="userSpaceOnUse"
+        >
+          <stop stopColor="#E9DEFF" />
+          <stop offset="1" stopColor="#B99AFF" />
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="16" fill={`url(#${bg})`} />
-      <path
-        fill="#111116"
-        transform="translate(1.2 0)"
-        d="M42.6 19.8c-2.15-3.4-5.9-5.45-11-5.45-7.7 0-13.5 4.7-13.5 11.65 0 5.2 2.8 8.45 9.45 10.8l6.25 2.1c3.4 1.15 4.9 2.5 4.9 4.85 0 2.9-2.6 4.7-6.55 4.7-3.75 0-6.65-1.45-8.65-4.25l-5.9 4.25c3 4.35 8 6.75 14.45 6.75 8.65 0 14.55-4.7 14.55-12 0-5.4-3-8.85-9.9-11.25l-6-2.05c-3.1-1.05-4.45-2.4-4.45-4.55 0-2.6 2.3-4.25 5.8-4.25 3.1 0 5.4 1.35 6.95 3.55l5.7-4z"
-      />
+      <path d={S_PATH} fill={`url(#${letter})`} transform="translate(32 32)" />
     </svg>
   );
 }
@@ -111,12 +128,12 @@ export function SlopWordmark({
       {showMark ? (
         <SlopMark
           className={cn(
-            "h-8 w-8 shrink-0 drop-shadow-[0_2px_10px_rgba(140,110,255,0.4)]",
+            "h-8 w-8 shrink-0 drop-shadow-[0_2px_12px_rgba(185,154,255,0.35)]",
             markClassName,
           )}
         />
       ) : null}
-      <span className="translate-y-px">SLOP</span>
+      <span className="leading-none">SLOP</span>
       <span className="sr-only"> — Stories That Keep You Watching</span>
     </Link>
   );

@@ -1,18 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="g" x1="64" y1="16" x2="448" y2="496" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7A5CFF"/>
-      <stop offset="0.5" stop-color="#B99AFF"/>
-      <stop offset="1" stop-color="#E9DEFF"/>
+    <linearGradient id="g" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1A1528"/>
+      <stop offset="1" stop-color="#0E0C14"/>
     </linearGradient>
-    <linearGradient id="s" x1="112" y1="32" x2="288" y2="224" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff" stop-opacity="0.35"/>
-      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    <linearGradient id="s" x1="144" y1="96" x2="368" y2="416" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#E9DEFF"/>
+      <stop offset="0.55" stop-color="#B99AFF"/>
+      <stop offset="1" stop-color="#9B7AFF"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="128" fill="url(#g)"/>
-  <rect width="512" height="512" rx="128" fill="url(#s)"/>
-  <g transform="translate(9.6 0) scale(8)">
-    <path fill="#111116" d="M42.6 19.8c-2.15-3.4-5.9-5.45-11-5.45-7.7 0-13.5 4.7-13.5 11.65 0 5.2 2.8 8.45 9.45 10.8l6.25 2.1c3.4 1.15 4.9 2.5 4.9 4.85 0 2.9-2.6 4.7-6.55 4.7-3.75 0-6.65-1.45-8.65-4.25l-5.9 4.25c3 4.35 8 6.75 14.45 6.75 8.65 0 14.55-4.7 14.55-12 0-5.4-3-8.85-9.9-11.25l-6-2.05c-3.1-1.05-4.45-2.4-4.45-4.55 0-2.6 2.3-4.25 5.8-4.25 3.1 0 5.4 1.35 6.95 3.55l5.7-4z"/>
+  <rect x="10" y="10" width="492" height="492" rx="118" fill="none" stroke="rgba(185,154,255,0.28)" stroke-width="12"/>
+  <g transform="translate(256 256) scale(8)">
+    <path fill="url(#s)" d="M12.4-14.8c-2.3-3.55-6.25-5.7-11.55-5.7-8.1 0-14.15 4.95-14.15 12.2 0 5.45 2.95 8.85 9.9 11.3l6.55 2.2c3.55 1.2 5.15 2.6 5.15 5.05 0 3.05-2.75 4.95-6.9 4.95-3.95 0-7-1.5-9.1-4.45l-6.2 4.45c3.15 4.55 8.4 7.05 15.15 7.05 9.05 0 15.25-4.95 15.25-12.55 0-5.65-3.15-9.25-10.4-11.75l-6.3-2.15c-3.25-1.1-4.65-2.5-4.65-4.75 0-2.75 2.4-4.45 6.05-4.45 3.25 0 5.65 1.4 7.25 3.7l6-4.05z"/>
   </g>
 </svg>
