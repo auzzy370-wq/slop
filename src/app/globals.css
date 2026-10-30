@@ -51,16 +51,17 @@ a {
   display: none;
 }
 
-/* TikTok-style vertical episode pager */
+/* TikTok-style vertical episode pager
+   --slop-feed-page is set in JS from the visual viewport so iOS
+   URL-bar / Dynamic Island never leave a black gap or mid-card settle. */
 .slop-feed-scroller {
   position: fixed;
   inset: 0;
-  height: 100%;
-  height: 100dvh;
   width: 100%;
+  height: 100%;
   overflow-x: hidden;
   overflow-y: auto;
-  overscroll-behavior-y: contain;
+  overscroll-behavior-y: none;
   -webkit-overflow-scrolling: touch;
   scroll-snap-type: y mandatory;
   scrollbar-width: none;
@@ -75,13 +76,25 @@ a {
 
 .slop-feed-slide {
   position: relative;
-  height: 100%;
-  height: 100dvh;
+  box-sizing: border-box;
   width: 100%;
+  height: var(--slop-feed-page, 100%);
+  min-height: var(--slop-feed-page, 100%);
+  max-height: var(--slop-feed-page, 100%);
   flex-shrink: 0;
   scroll-snap-align: start;
   scroll-snap-stop: always;
   overflow: hidden;
+  background: #000;
+}
+
+.slop-feed-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
   background: #000;
 }
 
@@ -158,8 +171,15 @@ a {
 /* Watch player — TikTok rail + cinematic drama accents */
 .slop-player-vignette {
   background:
-    linear-gradient(180deg, rgba(17, 17, 22, 0.55) 0%, transparent 18%),
-    linear-gradient(0deg, rgba(17, 17, 22, 0.92) 0%, rgba(17, 17, 22, 0.45) 24%, transparent 48%),
+    linear-gradient(180deg, rgba(17, 17, 22, 0.62) 0%, transparent 16%),
+    /* Heavy bottom curtain — masks burned-in episode captions behind chrome */
+    linear-gradient(
+      0deg,
+      rgba(17, 17, 22, 0.97) 0%,
+      rgba(17, 17, 22, 0.88) 14%,
+      rgba(17, 17, 22, 0.55) 28%,
+      transparent 46%
+    ),
     radial-gradient(100% 50% at 50% 100%, rgba(185, 154, 255, 0.1), transparent 55%);
 }
 

@@ -75,17 +75,35 @@ export function VideoFeed({
     return out;
   }, [feedVideos, showAds, settings.adPlacementEvery]);
 
+  const syncPageSize = useCallback(() => {
+    const root = scrollerRef.current;
+    if (!root) return 1;
+    // Prefer visualViewport — matches what the user actually sees on iOS.
+    const h = Math.round(
+      window.visualViewport?.height || root.clientHeight || window.innerHeight || 1,
+    );
+    root.style.setProperty("--slop-feed-page", `${h}px`);
+    // Keep the fixed scroller locked to the visual viewport height too.
+    root.style.height = `${h}px`;
+    return h;
+  }, []);
+
   const pageHeight = useCallback(() => {
     const root = scrollerRef.current;
-    return root?.clientHeight || window.innerHeight || 1;
-  }, []);
+    if (!root) return window.innerHeight || 1;
+    const raw = getComputedStyle(root).getPropertyValue("--slop-feed-page").trim();
+    const parsed = Number.parseFloat(raw);
+    if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    return syncPageSize();
+  }, [syncPageSize]);
 
   const snapToIndex = useCallback(
     (idx: number, behavior: ScrollBehavior = "smooth") => {
       const root = scrollerRef.current;
       if (!root) return;
+      const h = syncPageSize();
       const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      const top = clamped * pageHeight();
+      const top = clamped * h;
       settlingRef.current = true;
       root.scrollTo({ top, behavior });
       setActiveIndex(clamped);
@@ -96,7 +114,7 @@ export function VideoFeed({
         behavior === "smooth" ? 280 : 40,
       );
     },
-    [items.length, pageHeight],
+    [items.length, syncPageSize],
   );
 
   const nearestIndex = useCallback(() => {
@@ -125,48 +143,64 @@ export function VideoFeed({
   }, [activeIndex, nearestIndex, pageHeight, snapToIndex]);
 
   useEffect(() => {
+    syncPageSize();
     if (!startVideoId || !scrollerRef.current || items.length === 0) return;
     const idx = items.findIndex(
       (item) => item.kind === "video" && item.videoId === startVideoId,
     );
     if (idx >= 0) {
-      // Wait a frame so layout height is correct on mobile browsers.
       requestAnimationFrame(() => snapToIndex(idx, "instant" as ScrollBehavior));
     }
-  }, [startVideoId, items, snapToIndex]);
+  }, [startVideoId, items, snapToIndex, syncPageSize]);
 
   useEffect(() => {
     const root = scrollerRef.current;
     if (!root) return;
+
+    syncPageSize();
 
     const onScroll = () => {
       if (settlingRef.current) return;
       const idx = nearestIndex();
       if (idx !== activeIndex) setActiveIndex(idx);
       if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
-      // Debounced settle for browsers without scrollend (older iOS).
       scrollEndTimer.current = window.setTimeout(settleSnap, 90);
     };
 
     const onScrollEnd = () => settleSnap();
 
+    const onResize = () => {
+      const idx = nearestIndex();
+      syncPageSize();
+      // Re-lock to the same episode after URL-bar / rotate resize.
+      requestAnimationFrame(() =>
+        snapToIndex(idx, "instant" as ScrollBehavior),
+      );
+    };
+
     root.addEventListener("scroll", onScroll, { passive: true });
     root.addEventListener("scrollend", onScrollEnd);
-    // Re-snap after orientation / URL bar resize so pages stay full-bleed.
-    const onResize = () => {
-      snapToIndex(nearestIndex(), "instant" as ScrollBehavior);
-    };
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
 
     return () => {
       root.removeEventListener("scroll", onScroll);
       root.removeEventListener("scrollend", onScrollEnd);
       window.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
       if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
     };
-  }, [activeIndex, items.length, nearestIndex, settleSnap, snapToIndex, hydrated]);
+  }, [
+    activeIndex,
+    items.length,
+    nearestIndex,
+    settleSnap,
+    snapToIndex,
+    syncPageSize,
+    hydrated,
+  ]);
 
   if (!hydrated) {
     return (

@@ -516,7 +516,7 @@ export function VideoCard({
       ) : !failed ? (
         <video
           ref={videoRef}
-          className="absolute inset-0 h-full w-full object-cover"
+          className="slop-feed-video"
           src={active || loading ? video.videoUrl : undefined}
           poster={video.thumbnailUrl}
           playsInline
@@ -680,7 +680,7 @@ export function VideoCard({
       </div>
 
       {/* Bottom caption + film scrub — leaves room for the rail */}
-      <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.45rem,env(safe-area-inset-bottom))]">
+      <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
         <div
           key={active ? video.id : "idle"}
           className={`slop-caption relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
@@ -690,7 +690,7 @@ export function VideoCard({
         >
           <div
             aria-hidden
-            className="slop-player-ep-ghost absolute -top-12 right-16 text-[6.5rem] sm:right-24 sm:text-[8rem]"
+            className="slop-player-ep-ghost pointer-events-none absolute -top-10 left-0 text-[5.5rem] opacity-80 sm:text-[7rem]"
           >
             {epLabel}
           </div>
