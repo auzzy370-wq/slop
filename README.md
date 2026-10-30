@@ -43,7 +43,7 @@ App: [http://localhost:3456](http://localhost:3456)
 
 **Open this in Safari now** (Cloudflare tunnel — avoids Vercel anonymous 403):
 
-**https://valves-scientist-spray-consumers.trycloudflare.com**
+**https://kathy-epa-back-repeat.trycloudflare.com**
 
 Anonymous Vercel `*.tmp.now` URLs often show `403 FORBIDDEN` / “This request was blocked” on mobile networks. Use the tunnel above for testing; for a permanent free URL, create a free [Vercel](https://vercel.com/signup) account and import this repo (details in [`docs/DEPLOY.md`](docs/DEPLOY.md)).
 

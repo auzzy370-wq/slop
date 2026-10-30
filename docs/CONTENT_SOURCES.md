@@ -1,16 +1,13 @@
 # SLOP content sources
 
-Catalog episodes are **real AI-generated video**, not placeholder loops. Attribution:
+Full-episode AI dramas currently on the shelf:
 
-| Drama | Media source | License |
-| --- | --- | --- |
-| The Unsent Message | [Hugging Face — AI Drama Production Harness landscape demo](https://huggingface.co/datasets/tungmtp/ai-drama-production-harness-landscape-demo-media) (Mai & Linh dining-room film, scene clips) | Public demo media published for the harness |
-| Dinner Table | Same HF landscape demo (individual scene renders) | Public demo media |
-| Coming Home | [Wikimedia Commons — Seedance-2-husband-coming-home.webm](https://commons.wikimedia.org/wiki/File:Seedance-2-husband-coming-home.webm) | Public domain |
-| Neon Bloom | [Wikimedia Commons — AI generated video clip](https://commons.wikimedia.org/wiki/File:AI_generated_video_clip_-New_creative_video.webm) | CC BY-SA 4.0 |
-| Body Cam | [Wikimedia Commons — Sora AI body-cam example](https://commons.wikimedia.org/wiki/File:Example_of_Sora_AI-Generated_Police_Body_Camera_Footage.webm) | Public domain |
-| Dust Rider | [Wikimedia Commons — Gen-3 Alpha cowboy clip](https://commons.wikimedia.org/wiki/File:Gen-3_Alpha_3480943356,_A_cowboy_riding_his_,_pikaso_texttoimage_C_(1).webm) | Public domain |
+| Drama | Episodes | Runtime | Source |
+| --- | --- | --- | --- |
+| **The Second Key** | 4 | ~5.2 min total (~78s each) | Hugging Face `tungmtp/ai-drama-production-harness-demo-media` full vertical AI film, split into episodes |
+| **EXECUTE** | 3 | ~10 min total (~3.3 min each) | Wikimedia Commons [EXECUTE — dark Sci-Fi AI-short film](https://commons.wikimedia.org/wiki/File:EXECUTE_--_dark_Sci-Fi_AI-short_film.webm) (CC BY 3.0) |
+| **The Unsent Message** | 2 | ~1.5 min total | Hugging Face landscape AI drama harness demo film |
+| **Neon Bloom** | 1 | ~19s | Wikimedia Commons AI creative clip (CC BY-SA 4.0) |
+| **Coming Home** | 1 | ~15s | Wikimedia Commons Seedance short (public domain) |
 
-Clips were transcoded to vertical `720×1280` H.264 for the short-form player (letterboxed when the source was landscape).
-
-**Not used:** commercial ReelShort / DramaBox catalogs (copyrighted). New originals can be added later via admin publish once you generate more AI footage.
+All playback files under `/public/videos` are re-encoded to vertical `720×1280` H.264 for the short-form player.
