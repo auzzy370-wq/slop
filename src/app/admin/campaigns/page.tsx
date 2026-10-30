@@ -120,7 +120,7 @@ export default function CampaignsAdminPage() {
           ))}
         </select>
         <Input
-          placeholder="Destination path (e.g. /drama/the-gilded-lie)"
+          placeholder="Destination path (e.g. /drama/the-unsent-message)"
           value={form.destinationPath}
           onChange={(e) =>
             setForm({ ...form, destinationPath: e.target.value })

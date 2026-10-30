@@ -51,7 +51,7 @@ export default function AdminVideosPage() {
       title: form.title.trim(),
       description: form.description.trim(),
       videoUrl: form.videoUrl.trim(),
-      thumbnailUrl: form.thumbnailUrl.trim() || "/thumbnails/ep1-gilded.jpg",
+      thumbnailUrl: form.thumbnailUrl.trim() || "/thumbnails/unsent-ep1.jpg",
       durationSeconds: existing?.durationSeconds ?? 15,
       aspectRatio: "9:16",
       categoryIds:

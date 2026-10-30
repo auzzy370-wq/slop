@@ -15,7 +15,7 @@ export function StoreHygiene() {
   useEffect(() => {
     if (typeof window === "undefined") return;
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith("slop-local-v") && key !== "slop-local-v5") {
+      if (key.startsWith("slop-local-v") && key !== "slop-local-v6") {
         localStorage.removeItem(key);
       }
     }

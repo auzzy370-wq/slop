@@ -409,8 +409,8 @@ export const useSlopStore = create<SlopState>()(
       },
     }),
     {
-      name: "slop-local-v5",
-      version: 5,
+      name: "slop-local-v6",
+      version: 6,
       partialize: (state) => ({
         currentUser: state.currentUser,
         // Persist only real interactions + view tallies by id — never seed fakes.
@@ -500,7 +500,7 @@ export const useSlopStore = create<SlopState>()(
           for (const key of Object.keys(localStorage)) {
             if (
               key.startsWith("slop-local-v") &&
-              key !== "slop-local-v5"
+              key !== "slop-local-v6"
             ) {
               localStorage.removeItem(key);
             }

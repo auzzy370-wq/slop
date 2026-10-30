@@ -64,7 +64,7 @@ function SearchInner() {
 
         {!initial && (
           <p className="text-sm text-[var(--slop-slate)]">
-            Try “gilded”, “revenge”, “fantasy”, or “thriller”.
+            Try “unsent”, “neon”, “thriller”, or “sisters”.
           </p>
         )}
 
