@@ -8,7 +8,7 @@ Anonymous Vercel `*.tmp.now` links are often **blocked with 403** on mobile netw
 
 | Item | Value |
 | --- | --- |
-| **Public HTTPS (works in Safari)** | https://kathy-epa-back-repeat.trycloudflare.com |
+| **Public HTTPS (works in Safari)** |  |
 | Hosting path | Cloudflare Quick Tunnel → production Next.js on this agent |
 | Cost | $0 |
 
