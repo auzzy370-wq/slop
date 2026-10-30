@@ -41,13 +41,12 @@ App: [http://localhost:3456](http://localhost:3456)
 
 ## Public deploy (iPhone / Safari)
 
-**https://max-phrase-combination-aerial.trycloudflare.com**
+**https://slop-fawn.vercel.app**
 
-Anonymous Vercel `*.tmp.now` URLs often show `403 FORBIDDEN` on mobile. Use the tunnel above for testing; for a permanent free URL, create a free [Vercel](https://vercel.com/signup) account (details in [`docs/DEPLOY.md`](docs/DEPLOY.md)).
+Permanent free Vercel Hobby production URL. Redeploy with:
 
 ```bash
-npm run build && npm run start
-npx vercel login && npx vercel --prod
+vercel --prod
 ```
 
 ## Social auto-post

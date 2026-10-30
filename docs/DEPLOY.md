@@ -1,70 +1,40 @@
 # Deploy SLOP (free public HTTPS)
 
-SLOP is a **Next.js App Router** app with API routes (analytics, referrals, Stripe). It is **not** a static site. Host on **Vercel** (free Hobby tier) for a permanent URL.
+SLOP is a **Next.js App Router** app with API routes (analytics, referrals, Stripe). It is **not** a static site. Hosted on **Vercel** (free Hobby tier).
 
-## Use this URL on your iPhone right now
-
-Anonymous Vercel `*.tmp.now` links are often **blocked with 403** on mobile networks (Vercel bot protection). Use the Cloudflare tunnel instead:
+## Live production URL
 
 | Item | Value |
 | --- | --- |
-| **Public HTTPS (works in Safari)** |  |
-| Hosting path | Cloudflare Quick Tunnel → production Next.js on this agent |
-| Cost | $0 |
+| **Public HTTPS** | **https://slop-fawn.vercel.app** |
+| Vercel project | `slop15/slop` |
+| Cost | $0 (Hobby) |
 
 Open that URL in Safari. No localhost. Full app (watch, auth, admin, APIs).
 
-> This tunnel stays up while the Cursor cloud agent session is running. For a permanent URL that survives after the agent stops, complete the Vercel steps below.
-
-## Permanent free hosting (Vercel Hobby) — required once
-
-Do **not** rely on anonymous `*.tmp.now` deploys from a phone; they frequently return:
-
-`403 FORBIDDEN` / `This request was blocked` (Vercel edge protection on unclaimed temp URLs).
-
-### Option A — Vercel dashboard (easiest from iPhone)
-
-1. Create a free account at [https://vercel.com/signup](https://vercel.com/signup) ($0 Hobby).
-2. In Cursor, use **Create repo** so the project is on GitHub (or connect the Origin remote if you prefer CLI).
-3. In Vercel → **Add New Project** → import that Git repo.
-4. Framework preset: **Next.js**. Build: `npm run build`. Output: default.
-5. Deploy. You get `https://<name>.vercel.app` — open that in Safari.
-6. (Optional) Project → Settings → Environment Variables:
-   - `NEXT_PUBLIC_SITE_URL` = `https://<name>.vercel.app`
-   - `SLOP_ADMIN_KEY` = a long random secret (unlocks admin write APIs)
-   - Supabase / Stripe / PostHog / GA only if you use them
-
-Every push to `main` auto-redeploys.
-
-### Option B — CLI after you log in once
+## Redeploy from this agent
 
 ```bash
-npx vercel login          # approve on phone/email
-npx vercel --prod         # prints https://….vercel.app
+export PATH="$HOME/.local/bin:$PATH"
+vercel whoami          # must show your account
+vercel deploy --prod --yes
 ```
 
-### Why not Cloudflare Pages / Netlify static?
+`NEXT_PUBLIC_SITE_URL` is already set to `https://slop-fawn.vercel.app` on Production.
 
-- Needs `/api/analytics/*`, `/api/referrals`, `/api/stripe/*` (Node serverless).
-- Pure static export would break those features.
-- Netlify/Cloudflare Workers can host Next.js too, but need a free account + adapter; Vercel is the least friction for this stack.
+## Optional env (Vercel → Project → Settings → Environment Variables)
 
-## Update from iPhone (Cursor)
-
-1. Ask Cursor to change the site and commit/push to `main`.
-2. Wait for the Vercel deploy (usually under a minute).
-3. Refresh Safari on your `*.vercel.app` URL.
-
-While using only the Cloudflare tunnel (no Vercel yet): ask Cursor to apply changes here; the tunnel serves the live production server immediately after rebuild/restart.
+- `SLOP_ADMIN_KEY` — long random secret (unlocks admin write APIs)
+- Supabase / Stripe / PostHog / GA / social webhooks — only if you use them
 
 ## Production checklist
 
 - [x] `npm run build` succeeds
-- [x] Cloudflare tunnel homepage / explore / watch / drama / video / APIs return 200
-- [x] Admin write APIs lock on Vercel until `SLOP_ADMIN_KEY` is set
-- [ ] Create free Vercel account + import repo (you) → permanent `*.vercel.app`
-- [ ] Set `NEXT_PUBLIC_SITE_URL` after first permanent deploy
-- [ ] Optional: Supabase, Stripe, PostHog/GA4
+- [x] Vercel project linked (`slop15/slop`)
+- [x] Production alias live: `https://slop-fawn.vercel.app`
+- [x] Deployment Protection (SSO) disabled for public access
+- [x] `NEXT_PUBLIC_SITE_URL` set on Production
+- [ ] Optional: Supabase, Stripe, PostHog/GA4, social auto-post credentials
 
 ## Secrets — never put in frontend
 
