@@ -52,7 +52,7 @@ export function DramaDetail({ slug }: { slug: string }) {
 
   return (
     <div className="slop-cinematic min-h-[100dvh] pb-28">
-      <header className="absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 py-3">
+      <header className="slop-safe-header absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4">
         <SlopWordmark />
       </header>
 

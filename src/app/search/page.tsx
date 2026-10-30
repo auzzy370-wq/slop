@@ -44,7 +44,7 @@ function SearchInner() {
   };
 
   return (
-    <div className="slop-cinematic min-h-[100dvh] px-4 pb-28 pt-6">
+    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28">
       <div className="mx-auto max-w-2xl">
         <SlopWordmark className="mb-6" />
         <h1 className="mb-4 font-display text-3xl font-bold">Search SLOP</h1>

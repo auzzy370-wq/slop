@@ -51,7 +51,7 @@ export function HomeBrowse() {
 
   return (
     <div className="slop-cinematic min-h-[100dvh] pb-28">
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-white/5 bg-[rgba(17,17,22,0.82)] px-4 backdrop-blur-xl">
+      <header className="slop-safe-header sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-white/5 bg-[rgba(17,17,22,0.92)] px-4 backdrop-blur-xl">
         <SlopWordmark className="min-w-0" />
         <div className="flex shrink-0 items-center gap-2">
           {user?.isPremium && (

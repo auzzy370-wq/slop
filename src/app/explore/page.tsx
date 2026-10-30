@@ -37,7 +37,7 @@ function ExploreInner() {
     .sort((a, b) => a.displayOrder - b.displayOrder);
 
   return (
-    <div className="slop-cinematic min-h-[100dvh] px-4 pb-28 pt-6">
+    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28">
       <div className="mx-auto max-w-6xl animate-fade">
         <SlopWordmark className="mb-6" />
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[var(--slop-violet)]">

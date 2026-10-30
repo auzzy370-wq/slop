@@ -75,7 +75,7 @@ export default function PremiumPage() {
   };
 
   return (
-    <div className="slop-cinematic min-h-[100dvh] px-4 pb-28 pt-8">
+    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28">
       <div className="mx-auto max-w-lg animate-fade">
         <SlopWordmark className="mb-8" />
         <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--slop-violet)] text-[var(--slop-black)]">
