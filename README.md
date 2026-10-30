@@ -41,16 +41,22 @@ App: [http://localhost:3456](http://localhost:3456)
 
 ## Public deploy (iPhone / Safari)
 
-**Open this in Safari now** (Cloudflare tunnel — avoids Vercel anonymous 403):
+**https://academy-mario-doe-recipient.trycloudflare.com**
 
-****
-
-Anonymous Vercel `*.tmp.now` URLs often show `403 FORBIDDEN` / “This request was blocked” on mobile networks. Use the tunnel above for testing; for a permanent free URL, create a free [Vercel](https://vercel.com/signup) account and import this repo (details in [`docs/DEPLOY.md`](docs/DEPLOY.md)).
+Anonymous Vercel `*.tmp.now` URLs often show `403 FORBIDDEN` on mobile. Use the tunnel above for testing; for a permanent free URL, create a free [Vercel](https://vercel.com/signup) account (details in [`docs/DEPLOY.md`](docs/DEPLOY.md)).
 
 ```bash
-npm run build && npm run start          # production on :3456
-npx vercel login && npx vercel --prod   # permanent *.vercel.app after free signup
+npm run build && npm run start
+npx vercel login && npx vercel --prod
 ```
+
+## Social auto-post
+
+Publishing **episode 1 or 2** of a show triggers posts to Discord / Telegram / X / Facebook / Zapier webhook.
+
+- Admin UI: `/admin/social`
+- Docs: [`docs/SOCIAL_AUTO_POST.md`](docs/SOCIAL_AUTO_POST.md)
+- Env: see `.env.example` (`DISCORD_WEBHOOK_URL`, etc.)
 
 ## Product surfaces
 
@@ -59,7 +65,7 @@ npx vercel login && npx vercel --prod   # permanent *.vercel.app after free sign
 - **Watch** — vertical short-form episode feed with ads for free users
 - **Explore / genres / search** — discovery
 - **Premium** — Stripe-ready ad-free subscription
-- **Admin** — episode publish, categories, moderation, settings
+- **Admin** — episodes, social auto-post, analytics, moderation, settings
 
 ## Analytics & Rewards
 
