@@ -359,8 +359,11 @@ export function VideoCard({
       });
     }
   };
-  const onSubmitComment = () => {
-    const res = addComment(video.id, commentText);
+  const onSubmitComment = (opts?: {
+    parentId?: string;
+    replyToName?: string;
+  }) => {
+    const res = addComment(video.id, commentText, opts);
     if (res.needsAuth) {
       requireAuth("comment");
       return;
@@ -370,7 +373,7 @@ export function VideoCard({
       return;
     }
     setCommentText("");
-    toast.success("Comment posted");
+    toast.success(opts?.parentId ? "Reply posted" : "Comment posted");
   };
 
   const shareUrl =

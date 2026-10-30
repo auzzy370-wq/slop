@@ -105,6 +105,10 @@ export interface Comment {
   text: string;
   createdAt: string;
   moderationStatus: ModerationStatus;
+  /** Parent comment id when this is a reply */
+  parentId?: string | null;
+  /** Display name of the user being replied to */
+  replyToName?: string | null;
 }
 
 export interface Like {

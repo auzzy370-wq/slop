@@ -55,6 +55,7 @@ interface SlopState {
   addComment: (
     videoId: string,
     text: string,
+    opts?: { parentId?: string; replyToName?: string },
   ) => { ok: boolean; needsAuth?: boolean; error?: string };
   deleteComment: (commentId: string) => void;
   addReport: (input: {
@@ -219,7 +220,7 @@ export const useSlopStore = create<SlopState>()(
         return { ok: true };
       },
 
-      addComment: (videoId, text) => {
+      addComment: (videoId, text, opts) => {
         const user = get().currentUser;
         if (!user) return { ok: false, needsAuth: true };
         if (!get().settings.commentsEnabled) {
@@ -229,6 +230,15 @@ export const useSlopStore = create<SlopState>()(
         if (trimmed.length < 1 || trimmed.length > 500) {
           return { ok: false, error: "Comment must be 1–500 characters." };
         }
+        const parentId = opts?.parentId ?? null;
+        if (parentId) {
+          const parent = get().comments.find(
+            (c) => c.id === parentId && c.videoId === videoId,
+          );
+          if (!parent) {
+            return { ok: false, error: "Original comment not found." };
+          }
+        }
         const recent = get().comments.filter(
           (c) =>
             c.userId === user.id &&
@@ -237,15 +247,23 @@ export const useSlopStore = create<SlopState>()(
         if (recent.length >= 3) {
           return { ok: false, error: "Slow down — rate limit hit." };
         }
+        const replyToName = opts?.replyToName ?? null;
+        const cleaned =
+          replyToName
+            ? trimmed.replace(new RegExp(`^@${replyToName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*`), "")
+            : trimmed;
+        const body = cleaned.trim() || trimmed;
         const comment: Comment = {
           id: uid("cmt"),
           videoId,
           userId: user.id,
           displayName: user.displayName,
           avatarUrl: user.avatarUrl,
-          text: trimmed,
+          text: body,
           createdAt: new Date().toISOString(),
           moderationStatus: "visible",
+          parentId,
+          replyToName,
         };
         set({
           comments: [comment, ...get().comments],
@@ -263,11 +281,18 @@ export const useSlopStore = create<SlopState>()(
         const comment = get().comments.find((c) => c.id === commentId);
         if (!comment || !user) return;
         if (comment.userId !== user.id && user.role !== "admin") return;
+        const removeIds = new Set([commentId]);
+        for (const c of get().comments) {
+          if (c.parentId === commentId) removeIds.add(c.id);
+        }
         set({
-          comments: get().comments.filter((c) => c.id !== commentId),
+          comments: get().comments.filter((c) => !removeIds.has(c.id)),
           videos: get().videos.map((v) =>
             v.id === comment.videoId
-              ? { ...v, commentCount: Math.max(0, v.commentCount - 1) }
+              ? {
+                  ...v,
+                  commentCount: Math.max(0, v.commentCount - removeIds.size),
+                }
               : v,
           ),
         });
