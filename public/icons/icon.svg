@@ -1,16 +1,19 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <defs>
-    <linearGradient id="g" x1="48" y1="16" x2="464" y2="496" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#7A5CFF"/>
-      <stop offset="0.48" stop-color="#B99AFF"/>
-      <stop offset="1" stop-color="#E9DEFF"/>
+    <linearGradient id="g" x1="80" y1="16" x2="432" y2="496" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5B3DFF"/>
+      <stop offset="0.5" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#EDE4FF"/>
     </linearGradient>
-    <linearGradient id="s" x1="112" y1="32" x2="288" y2="240" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#fff" stop-opacity="0.35"/>
+    <linearGradient id="s" x1="112" y1="32" x2="304" y2="240" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff" stop-opacity="0.4"/>
       <stop offset="1" stop-color="#fff" stop-opacity="0"/>
     </linearGradient>
   </defs>
   <rect width="512" height="512" rx="128" fill="url(#g)"/>
   <rect width="512" height="512" rx="128" fill="url(#s)"/>
-  <path fill="#111116" d="M345.6 156.8c-17.6-28-48.8-44.8-91.2-44.8-64 0-112 39.2-112 96.8 0 43.2 23.2 70.4 78.4 89.6l52 17.6c28 9.6 40.8 20.8 40.8 40 0 24-21.6 39.2-54.4 39.2-31.2 0-55.2-12-72-35.2l-48.8 35.2c24.8 36 66.4 56 120 56 72 0 120.8-39.2 120.8-100 0-44.8-24.8-73.6-82.4-93.6l-49.6-16.8c-25.6-8.8-36.8-20-36.8-37.6 0-21.6 19.2-35.2 48-35.2 25.6 0 44.8 11.2 57.6 29.6l47.2-32.8z"/>
+  <rect x="152" y="88" width="208" height="336" rx="56" fill="#111116"/>
+  <rect x="184" y="128" width="144" height="256" rx="28" fill="#1A1528"/>
+  <rect x="184" y="128" width="144" height="80" rx="28" fill="#2A2140" opacity="0.55"/>
+  <path d="M220.8 211.2v121.6L328 272 220.8 211.2z" fill="#F3ECFF"/>
 </svg>

@@ -51,9 +51,9 @@ export function HomeBrowse() {
 
   return (
     <div className="slop-cinematic min-h-[100dvh] pb-28">
-      <header className="sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-white/5 bg-[rgba(17,17,22,0.75)] px-4 py-3 backdrop-blur-xl">
-        <SlopWordmark />
-        <div className="flex items-center gap-2">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between gap-3 border-b border-white/5 bg-[rgba(17,17,22,0.82)] px-4 backdrop-blur-xl">
+        <SlopWordmark className="min-w-0" />
+        <div className="flex shrink-0 items-center gap-2">
           {user?.isPremium && (
             <span className="hidden rounded-full border border-[var(--slop-violet)]/40 bg-[var(--slop-violet)]/15 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--slop-lavender)] sm:inline">
               Premium
@@ -61,7 +61,7 @@ export function HomeBrowse() {
           )}
           <Link
             href="/search"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 text-white/80 hover:bg-white/10"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/5 text-white/80 hover:bg-white/10"
             aria-label="Search"
           >
             <Search className="h-4 w-4" />
