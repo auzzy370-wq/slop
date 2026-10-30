@@ -2,7 +2,7 @@
 
 **Stories That Keep You Watching.**
 
-SLOP is a premium short-form drama streaming platform — cinematic AI-powered series across romance, thriller, revenge, fantasy, suspense, and drama. Built as a responsive website and PWA with a vertical episode player.
+SLOP is a premium short-form drama streaming platform — **30 cinematic AI-powered series** (190 episodes) across romance, thriller, revenge, fantasy, suspense, and drama. Built as a responsive website and PWA with a vertical episode player.
 
 ## Brand
 

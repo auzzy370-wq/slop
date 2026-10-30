@@ -50,36 +50,46 @@ def sync_bfw() -> None:
 
 
 def sync_originals() -> None:
-    series_ids = [
-        "blood-contract",
-        "crown-of-ash",
-        "apartment-7",
-        "draft-saved",
-        "neon-vow",
-    ]
-    all_durs: dict[str, dict[int, int]] = {s: {} for s in series_ids}
-    for sid in series_ids:
-        for p in VID.glob(f"{sid}-ep*.mp4"):
-            n = int(p.stem.split("-ep")[-1])
-            all_durs[sid][n] = round(probe(p))
+    # Discover series ids from video filenames (skip forgotten-wife)
+    all_durs: dict[str, dict[int, int]] = {}
+    for p in VID.glob("*-ep*.mp4"):
+        stem = p.stem
+        if stem.startswith("forgotten-wife"):
+            continue
+        if "-ep" not in stem:
+            continue
+        sid, _, num = stem.rpartition("-ep")
+        try:
+            n = int(num)
+        except ValueError:
+            continue
+        all_durs.setdefault(sid, {})[n] = round(probe(p))
     path = pathlib.Path("/workspace/src/lib/series/originals/catalog.ts")
     text = path.read_text()
-    lines = ["export const ORIGINAL_RENDERED_DURATIONS: Record<string, Record<number, number>> = {\n"]
-    for sid in series_ids:
+    # Prefer rewriting the Object.fromEntries initializer to a concrete map
+    lines = [
+        "export const ORIGINAL_RENDERED_DURATIONS: Record<\n",
+        "  string,\n",
+        "  Record<number, number>\n",
+        "> = {\n",
+    ]
+    for sid in sorted(all_durs):
         lines.append(f'  "{sid}": {{\n')
         for n in sorted(all_durs[sid]):
             lines.append(f"    {n}: {all_durs[sid][n]},\n")
         lines.append("  },\n")
     lines.append("};\n")
     block = "".join(lines)
-    text2 = re.sub(
-        r"export const ORIGINAL_RENDERED_DURATIONS: Record<string, Record<number, number>> =\s*\{[\s\S]*?\};",
-        block.rstrip() + ";",
+    text2, n = re.subn(
+        r"export const ORIGINAL_RENDERED_DURATIONS:[\s\S]*?= \{[\s\S]*?\n\};",
+        block.rstrip(),
         text,
         count=1,
     )
-    path.write_text(text2)
-    print("originals", {k: len(v) for k, v in all_durs.items()})
+    if n != 1:
+        raise SystemExit(f"failed to rewrite ORIGINAL_RENDERED_DURATIONS (n={n})")
+    path.write_text(text2 + ("\n" if not text2.endswith("\n") else ""))
+    print("originals", {k: len(v) for k, v in all_durs.items()}, "series", len(all_durs))
 
 
 if __name__ == "__main__":

@@ -48,12 +48,7 @@ function ep(
   };
 }
 
-export type OriginalSeriesId =
-  | "blood-contract"
-  | "crown-of-ash"
-  | "apartment-7"
-  | "draft-saved"
-  | "neon-vow";
+export type OriginalSeriesId = string;
 
 export interface OriginalSeriesDef {
   id: OriginalSeriesId;
