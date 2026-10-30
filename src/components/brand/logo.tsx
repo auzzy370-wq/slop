@@ -59,8 +59,8 @@ export function SlopMark({ className }: { className?: string }) {
         stroke="rgba(185,154,255,0.28)"
         strokeWidth="1.5"
       />
-      {/* Center of tile is (32, 32) */}
-      <path d={S_PATH} fill={`url(#${letter})`} transform="translate(32 32)" />
+      {/* Optical center — S sits slightly high of geometric mid */}
+      <path d={S_PATH} fill={`url(#${letter})`} transform="translate(32 30.8)" />
     </svg>
   );
 }
@@ -101,7 +101,7 @@ export function SlopMarkMini({ className }: { className?: string }) {
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="16" fill={`url(#${bg})`} />
-      <path d={S_PATH} fill={`url(#${letter})`} transform="translate(32 32)" />
+      <path d={S_PATH} fill={`url(#${letter})`} transform="translate(32 30.8)" />
     </svg>
   );
 }
