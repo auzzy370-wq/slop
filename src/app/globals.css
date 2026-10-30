@@ -51,27 +51,25 @@ a {
   display: none;
 }
 
-/* TikTok-style vertical episode pager
-   --slop-feed-page is set in JS from the visual viewport so iOS
-   URL-bar / Dynamic Island never leave a black gap or mid-card settle. */
+/* TikTok-style vertical episode pager (transform track, not native scroll).
+   --slop-feed-page is set in JS from the visual viewport. */
 .slop-feed-scroller {
   position: fixed;
   inset: 0;
   width: 100%;
   height: 100%;
-  overflow-x: hidden;
-  overflow-y: auto;
-  overscroll-behavior-y: none;
-  -webkit-overflow-scrolling: touch;
-  scroll-snap-type: y mandatory;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
+  overflow: hidden;
+  overscroll-behavior: none;
   background: #000;
   touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
-.slop-feed-scroller::-webkit-scrollbar {
-  display: none;
+.slop-feed-track {
+  width: 100%;
+  will-change: transform;
+  backface-visibility: hidden;
 }
 
 .slop-feed-slide {
@@ -81,9 +79,6 @@ a {
   height: var(--slop-feed-page, 100%);
   min-height: var(--slop-feed-page, 100%);
   max-height: var(--slop-feed-page, 100%);
-  flex-shrink: 0;
-  scroll-snap-align: start;
-  scroll-snap-stop: always;
   overflow: hidden;
   background: #000;
 }

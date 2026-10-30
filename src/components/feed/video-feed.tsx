@@ -12,6 +12,10 @@ type FeedItem =
   | { kind: "video"; videoId: string }
   | { kind: "ad"; key: string };
 
+const SWIPE_DISTANCE = 56;
+const SWIPE_VELOCITY = 0.45; // px/ms
+const MAX_RUBBER = 72;
+
 export function VideoFeed({
   section = "for-you",
   categoryId,
@@ -34,9 +38,24 @@ export function VideoFeed({
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const settlingRef = useRef(false);
-  const scrollEndTimer = useRef<number | null>(null);
+  const [pageH, setPageH] = useState(0);
+
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const trackRef = useRef<HTMLDivElement>(null);
+  const indexRef = useRef(0);
+  const pageHRef = useRef(0);
+  const dragRef = useRef<{
+    pointerId: number;
+    startX: number;
+    startY: number;
+    startT: number;
+    lastY: number;
+    lastT: number;
+    dragging: boolean;
+    axis: "undecided" | "y" | "x";
+  } | null>(null);
+  const animatingRef = useRef(false);
+  const wheelLockRef = useRef(0);
 
   const savedIds = useMemo(
     () =>
@@ -75,132 +94,179 @@ export function VideoFeed({
     return out;
   }, [feedVideos, showAds, settings.adPlacementEvery]);
 
-  const syncPageSize = useCallback(() => {
-    const root = scrollerRef.current;
-    if (!root) return 1;
-    // Prefer visualViewport — matches what the user actually sees on iOS.
+  const itemsLenRef = useRef(items.length);
+  itemsLenRef.current = items.length;
+
+  const measure = useCallback(() => {
     const h = Math.round(
-      window.visualViewport?.height || root.clientHeight || window.innerHeight || 1,
+      window.visualViewport?.height ||
+        viewportRef.current?.clientHeight ||
+        window.innerHeight ||
+        1,
     );
-    root.style.setProperty("--slop-feed-page", `${h}px`);
-    // Keep the fixed scroller locked to the visual viewport height too.
-    root.style.height = `${h}px`;
+    pageHRef.current = h;
+    setPageH(h);
+    if (viewportRef.current) {
+      viewportRef.current.style.setProperty("--slop-feed-page", `${h}px`);
+      viewportRef.current.style.height = `${h}px`;
+    }
     return h;
   }, []);
 
-  const pageHeight = useCallback(() => {
-    const root = scrollerRef.current;
-    if (!root) return window.innerHeight || 1;
-    const raw = getComputedStyle(root).getPropertyValue("--slop-feed-page").trim();
-    const parsed = Number.parseFloat(raw);
-    if (Number.isFinite(parsed) && parsed > 0) return parsed;
-    return syncPageSize();
-  }, [syncPageSize]);
+  const applyTransform = useCallback((y: number, animate: boolean) => {
+    const track = trackRef.current;
+    if (!track) return;
+    track.style.transition = animate
+      ? "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)"
+      : "none";
+    track.style.transform = `translate3d(0, ${y}px, 0)`;
+  }, []);
 
-  const snapToIndex = useCallback(
-    (idx: number, behavior: ScrollBehavior = "smooth") => {
-      const root = scrollerRef.current;
-      if (!root) return;
-      const h = syncPageSize();
-      const clamped = Math.max(0, Math.min(items.length - 1, idx));
-      const top = clamped * h;
-      settlingRef.current = true;
-      root.scrollTo({ top, behavior });
+  const goTo = useCallback(
+    (idx: number, animate = true) => {
+      const h = pageHRef.current || measure();
+      const clamped = Math.max(0, Math.min(itemsLenRef.current - 1, idx));
+      indexRef.current = clamped;
       setActiveIndex(clamped);
-      window.setTimeout(
-        () => {
-          settlingRef.current = false;
-        },
-        behavior === "smooth" ? 280 : 40,
-      );
+      animatingRef.current = animate;
+      applyTransform(-clamped * h, animate);
+      if (animate) {
+        window.setTimeout(() => {
+          animatingRef.current = false;
+        }, 300);
+      }
     },
-    [items.length, syncPageSize],
+    [applyTransform, measure],
   );
 
-  const nearestIndex = useCallback(() => {
-    const root = scrollerRef.current;
-    if (!root) return 0;
-    const h = pageHeight();
-    return Math.max(
-      0,
-      Math.min(items.length - 1, Math.round(root.scrollTop / h)),
-    );
-  }, [items.length, pageHeight]);
-
-  /** Force settle onto a full slide — CSS snap alone can stall mid-card on iOS. */
-  const settleSnap = useCallback(() => {
-    if (settlingRef.current) return;
-    const root = scrollerRef.current;
-    if (!root) return;
-    const h = pageHeight();
-    const idx = nearestIndex();
-    const target = idx * h;
-    if (Math.abs(root.scrollTop - target) > 1.5) {
-      snapToIndex(idx, "smooth");
-    } else if (idx !== activeIndex) {
-      setActiveIndex(idx);
-    }
-  }, [activeIndex, nearestIndex, pageHeight, snapToIndex]);
-
+  // Initial measure + start episode
   useEffect(() => {
-    syncPageSize();
-    if (!startVideoId || !scrollerRef.current || items.length === 0) return;
-    const idx = items.findIndex(
-      (item) => item.kind === "video" && item.videoId === startVideoId,
-    );
-    if (idx >= 0) {
-      requestAnimationFrame(() => snapToIndex(idx, "instant" as ScrollBehavior));
-    }
-  }, [startVideoId, items, snapToIndex, syncPageSize]);
-
-  useEffect(() => {
-    const root = scrollerRef.current;
-    if (!root) return;
-
-    syncPageSize();
-
-    const onScroll = () => {
-      if (settlingRef.current) return;
-      const idx = nearestIndex();
-      if (idx !== activeIndex) setActiveIndex(idx);
-      if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
-      scrollEndTimer.current = window.setTimeout(settleSnap, 90);
-    };
-
-    const onScrollEnd = () => settleSnap();
-
-    const onResize = () => {
-      const idx = nearestIndex();
-      syncPageSize();
-      // Re-lock to the same episode after URL-bar / rotate resize.
-      requestAnimationFrame(() =>
-        snapToIndex(idx, "instant" as ScrollBehavior),
+    if (!hydrated) return;
+    measure();
+    let start = 0;
+    if (startVideoId) {
+      const idx = items.findIndex(
+        (item) => item.kind === "video" && item.videoId === startVideoId,
       );
-    };
+      if (idx >= 0) start = idx;
+    }
+    indexRef.current = start;
+    setActiveIndex(start);
+    requestAnimationFrame(() => goTo(start, false));
+  }, [hydrated, items, startVideoId, goTo, measure]);
 
-    root.addEventListener("scroll", onScroll, { passive: true });
-    root.addEventListener("scrollend", onScrollEnd);
+  // Resize keeps the current page locked
+  useEffect(() => {
+    if (!hydrated) return;
+    const onResize = () => {
+      measure();
+      goTo(indexRef.current, false);
+    };
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
-    window.visualViewport?.addEventListener("scroll", onResize);
-
     return () => {
-      root.removeEventListener("scroll", onScroll);
-      root.removeEventListener("scrollend", onScrollEnd);
       window.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
-      window.visualViewport?.removeEventListener("scroll", onResize);
-      if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
     };
-  }, [
-    activeIndex,
-    items.length,
-    nearestIndex,
-    settleSnap,
-    snapToIndex,
-    syncPageSize,
-    hydrated,
-  ]);
+  }, [hydrated, goTo, measure]);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (e.pointerType === "mouse" && e.button !== 0) return;
+    if (animatingRef.current) return;
+    // Don't hijack scrubber / buttons / links.
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, a, input, textarea, [role='slider'], [data-no-swipe]")) {
+      return;
+    }
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startT: e.timeStamp,
+      lastY: e.clientY,
+      lastT: e.timeStamp,
+      dragging: false,
+      axis: "undecided",
+    };
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+
+    const dy = e.clientY - drag.startY;
+    const dx = e.clientX - drag.startX;
+
+    if (drag.axis === "undecided") {
+      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
+      // Vertical wins ties — this is a vertical pager.
+      drag.axis = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
+      if (drag.axis === "x") {
+        dragRef.current = null;
+        return;
+      }
+      drag.dragging = true;
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        /* ignore */
+      }
+    }
+
+    if (!drag.dragging) return;
+    e.preventDefault();
+
+    drag.lastY = e.clientY;
+    drag.lastT = e.timeStamp;
+
+    const h = pageHRef.current || measure();
+    const base = -indexRef.current * h;
+    let offset = dy;
+    // Rubber-band at ends
+    if (
+      (indexRef.current === 0 && dy > 0) ||
+      (indexRef.current >= itemsLenRef.current - 1 && dy < 0)
+    ) {
+      offset = Math.sign(dy) * Math.min(Math.abs(dy) * 0.35, MAX_RUBBER);
+    }
+    applyTransform(base + offset, false);
+  };
+
+  const finishDrag = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
+    dragRef.current = null;
+
+    if (!drag.dragging) return;
+
+    const dy = e.clientY - drag.startY;
+    const dt = Math.max(16, e.timeStamp - drag.startT);
+    const instantDt = Math.max(16, e.timeStamp - drag.lastT);
+    const instantDy = e.clientY - drag.lastY;
+    const velocity = instantDy / instantDt; // px/ms, negative = swipe up = next
+
+    let next = indexRef.current;
+    const goNext =
+      dy < -SWIPE_DISTANCE || velocity < -SWIPE_VELOCITY;
+    const goPrev =
+      dy > SWIPE_DISTANCE || velocity > SWIPE_VELOCITY;
+
+    if (goNext) next = indexRef.current + 1;
+    else if (goPrev) next = indexRef.current - 1;
+
+    goTo(next, true);
+  };
+
+  const onWheel = (e: React.WheelEvent) => {
+    // Desktop / trackpad paging
+    if (Math.abs(e.deltaY) < 8) return;
+    e.preventDefault();
+    const now = Date.now();
+    if (now - wheelLockRef.current < 420 || animatingRef.current) return;
+    wheelLockRef.current = now;
+    if (e.deltaY > 0) goTo(indexRef.current + 1, true);
+    else goTo(indexRef.current - 1, true);
+  };
 
   if (!hydrated) {
     return (
@@ -231,49 +297,62 @@ export function VideoFeed({
 
   return (
     <div
-      ref={scrollerRef}
+      ref={viewportRef}
       className="slop-feed-scroller"
       aria-label="Episode feed"
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+      onWheel={onWheel}
     >
-      {items.map((item, index) => {
-        const near = Math.abs(index - activeIndex) <= 1;
-        if (item.kind === "ad") {
+      <div
+        ref={trackRef}
+        className="slop-feed-track"
+        style={{
+          height: pageH ? pageH * items.length : undefined,
+        }}
+      >
+        {items.map((item, index) => {
+          const near = Math.abs(index - activeIndex) <= 1;
+          if (item.kind === "ad") {
+            return (
+              <section
+                key={item.key}
+                className="slop-feed-slide"
+                data-index={index}
+              >
+                <AdSlot index={index} />
+              </section>
+            );
+          }
+          const video = feedVideos.find((v) => v.id === item.videoId)!;
           return (
             <section
-              key={item.key}
+              key={video.id}
               className="slop-feed-slide"
               data-index={index}
             >
-              <AdSlot index={index} />
+              {near ? (
+                <VideoCard
+                  video={video}
+                  active={index === activeIndex}
+                  muted={muted}
+                  onToggleMute={() => setMuted((m) => !m)}
+                  categoryNames={video.categoryIds
+                    .map((id) => categoryNameMap[id])
+                    .filter(Boolean)}
+                />
+              ) : (
+                <div
+                  className="h-full w-full bg-cover bg-center"
+                  style={{ backgroundImage: `url(${video.thumbnailUrl})` }}
+                />
+              )}
             </section>
           );
-        }
-        const video = feedVideos.find((v) => v.id === item.videoId)!;
-        return (
-          <section
-            key={video.id}
-            className="slop-feed-slide"
-            data-index={index}
-          >
-            {near ? (
-              <VideoCard
-                video={video}
-                active={index === activeIndex}
-                muted={muted}
-                onToggleMute={() => setMuted((m) => !m)}
-                categoryNames={video.categoryIds
-                  .map((id) => categoryNameMap[id])
-                  .filter(Boolean)}
-              />
-            ) : (
-              <div
-                className="h-full w-full bg-cover bg-center"
-                style={{ backgroundImage: `url(${video.thumbnailUrl})` }}
-              />
-            )}
-          </section>
-        );
-      })}
+        })}
+      </div>
     </div>
   );
 }

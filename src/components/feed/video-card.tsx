@@ -603,8 +603,8 @@ export function VideoCard({
 
       {/* Instagram Reels–style right action rail */}
       <div
-        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-6 ${
-          chromeVisible ? "bottom-[7.5rem]" : "bottom-[3.75rem]"
+        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-4.5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-5 ${
+          chromeVisible ? "bottom-[5.75rem]" : "bottom-[3.25rem]"
         }`}
       >
         <RailButton
@@ -731,6 +731,7 @@ export function VideoCard({
             aria-valuenow={Math.round(progress * 100)}
             tabIndex={0}
             className="relative flex h-9 cursor-pointer touch-none items-center"
+            data-no-swipe
             onPointerDown={onScrubPointerDown}
             onPointerMove={onScrubPointerMove}
             onPointerUp={onScrubPointerUp}
