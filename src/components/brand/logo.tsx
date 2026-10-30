@@ -142,7 +142,7 @@ export function SlopWordmark({
           )}
         />
       ) : null}
-      <SlopLetters className="h-[21px] translate-y-[0.5px] text-white" />
+      <SlopLetters className="h-[22px] text-white" />
       <span className="sr-only">SLOP — Stories That Keep You Watching</span>
     </Link>
   );
