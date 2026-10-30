@@ -31,9 +31,30 @@ export const FORGOTTEN_WIFE_DRAMA: Drama = {
   publishedAt: "2026-10-30T19:00:00.000Z",
 };
 
+/**
+ * Episodes with real generated MP4s under /public/videos.
+ * Durations from ffprobe after render — extend as more eps are generated.
+ */
+const RENDERED_DURATIONS: Record<number, number> = {
+  1: 96,
+  2: 45,
+  3: 44,
+  4: 36,
+  5: 39,
+  6: 32,
+  7: 30,
+  8: 28,
+  9: 25,
+  10: 30,
+  11: 29,
+  12: 29,
+};
+
 function epMeta(n: number) {
   const script = FORGOTTEN_WIFE_SCRIPTS[n - 1]!;
   const pad = String(n).padStart(2, "0");
+  const renderedSec = RENDERED_DURATIONS[n];
+  const rendered = typeof renderedSec === "number";
   return {
     id: `ep_bfw_${pad}`,
     slug: `forgotten-wife-ep-${pad}`,
@@ -44,21 +65,30 @@ function epMeta(n: number) {
       script.hook === script.cliffhanger
         ? script.hook
         : `${script.hook} ${script.cliffhanger}`,
-    videoUrl: "",
-    thumbnailUrl: "/thumbnails/forgotten-wife-ep1.jpg",
-    durationSeconds: scriptDurationSec(script),
+    videoUrl: rendered ? `/videos/forgotten-wife-ep${n}.mp4` : "",
+    thumbnailUrl: rendered
+      ? `/thumbnails/forgotten-wife-ep${n}.jpg`
+      : "/thumbnails/forgotten-wife-ep1.jpg",
+    durationSeconds: rendered ? renderedSec : scriptDurationSec(script),
     categoryIds: ["gen_romance", "gen_revenge", "gen_suspense"],
-    tags: ["SLOP original", "scripted", "subtitles", `episode ${n}`],
+    tags: [
+      "SLOP original",
+      rendered ? "generated video" : "scripted",
+      "subtitles",
+      `episode ${n}`,
+    ],
     status: "published" as const,
     featured: n <= 2,
     pinned: n === 1,
     sourceAttribution: "The Billionaire's Forgotten Wife",
-    licensingNotes: "SLOP Original — scripted subtitled drama.",
+    licensingNotes: rendered
+      ? "SLOP Original — generated cinematic episode (AI stills + voice + subtitles)."
+      : "SLOP Original — scripted subtitled drama (video render pending).",
     createdAt: "2026-10-30T18:00:00.000Z",
     publishedAt: new Date(
       Date.parse("2026-10-30T19:00:00.000Z") + (n - 1) * 60_000,
     ).toISOString(),
-    playback: "scripted" as const,
+    playback: (rendered ? "video" : "scripted") as "video" | "scripted",
     scriptSeriesId: "forgotten-wife",
   };
 }

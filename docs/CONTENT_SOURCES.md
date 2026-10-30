@@ -4,7 +4,7 @@ Full-episode dramas currently on the shelf:
 
 | Drama | Episodes | Runtime | Source |
 | --- | --- | --- | --- |
-| **The Billionaire's Forgotten Wife** | 60 | ~45–90s each | **SLOP Original** — scripted cinematic episodes with burned-in style subtitles (betrayal / revenge / billionaire romance bible) |
+| **The Billionaire's Forgotten Wife** | 60 | ~36–96s each | **SLOP Original** — generated vertical episodes (AI scene stills + neural TTS voices + burned-in subtitles). Eps 1–5 rendered as MP4; remaining eps play as scripted until rendered |
 | **The Second Key** | 4 | ~5.2 min total (~78s each) | Hugging Face `tungmtp/ai-drama-production-harness-demo-media` full vertical AI film, split into episodes |
 | **EXECUTE** | 3 | ~10 min total (~3.3 min each) | Wikimedia Commons [EXECUTE — dark Sci-Fi AI-short film](https://commons.wikimedia.org/wiki/File:EXECUTE_--_dark_Sci-Fi_AI-short_film.webm) (CC BY 3.0) |
 | **The Unsent Message** | 2 | ~1.5 min total | Hugging Face landscape AI drama harness demo film |
