@@ -24,6 +24,7 @@ export default function PremiumPage() {
   const startCheckout = async () => {
     if (!user) {
       toast.message("Sign in first", {
+        position: "bottom-center",
         action: {
           label: "Sign in",
           onClick: () => {
