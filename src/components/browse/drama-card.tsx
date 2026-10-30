@@ -2,24 +2,30 @@
 
 import Link from "next/link";
 import type { Drama } from "@/lib/types";
-import { formatCount } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 
 export function DramaCard({
   drama,
   size = "md",
 }: {
   drama: Drama;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "fluid";
 }) {
   const width =
-    size === "lg" ? "w-44 sm:w-52" : size === "sm" ? "w-28 sm:w-32" : "w-36 sm:w-40";
+    size === "fluid"
+      ? "w-full"
+      : size === "lg"
+        ? "w-44 sm:w-52"
+        : size === "sm"
+          ? "w-28 sm:w-32"
+          : "w-36 sm:w-40";
 
   return (
     <Link
       href={`/drama/${drama.slug}`}
-      className={`${width} shrink-0 snap-start group`}
+      className={cn(width, "shrink-0 snap-start group")}
     >
-      <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-[var(--slop-panel)] transition duration-300 group-hover:border-[var(--slop-violet)]/50 group-hover:shadow-[0_12px_40px_rgba(185,154,255,0.15)]">
+      <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-[var(--slop-panel)] transition duration-300 group-hover:border-[var(--slop-violet)]/50">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={drama.posterUrl}
@@ -37,11 +43,6 @@ export function DramaCard({
               : ""}
           </p>
         </div>
-        {drama.trendingRank && drama.trendingRank <= 3 && (
-          <span className="absolute left-2 top-2 rounded-md bg-[var(--slop-violet)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--slop-black)]">
-            #{drama.trendingRank}
-          </span>
-        )}
       </div>
     </Link>
   );

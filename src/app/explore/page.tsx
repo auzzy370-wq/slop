@@ -5,6 +5,11 @@ import { Suspense, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { SlopWordmark } from "@/components/brand/logo";
 import { DramaCard } from "@/components/browse/drama-card";
+import {
+  GenreTile,
+  genreCount,
+  genreCover,
+} from "@/components/browse/genre-tile";
 import { useSlopStore } from "@/store/slop-store";
 
 function ExploreInner() {
@@ -27,6 +32,10 @@ function ExploreInner() {
     );
   }, [dramas, sort]);
 
+  const activeCats = categories
+    .filter((c) => c.active)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
+
   return (
     <div className="slop-cinematic min-h-[100dvh] px-4 pb-28 pt-6">
       <div className="mx-auto max-w-6xl animate-fade">
@@ -43,36 +52,24 @@ function ExploreInner() {
         </p>
 
         <section className="mb-10">
-          <h2 className="mb-4 text-sm font-semibold uppercase tracking-wider text-[var(--slop-slate)]">
-            Genres
-          </h2>
+          <h2 className="mb-4 font-display text-xl font-bold">Genres</h2>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {categories
-              .filter((c) => c.active)
-              .sort((a, b) => a.displayOrder - b.displayOrder)
-              .map((cat) => (
-                <Link
-                  key={cat.id}
-                  href={`/categories/${cat.slug}`}
-                  className="group rounded-2xl border border-white/10 bg-[var(--slop-panel)] p-4 transition hover:border-[var(--slop-violet)]/40 hover:bg-[var(--slop-panel-elevated)]"
-                >
-                  <span className="mb-3 block text-[var(--slop-violet)]">
-                    {cat.icon}
-                  </span>
-                  <p className="font-semibold text-white group-hover:text-[var(--slop-lavender)]">
-                    {cat.name}
-                  </p>
-                  <p className="mt-1 line-clamp-2 text-xs text-[var(--slop-slate)]">
-                    {cat.description}
-                  </p>
-                </Link>
-              ))}
+            {activeCats.map((cat) => (
+              <GenreTile
+                key={cat.id}
+                category={cat}
+                coverUrl={genreCover(cat.id, published)}
+                count={genreCount(cat.id, dramas)}
+                size="lg"
+                className="w-full min-h-[7rem]"
+              />
+            ))}
           </div>
         </section>
 
         <section>
           <div className="mb-4 flex items-end justify-between gap-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-[var(--slop-slate)]">
+            <h2 className="font-display text-xl font-bold">
               {sort === "newest" ? "Recently added" : "Trending now"}
             </h2>
             <div className="flex gap-2 text-sm">
@@ -101,9 +98,7 @@ function ExploreInner() {
           </div>
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
             {published.map((drama) => (
-              <div key={drama.id} className="flex justify-center">
-                <DramaCard drama={drama} size="lg" />
-              </div>
+              <DramaCard key={drama.id} drama={drama} size="fluid" />
             ))}
           </div>
         </section>

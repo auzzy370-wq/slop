@@ -4,6 +4,11 @@ import Link from "next/link";
 import { ArrowUpRight, Play, Search } from "lucide-react";
 import { SlopWordmark } from "@/components/brand/logo";
 import { DramaCard } from "@/components/browse/drama-card";
+import {
+  GenreTile,
+  genreCount,
+  genreCover,
+} from "@/components/browse/genre-tile";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
 import type { Drama } from "@/lib/types";
@@ -123,19 +128,17 @@ export function HomeBrowse() {
               See all
             </Link>
           </div>
-          <div className="row-scroll">
+          <div className="row-scroll gap-3">
             {categories
               .filter((c) => c.active)
               .sort((a, b) => a.displayOrder - b.displayOrder)
               .map((cat) => (
-                <Link
+                <GenreTile
                   key={cat.id}
-                  href={`/categories/${cat.slug}`}
-                  className="shrink-0 rounded-2xl border border-white/10 bg-[var(--slop-panel)] px-4 py-3 transition hover:border-[var(--slop-violet)]/40 hover:bg-[var(--slop-panel-elevated)]"
-                >
-                  <span className="text-[var(--slop-violet)]">{cat.icon}</span>
-                  <p className="mt-1 text-sm font-semibold">{cat.name}</p>
-                </Link>
+                  category={cat}
+                  coverUrl={genreCover(cat.id, published)}
+                  count={genreCount(cat.id, published)}
+                />
               ))}
           </div>
         </section>
