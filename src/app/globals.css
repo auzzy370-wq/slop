@@ -121,36 +121,20 @@ a {
   font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Watch player — cinematic frame, not TikTok chrome */
+/* Watch player — TikTok rail + cinematic drama accents */
 .slop-player-vignette {
   background:
-    linear-gradient(180deg, rgba(17, 17, 22, 0.78) 0%, transparent 20%),
-    linear-gradient(0deg, rgba(17, 17, 22, 0.96) 0%, rgba(17, 17, 22, 0.62) 26%, transparent 50%),
-    radial-gradient(110% 55% at 50% 100%, rgba(185, 154, 255, 0.14), transparent 58%);
+    linear-gradient(180deg, rgba(17, 17, 22, 0.55) 0%, transparent 18%),
+    linear-gradient(0deg, rgba(17, 17, 22, 0.92) 0%, rgba(17, 17, 22, 0.45) 24%, transparent 48%),
+    radial-gradient(100% 50% at 50% 100%, rgba(185, 154, 255, 0.1), transparent 55%);
 }
 
 .slop-player-grain {
-  opacity: 0.055;
+  opacity: 0.04;
   mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 180px 180px;
-  animation: slop-grain 0.45s steps(2) infinite;
-}
-
-.slop-player-scanline {
-  background: linear-gradient(90deg, transparent, rgba(233, 222, 255, 0.55), transparent);
-  opacity: 0.55;
-}
-
-.slop-player-rail {
-  background: linear-gradient(
-    180deg,
-    transparent 8%,
-    rgba(185, 154, 255, 0.55) 22%,
-    rgba(233, 222, 255, 0.85) 50%,
-    rgba(185, 154, 255, 0.55) 78%,
-    transparent 92%
-  );
+  animation: slop-grain 0.5s steps(2) infinite;
 }
 
 .slop-live-pip {
@@ -163,25 +147,22 @@ a {
 }
 
 .slop-ep-chip {
-  display: flex;
-  align-items: baseline;
-  gap: 0.45rem;
-  border: 1px solid rgba(233, 222, 255, 0.18);
-  background: rgba(17, 17, 22, 0.55);
-  backdrop-filter: blur(12px);
-  clip-path: polygon(0 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(17, 17, 22, 0.45);
+  backdrop-filter: blur(10px);
+  border-radius: 999px;
 }
 
 .slop-meta-slash {
   display: inline-block;
-  width: 14px;
+  width: 12px;
   height: 2px;
   background: var(--slop-violet);
   transform: skewX(-28deg);
 }
 
 .slop-player-meta {
-  animation: slop-up 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: slop-up 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .slop-player-ep-ghost {
@@ -190,9 +171,29 @@ a {
   letter-spacing: -0.07em;
   line-height: 0.75;
   color: transparent;
-  -webkit-text-stroke: 1px rgba(233, 222, 255, 0.18);
+  -webkit-text-stroke: 1px rgba(233, 222, 255, 0.14);
   user-select: none;
   pointer-events: none;
+}
+
+.slop-rail-orb {
+  border-radius: 999px;
+  background: rgba(17, 17, 22, 0.42);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.slop-rail-btn:active .slop-rail-orb,
+.slop-rail-btn:hover .slop-rail-orb {
+  transform: scale(1.06);
+  border-color: rgba(185, 154, 255, 0.45);
+}
+
+.slop-rail-orb.is-active {
+  border-color: rgba(185, 154, 255, 0.55);
+  background: rgba(185, 154, 255, 0.16);
 }
 
 .slop-scrub-track {
@@ -200,100 +201,61 @@ a {
   background:
     repeating-linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.16) 0 1.5px,
+      rgba(255, 255, 255, 0.14) 0 1.5px,
       transparent 1.5px 9px
     ),
-    rgba(255, 255, 255, 0.1);
-  border-radius: 0;
+    rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
   overflow: visible;
   transition: height 160ms ease;
 }
 
-.slop-scrub-track.is-scrubbing {
-  height: 6px;
+.slop-scrub-track.is-scrubbing,
+.slop-scrubbing .slop-scrub-track {
+  height: 5px;
 }
 
 .slop-scrub-fill {
   height: 100%;
+  border-radius: inherit;
   background: linear-gradient(90deg, #8f74d4 0%, #b99aff 55%, #e9deff 100%);
-  box-shadow: 0 0 14px rgba(185, 154, 255, 0.4);
 }
 
 .slop-scrub-thumb {
-  width: 11px;
-  height: 11px;
-  background: #e9deff;
-  transform: translate(-50%, -50%) rotate(45deg);
-  box-shadow: 0 0 0 3px rgba(17, 17, 22, 0.9);
-  transition: width 140ms ease, height 140ms ease, background 140ms ease;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 0 0 3px rgba(17, 17, 22, 0.75);
+  transition: width 140ms ease, height 140ms ease;
 }
 
 .slop-scrub-thumb.is-active {
-  width: 15px;
-  height: 15px;
-  background: #fff;
-}
-
-.slop-scrubbing .slop-scrub-track {
-  height: 6px;
-}
-
-.slop-action-dock {
-  backdrop-filter: blur(16px);
-  background: rgba(17, 17, 22, 0.62);
-  border: 1px solid rgba(233, 222, 255, 0.14);
-  clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 10px, 100% 100%, 10px 100%, 0 calc(100% - 10px));
-}
-
-.slop-dock-btn {
-  position: relative;
-}
-
-.slop-dock-btn::after {
-  content: "";
-  position: absolute;
-  inset: 6px 4px;
-  border: 1px solid transparent;
-  transition: border-color 160ms ease, background 160ms ease;
-}
-
-.slop-dock-btn:hover::after,
-.slop-dock-btn.is-active::after {
-  border-color: rgba(185, 154, 255, 0.35);
-  background: rgba(185, 154, 255, 0.08);
-}
-
-.slop-dock-divider {
-  width: 1px;
-  height: 18px;
-  margin: 0 2px;
-  background: rgba(255, 255, 255, 0.12);
+  width: 16px;
+  height: 16px;
 }
 
 .slop-loader {
   width: 28px;
   height: 28px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
   border-top-color: var(--slop-violet);
-  transform: rotate(45deg);
-  animation: slop-spin-diamond 0.85s linear infinite;
+  animation: slop-spin-diamond 0.75s linear infinite;
 }
 
-.slop-pause-mark {
-  background: rgba(17, 17, 22, 0.55);
-  backdrop-filter: blur(12px);
-  border: 1px solid rgba(185, 154, 255, 0.45);
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  animation: slop-pause-in 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+.slop-pause-ring {
+  animation: slop-pause-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.slop-pause-mark::before {
+.slop-pause-ring::before {
   content: "";
   position: absolute;
-  inset: -12px;
-  border: 1px solid rgba(185, 154, 255, 0.35);
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
-  animation: slop-diamond-pulse 1.5s ease-out infinite;
+  inset: -10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  animation: slop-pulse-ring 1.4s ease-out infinite;
 }
 
 @keyframes slop-grain {
@@ -320,14 +282,14 @@ a {
 
 @keyframes slop-spin-diamond {
   to {
-    transform: rotate(405deg);
+    transform: rotate(360deg);
   }
 }
 
 @keyframes slop-pause-in {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) scale(0.82);
+    transform: translate(-50%, -50%) scale(0.86);
   }
   to {
     opacity: 1;
@@ -335,10 +297,10 @@ a {
   }
 }
 
-@keyframes slop-diamond-pulse {
+@keyframes slop-pulse-ring {
   0% {
     transform: scale(0.92);
-    opacity: 0.6;
+    opacity: 0.55;
   }
   70% {
     transform: scale(1.18);
