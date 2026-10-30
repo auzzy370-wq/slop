@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useSlopStore } from "@/store/slop-store";
 import type { PublicationStatus, Video } from "@/lib/types";
+import { triggerEpisodeAutoPost } from "@/lib/social/client";
 import { slugify, uid } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -22,6 +23,7 @@ const emptyForm = {
   featured: false,
   sourceAttribution: "SLOP Original",
   licensingNotes: "",
+  autoPostSocial: true,
 };
 
 export default function AdminVideosPage() {
@@ -33,7 +35,7 @@ export default function AdminVideosPage() {
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const save = () => {
+  const save = async () => {
     if (!form.title.trim() || !form.videoUrl.trim() || !form.dramaId) {
       toast.error("Title, drama, and video URL are required");
       return;
@@ -43,6 +45,7 @@ export default function AdminVideosPage() {
       ? videos.find((v) => v.id === editingId)
       : null;
     const drama = dramas.find((d) => d.id === form.dramaId);
+    const wasPublished = existing?.status === "published";
     const video: Video = {
       id: existing?.id ?? uid("ep"),
       slug: existing?.slug ?? slugify(`${drama?.slug ?? "drama"}-ep-${form.episodeNumber}`),
@@ -79,6 +82,45 @@ export default function AdminVideosPage() {
     };
     upsertVideo(video);
     toast.success(editingId ? "Episode updated" : "Episode saved");
+
+    const shouldAutoPost =
+      form.autoPostSocial &&
+      form.status === "published" &&
+      !wasPublished &&
+      video.episodeNumber <= 2 &&
+      drama;
+
+    if (shouldAutoPost && drama) {
+      const toastId = toast.loading(
+        `Auto-posting Ep ${video.episodeNumber} to socials…`,
+      );
+      try {
+        const result = await triggerEpisodeAutoPost({
+          dramaId: drama.id,
+          dramaTitle: drama.title,
+          dramaSlug: drama.slug,
+          episodeId: video.id,
+          episodeNumber: video.episodeNumber,
+          episodeTitle: video.title,
+          episodeSlug: video.slug,
+          description: video.description,
+          thumbnailUrl: video.thumbnailUrl,
+          videoUrl: video.videoUrl,
+        });
+        if (result.skipped) {
+          toast.message(result.message || "Auto-post skipped", { id: toastId });
+        } else if (result.ok) {
+          toast.success(result.message || "Posted to socials", { id: toastId });
+        } else {
+          toast.error(result.message || "Social auto-post failed", {
+            id: toastId,
+          });
+        }
+      } catch {
+        toast.error("Social auto-post request failed", { id: toastId });
+      }
+    }
+
     setForm(emptyForm);
     setEditingId(null);
   };
@@ -98,6 +140,7 @@ export default function AdminVideosPage() {
       featured: video.featured,
       sourceAttribution: video.sourceAttribution,
       licensingNotes: video.licensingNotes,
+      autoPostSocial: true,
     });
   };
 
@@ -226,7 +269,25 @@ export default function AdminVideosPage() {
             />
             Featured
           </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={form.autoPostSocial}
+              onChange={(e) =>
+                setForm({ ...form, autoPostSocial: e.target.checked })
+              }
+            />
+            Auto-post Ep 1–2 to socials on publish
+          </label>
         </div>
+        <p className="text-xs text-white/40">
+          When you publish episode 1 or 2, SLOP posts a watch link to every
+          connected social channel. Configure channels in{" "}
+          <a href="/admin/social" className="text-[var(--slop-violet)]">
+            Social auto-post
+          </a>
+          .
+        </p>
         {form.videoUrl && (
           <video
             src={form.videoUrl}
@@ -272,17 +333,60 @@ export default function AdminVideosPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() =>
-                  upsertVideo({
+                onClick={async () => {
+                  const publishing = video.status !== "published";
+                  const next = {
                     ...video,
-                    status:
-                      video.status === "published" ? "unpublished" : "published",
-                    publishedAt:
-                      video.status === "published"
-                        ? video.publishedAt
-                        : new Date().toISOString(),
-                  })
-                }
+                    status: (publishing
+                      ? "published"
+                      : "unpublished") as PublicationStatus,
+                    publishedAt: publishing
+                      ? video.publishedAt ?? new Date().toISOString()
+                      : video.publishedAt,
+                  };
+                  upsertVideo(next);
+                  if (publishing && video.episodeNumber <= 2) {
+                    const drama = dramas.find((d) => d.id === video.dramaId);
+                    if (drama) {
+                      const toastId = toast.loading(
+                        `Auto-posting Ep ${video.episodeNumber}…`,
+                      );
+                      try {
+                        const result = await triggerEpisodeAutoPost({
+                          dramaId: drama.id,
+                          dramaTitle: drama.title,
+                          dramaSlug: drama.slug,
+                          episodeId: video.id,
+                          episodeNumber: video.episodeNumber,
+                          episodeTitle: video.title,
+                          episodeSlug: video.slug,
+                          description: video.description,
+                          thumbnailUrl: video.thumbnailUrl,
+                          videoUrl: video.videoUrl,
+                        });
+                        if (result.skipped) {
+                          toast.message(result.message || "Auto-post skipped", {
+                            id: toastId,
+                          });
+                        } else if (result.ok) {
+                          toast.success(
+                            result.message || "Posted to socials",
+                            { id: toastId },
+                          );
+                        } else {
+                          toast.error(
+                            result.message || "Social auto-post failed",
+                            { id: toastId },
+                          );
+                        }
+                      } catch {
+                        toast.error("Social auto-post request failed", {
+                          id: toastId,
+                        });
+                      }
+                    }
+                  }
+                }}
               >
                 {video.status === "published" ? "Unpublish" : "Publish"}
               </Button>

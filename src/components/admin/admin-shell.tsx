@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Link2,
   Settings,
+  Share2,
   Users,
   Video,
 } from "lucide-react";
@@ -23,6 +24,7 @@ const nav = [
   { href: "/admin/campaigns", label: "Campaigns", icon: Link2 },
   { href: "/admin/referrals", label: "Rewards", icon: Gift },
   { href: "/admin/videos", label: "Episodes", icon: Video },
+  { href: "/admin/social", label: "Social", icon: Share2 },
   { href: "/admin/categories", label: "Categories", icon: FolderOpen },
   { href: "/admin/users", label: "Users", icon: Users },
   { href: "/admin/reports", label: "Reports", icon: Flag },
