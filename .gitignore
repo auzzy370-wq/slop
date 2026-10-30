@@ -43,3 +43,6 @@ next-env.d.ts
 # local analytics / referral event store
 /data/
 *.tmp
+
+# netlify local build output
+.netlify/

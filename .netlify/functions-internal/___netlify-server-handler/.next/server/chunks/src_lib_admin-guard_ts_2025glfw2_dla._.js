@@ -1,3 +1,0 @@
-module.exports=[21528,e=>{"use strict";var s=e.i(89171);e.s(["requireAdminKey",0,function(e){let n=process.env.SLOP_ADMIN_KEY,r=e.headers.get("x-slop-admin-key");return n?r!==n?s.NextResponse.json({error:"unauthorized"},{status:401}):null:"1"===process.env.VERCEL?s.NextResponse.json({error:"admin_writes_locked",message:"Set SLOP_ADMIN_KEY in Vercel env to enable admin write APIs on the public deployment."},{status:403}):null}])}];
-
-//# sourceMappingURL=src_lib_admin-guard_ts_2025glfw2_dla._.js.map
