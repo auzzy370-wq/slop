@@ -41,7 +41,7 @@ App: [http://localhost:3456](http://localhost:3456)
 
 ## Public deploy (iPhone / Safari)
 
-**https://academy-mario-doe-recipient.trycloudflare.com**
+**https://max-phrase-combination-aerial.trycloudflare.com**
 
 Anonymous Vercel `*.tmp.now` URLs often show `403 FORBIDDEN` on mobile. Use the tunnel above for testing; for a permanent free URL, create a free [Vercel](https://vercel.com/signup) account (details in [`docs/DEPLOY.md`](docs/DEPLOY.md)).
 

@@ -65,12 +65,18 @@ export function VideoCard({
   const likes = useSlopStore((s) => s.likes);
   const saves = useSlopStore((s) => s.saves);
   const comments = useSlopStore((s) => s.comments);
+  const dramas = useSlopStore((s) => s.dramas);
   const toggleLike = useSlopStore((s) => s.toggleLike);
   const toggleSave = useSlopStore((s) => s.toggleSave);
   const addComment = useSlopStore((s) => s.addComment);
   const deleteComment = useSlopStore((s) => s.deleteComment);
   const addReport = useSlopStore((s) => s.addReport);
   const recordView = useSlopStore((s) => s.recordView);
+  const drama = dramas.find((d) => d.id === video.dramaId);
+  const epLabel = String(video.episodeNumber).padStart(2, "0");
+  const epTotal = drama?.episodeCount
+    ? String(drama.episodeCount).padStart(2, "0")
+    : null;
   const viewed = useRef(false);
   const playbackId = useRef(uid("pb"));
   const lastProgressSent = useRef(0);
@@ -326,7 +332,7 @@ export function VideoCard({
   };
 
   return (
-    <article className="relative h-full w-full snap-start overflow-hidden bg-black">
+    <article className="relative h-full w-full snap-start overflow-hidden bg-[var(--slop-black)]">
       {!failed ? (
         <video
           ref={videoRef}
@@ -374,11 +380,42 @@ export function VideoCard({
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/85" />
+      <div className="pointer-events-none absolute inset-0 slop-player-vignette" />
+      <div className="pointer-events-none absolute inset-0 slop-player-grain" aria-hidden />
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-px slop-player-scanline" />
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-[3px] slop-player-rail" />
+
+      {/* Top cinema strip */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 px-4 pt-[max(0.85rem,env(safe-area-inset-top))]">
+        <div className="mt-11 flex items-end justify-between gap-3">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="slop-live-pip" aria-hidden />
+              <p className="font-display text-[11px] font-bold tracking-[0.32em] text-[var(--slop-lavender)]">
+                SLOP
+              </p>
+            </div>
+            <p className="mt-1.5 truncate text-[11px] uppercase tracking-[0.2em] text-white/40">
+              {drama?.title ?? video.sourceAttribution}
+            </p>
+          </div>
+          <div className="slop-ep-chip shrink-0 px-3 py-1.5">
+            <p className="font-display text-[11px] font-semibold uppercase tracking-[0.18em] text-white/45">
+              Ep
+            </p>
+            <p className="font-display text-lg font-bold leading-none tabular-nums text-white">
+              {epLabel}
+              {epTotal ? (
+                <span className="text-white/30">/{epTotal}</span>
+              ) : null}
+            </p>
+          </div>
+        </div>
+      </div>
 
       {loading && active && !failed && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-[var(--slop-violet)]" />
+        <div className="absolute inset-0 z-20 flex items-center justify-center">
+          <div className="slop-loader" />
         </div>
       )}
 
@@ -386,111 +423,115 @@ export function VideoCard({
         <button
           type="button"
           onClick={togglePlay}
-          className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black/50 p-4 text-white backdrop-blur-md"
+          className="slop-pause-mark absolute left-1/2 top-[40%] z-20 flex h-[4.5rem] w-[4.5rem] -translate-x-1/2 -translate-y-1/2 items-center justify-center text-white"
           aria-label="Play"
         >
-          <Play className="h-8 w-8 fill-white" />
+          <Play className="relative z-10 ml-1 h-7 w-7 fill-[var(--slop-lavender)] text-[var(--slop-lavender)]" />
         </button>
       )}
 
-      {/* Side actions — sit above bottom chrome */}
-      <div className="absolute bottom-[9.5rem] right-3 z-20 flex flex-col items-center gap-3.5 pb-[env(safe-area-inset-bottom)] sm:bottom-40">
-        <ActionButton
-          label={video.likeCount > 0 ? formatCount(video.likeCount) : "Like"}
-          active={liked}
-          onClick={onLike}
-          ariaLabel="Like"
+      {/* Bottom cinema chrome */}
+      <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.55rem,env(safe-area-inset-bottom))]">
+        <div
+          key={active ? video.id : "idle"}
+          className={`relative px-4 ${active ? "slop-player-meta" : ""}`}
         >
-          <Heart className={liked ? "fill-[var(--slop-violet)] text-[var(--slop-violet)]" : ""} />
-        </ActionButton>
-        <ActionButton
-          label={
-            video.commentCount > 0 ? formatCount(video.commentCount) : "Comment"
-          }
-          onClick={() => setCommentsOpen(true)}
-          ariaLabel="Comments"
-        >
-          <MessageCircle />
-        </ActionButton>
-        <ActionButton
-          label={
-            saved
-              ? "Saved"
-              : video.saveCount > 0
-                ? formatCount(video.saveCount)
-                : "Save"
-          }
-          active={saved}
-          onClick={onSave}
-          ariaLabel="Save"
-        >
-          <Bookmark className={saved ? "fill-white" : ""} />
-        </ActionButton>
-        <ActionButton label="Share" onClick={() => setShareOpen(true)} ariaLabel="Share">
-          <Share2 />
-        </ActionButton>
-        <ActionButton
-          label=""
-          onClick={onToggleMute}
-          ariaLabel={muted ? "Unmute" : "Mute"}
-        >
-          {muted ? <VolumeX /> : <Volume2 />}
-        </ActionButton>
-        <ActionButton
-          label=""
-          onClick={() => setPaused((p) => !p)}
-          ariaLabel={paused ? "Play" : "Pause"}
-        >
-          {paused ? <Play /> : <Pause />}
-        </ActionButton>
-        <ActionButton label="" onClick={() => setReportOpen(true)} ariaLabel="More">
-          <MoreHorizontal />
-        </ActionButton>
-      </div>
+          <div
+            aria-hidden
+            className="slop-player-ep-ghost absolute -top-14 right-2 text-[8rem] sm:text-[10rem]"
+          >
+            {epLabel}
+          </div>
 
-      {/* Title + description + scrub bar pinned to bottom */}
-      <div className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black via-black/70 to-transparent pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-16">
-        <div className="px-4 pr-16">
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--slop-violet)]">
-            {video.sourceAttribution} · EP {video.episodeNumber}
-          </p>
-          <h2 className="font-display text-xl leading-tight text-white drop-shadow-md sm:text-2xl">
+          <div className="relative flex items-center gap-2">
+            <span className="slop-meta-slash" aria-hidden />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.24em] text-[var(--slop-violet)]">
+              Episode {video.episodeNumber}
+              {categoryNames[0] ? ` · ${categoryNames[0]}` : ""}
+            </p>
+          </div>
+          <h2 className="relative mt-2 max-w-[90%] font-display text-[1.7rem] font-bold leading-[0.98] tracking-[-0.03em] text-white sm:text-[2rem]">
             {video.title}
           </h2>
-          <p className="mt-1.5 line-clamp-2 text-sm text-white/80">
+          <p className="relative mt-2.5 max-w-[92%] line-clamp-2 text-[13px] leading-relaxed text-white/65">
             {video.description}
           </p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            {categoryNames.map((name) => (
-              <span
-                key={name}
-                className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/80 backdrop-blur"
+
+          <div className="relative mt-3.5 flex flex-wrap items-center gap-x-3 gap-y-2">
+            <div className="slop-action-dock flex items-center">
+              <DockButton
+                active={liked}
+                onClick={onLike}
+                ariaLabel="Like"
+                label={video.likeCount > 0 ? formatCount(video.likeCount) : undefined}
               >
-                {name}
-              </span>
-            ))}
+                <Heart
+                  className={
+                    liked
+                      ? "fill-[var(--slop-violet)] text-[var(--slop-violet)]"
+                      : ""
+                  }
+                />
+              </DockButton>
+              <DockButton
+                onClick={() => setCommentsOpen(true)}
+                ariaLabel="Comments"
+                label={
+                  video.commentCount > 0
+                    ? formatCount(video.commentCount)
+                    : undefined
+                }
+              >
+                <MessageCircle />
+              </DockButton>
+              <DockButton active={saved} onClick={onSave} ariaLabel="Save">
+                <Bookmark className={saved ? "fill-white" : ""} />
+              </DockButton>
+              <DockButton onClick={() => setShareOpen(true)} ariaLabel="Share">
+                <Share2 />
+              </DockButton>
+              <span className="slop-dock-divider" aria-hidden />
+              <DockButton
+                onClick={onToggleMute}
+                ariaLabel={muted ? "Unmute" : "Mute"}
+              >
+                {muted ? <VolumeX /> : <Volume2 />}
+              </DockButton>
+              <DockButton
+                onClick={() => setPaused((p) => !p)}
+                ariaLabel={paused ? "Play" : "Pause"}
+              >
+                {paused ? <Play /> : <Pause />}
+              </DockButton>
+              <DockButton onClick={() => setReportOpen(true)} ariaLabel="More">
+                <MoreHorizontal />
+              </DockButton>
+            </div>
             {video.viewCount > 0 ? (
-              <span className="text-xs text-white/45">
-                {formatCount(video.viewCount)} views
+              <span className="text-[10px] uppercase tracking-[0.16em] text-white/30">
+                {formatCount(video.viewCount)} watched
               </span>
             ) : null}
           </div>
         </div>
 
-        <div className="mt-3 px-3">
-          <div className="mb-1 flex items-center justify-between text-[10px] font-medium tabular-nums text-white/55">
-            <span>{formatTime(progress * (duration || 0))}</span>
+        <div className={`mt-4 px-4 ${scrubbing ? "slop-scrubbing" : ""}`}>
+          <div className="mb-1.5 flex items-center justify-between font-display text-[10px] font-semibold tabular-nums tracking-wide text-white/45">
+            <span className="text-[var(--slop-lavender)]">
+              {formatTime(progress * (duration || 0))}
+            </span>
+            <span className="tracking-[0.28em] text-white/25">SEEK</span>
             <span>{formatTime(duration || video.durationSeconds)}</span>
           </div>
           <div
             ref={scrubRef}
             role="slider"
-            aria-label="Seek"
+            aria-label="Seek through episode"
             aria-valuemin={0}
             aria-valuemax={100}
             aria-valuenow={Math.round(progress * 100)}
             tabIndex={0}
-            className="relative flex h-8 cursor-pointer touch-none items-center"
+            className="relative flex h-11 cursor-pointer touch-none items-center"
             onPointerDown={onScrubPointerDown}
             onPointerMove={onScrubPointerMove}
             onPointerUp={onScrubPointerUp}
@@ -509,16 +550,14 @@ export function VideoCard({
             }}
           >
             <div
-              className={`relative w-full rounded-full bg-white/25 ${scrubbing ? "h-1.5" : "h-1"}`}
+              className={`slop-scrub-track relative w-full ${scrubbing ? "is-scrubbing" : ""}`}
             >
               <div
-                className="absolute inset-y-0 left-0 rounded-full bg-[var(--slop-violet)]"
+                className="slop-scrub-fill absolute inset-y-0 left-0"
                 style={{ width: `${progress * 100}%` }}
               />
               <div
-                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow ${
-                  scrubbing ? "h-4 w-4" : "h-3 w-3"
-                }`}
+                className={`slop-scrub-thumb absolute top-1/2 ${scrubbing ? "is-active" : ""}`}
                 style={{ left: `${progress * 100}%` }}
               />
             </div>
@@ -641,7 +680,7 @@ export function VideoCard({
   );
 }
 
-function ActionButton({
+function DockButton({
   children,
   label,
   onClick,
@@ -649,7 +688,7 @@ function ActionButton({
   ariaLabel,
 }: {
   children: React.ReactNode;
-  label: string;
+  label?: string;
   onClick: () => void;
   active?: boolean;
   ariaLabel: string;
@@ -659,14 +698,19 @@ function ActionButton({
       type="button"
       onClick={onClick}
       aria-label={ariaLabel}
-      className="flex flex-col items-center gap-1 text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)] transition hover:scale-105"
+      aria-pressed={active}
+      className={`slop-dock-btn group relative flex h-11 min-w-11 items-center justify-center gap-1.5 px-2.5 text-white/85 transition ${
+        active ? "is-active text-[var(--slop-lavender)]" : "hover:text-white"
+      }`}
     >
-      <span
-        className={`flex h-12 w-12 items-center justify-center rounded-full bg-black/40 backdrop-blur-md ${active ? "ring-1 ring-[var(--slop-violet)]/50" : ""}`}
-      >
-        <span className="[&>svg]:h-6 [&>svg]:w-6">{children}</span>
+      <span className="[&>svg]:h-[18px] [&>svg]:w-[18px] [&>svg]:stroke-[1.75]">
+        {children}
       </span>
-      {label ? <span className="text-[11px] font-medium">{label}</span> : null}
+      {label ? (
+        <span className="font-display text-[10px] font-semibold tabular-nums tracking-wide text-white/55 group-hover:text-white/80">
+          {label}
+        </span>
+      ) : null}
     </button>
   );
 }
