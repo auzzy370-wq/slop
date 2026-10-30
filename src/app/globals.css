@@ -165,6 +165,25 @@ a {
   animation: slop-up 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.slop-caption {
+  transform-origin: bottom left;
+  transition:
+    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.slop-caption.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.slop-caption.is-hidden {
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+}
+
 .slop-player-ep-ghost {
   font-family: var(--font-display), ui-sans-serif, system-ui, sans-serif;
   font-weight: 700;
@@ -177,23 +196,61 @@ a {
 }
 
 .slop-rail-orb {
+  position: relative;
   border-radius: 999px;
-  background: rgba(17, 17, 22, 0.42);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
-  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.04) 42%, rgba(17, 17, 22, 0.35) 100%),
+    rgba(17, 17, 22, 0.48);
+  backdrop-filter: blur(18px) saturate(1.35);
+  -webkit-backdrop-filter: blur(18px) saturate(1.35);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.18) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.35) inset,
+    0 8px 24px rgba(0, 0, 0, 0.45);
+  transition:
+    transform 180ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.slop-rail-orb::before {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.16), transparent 48%);
+  pointer-events: none;
 }
 
 .slop-rail-btn:active .slop-rail-orb,
 .slop-rail-btn:hover .slop-rail-orb {
-  transform: scale(1.06);
-  border-color: rgba(185, 154, 255, 0.45);
+  transform: scale(1.07);
+  border-color: rgba(233, 222, 255, 0.45);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.24) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.3) inset,
+    0 10px 28px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(185, 154, 255, 0.18);
 }
 
 .slop-rail-orb.is-active {
-  border-color: rgba(185, 154, 255, 0.55);
-  background: rgba(185, 154, 255, 0.16);
+  border-color: rgba(185, 154, 255, 0.65);
+  background:
+    linear-gradient(160deg, rgba(233, 222, 255, 0.28) 0%, rgba(185, 154, 255, 0.16) 45%, rgba(17, 17, 22, 0.4) 100%),
+    rgba(185, 154, 255, 0.18);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.22) inset,
+    0 0 0 1px rgba(185, 154, 255, 0.25),
+    0 10px 28px rgba(0, 0, 0, 0.45),
+    0 0 22px rgba(185, 154, 255, 0.22);
+}
+
+.slop-rail-label {
+  color: rgba(255, 255, 255, 0.88);
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.75);
+  letter-spacing: 0.06em;
 }
 
 .slop-scrub-track {

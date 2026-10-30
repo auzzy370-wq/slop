@@ -51,6 +51,7 @@ export function VideoCard({
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [scrubbing, setScrubbing] = useState(false);
+  const [chromeVisible, setChromeVisible] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -59,6 +60,7 @@ export function VideoCard({
   const [reportDetails, setReportDetails] = useState("");
   const scrubRef = useRef<HTMLDivElement>(null);
   const wasPlayingBeforeScrub = useRef(false);
+  const chromeHideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const user = useSlopStore((s) => s.currentUser);
   const likes = useSlopStore((s) => s.likes);
@@ -164,8 +166,59 @@ export function VideoCard({
     if (!active) {
       setPaused(false);
       setProgress(0);
+      setChromeVisible(true);
     }
   }, [active]);
+
+  const clearChromeHideTimer = useCallback(() => {
+    if (chromeHideTimer.current) {
+      clearTimeout(chromeHideTimer.current);
+      chromeHideTimer.current = null;
+    }
+  }, []);
+
+  const scheduleChromeHide = useCallback(() => {
+    clearChromeHideTimer();
+    if (!active) return;
+    chromeHideTimer.current = setTimeout(() => {
+      setChromeVisible(false);
+      chromeHideTimer.current = null;
+    }, 10000);
+  }, [active, clearChromeHideTimer]);
+
+  const revealChrome = useCallback(() => {
+    setChromeVisible(true);
+    scheduleChromeHide();
+  }, [scheduleChromeHide]);
+
+  useEffect(() => {
+    if (!active) {
+      clearChromeHideTimer();
+      return;
+    }
+    setChromeVisible(true);
+    scheduleChromeHide();
+    return clearChromeHideTimer;
+  }, [active, video.id, clearChromeHideTimer, scheduleChromeHide]);
+
+  useEffect(() => {
+    if (!active) return;
+    if (paused || scrubbing || commentsOpen || shareOpen || reportOpen) {
+      clearChromeHideTimer();
+      setChromeVisible(true);
+      return;
+    }
+    scheduleChromeHide();
+  }, [
+    active,
+    paused,
+    scrubbing,
+    commentsOpen,
+    shareOpen,
+    reportOpen,
+    clearChromeHideTimer,
+    scheduleChromeHide,
+  ]);
 
   const onTimeUpdate = () => {
     const el = videoRef.current;
@@ -259,8 +312,18 @@ export function VideoCard({
   };
 
   const togglePlay = useCallback(() => {
+    setChromeVisible(true);
+    scheduleChromeHide();
     setPaused((p) => !p);
-  }, []);
+  }, [scheduleChromeHide]);
+
+  const onVideoSurfaceTap = useCallback(() => {
+    if (!chromeVisible) {
+      revealChrome();
+      return;
+    }
+    togglePlay();
+  }, [chromeVisible, revealChrome, togglePlay]);
 
   const requireAuth = (action: string) => {
     toast.message(`Sign in to ${action}`, {
@@ -357,7 +420,7 @@ export function VideoCard({
             setFailed(true);
             setLoading(false);
           }}
-          onClick={togglePlay}
+          onClick={onVideoSurfaceTap}
         />
       ) : (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#121212] px-6 text-center">
@@ -421,10 +484,17 @@ export function VideoCard({
       )}
 
       {/* TikTok-style right action rail */}
-      <div className="absolute bottom-[7.5rem] right-2 z-30 flex flex-col items-center gap-3.5 sm:right-3 sm:gap-4">
+      <div
+        className={`absolute right-2 z-30 flex flex-col items-center gap-4 transition-[bottom] duration-300 ease-out sm:right-3 sm:gap-[1.15rem] ${
+          chromeVisible ? "bottom-[7.5rem]" : "bottom-[3.75rem]"
+        }`}
+      >
         <RailButton
           active={liked}
-          onClick={onLike}
+          onClick={() => {
+            revealChrome();
+            onLike();
+          }}
           ariaLabel="Like"
           label={formatCount(video.likeCount)}
         >
@@ -437,7 +507,10 @@ export function VideoCard({
           />
         </RailButton>
         <RailButton
-          onClick={() => setCommentsOpen(true)}
+          onClick={() => {
+            revealChrome();
+            setCommentsOpen(true);
+          }}
           ariaLabel="Comments"
           label={formatCount(video.commentCount)}
         >
@@ -445,23 +518,43 @@ export function VideoCard({
         </RailButton>
         <RailButton
           active={saved}
-          onClick={onSave}
+          onClick={() => {
+            revealChrome();
+            onSave();
+          }}
           ariaLabel="Save"
           label={saved ? "Saved" : "Save"}
         >
           <Bookmark className={saved ? "fill-white" : ""} />
         </RailButton>
-        <RailButton onClick={() => setShareOpen(true)} ariaLabel="Share" label="Share">
+        <RailButton
+          onClick={() => {
+            revealChrome();
+            setShareOpen(true);
+          }}
+          ariaLabel="Share"
+          label="Share"
+        >
           <Share2 />
         </RailButton>
         <RailButton
-          onClick={onToggleMute}
+          onClick={() => {
+            revealChrome();
+            onToggleMute();
+          }}
           ariaLabel={muted ? "Unmute" : "Mute"}
           label={muted ? "Mute" : "Sound"}
         >
           {muted ? <VolumeX /> : <Volume2 />}
         </RailButton>
-        <RailButton onClick={() => setReportOpen(true)} ariaLabel="More" label="More">
+        <RailButton
+          onClick={() => {
+            revealChrome();
+            setReportOpen(true);
+          }}
+          ariaLabel="More"
+          label="More"
+        >
           <MoreHorizontal />
         </RailButton>
       </div>
@@ -470,7 +563,10 @@ export function VideoCard({
       <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.45rem,env(safe-area-inset-bottom))]">
         <div
           key={active ? video.id : "idle"}
-          className={`relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${active ? "slop-player-meta" : ""}`}
+          className={`slop-caption relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
+            chromeVisible ? "is-visible" : "is-hidden"
+          }`}
+          aria-hidden={!chromeVisible}
         >
           <div
             aria-hidden
@@ -682,19 +778,19 @@ function RailButton({
       onClick={onClick}
       aria-label={ariaLabel}
       aria-pressed={active}
-      className="slop-rail-btn group flex flex-col items-center gap-1 text-white"
+      className="slop-rail-btn group flex flex-col items-center gap-1.5 text-white"
     >
       <span
-        className={`slop-rail-orb flex h-12 w-12 items-center justify-center ${
+        className={`slop-rail-orb flex h-[3.25rem] w-[3.25rem] items-center justify-center ${
           active ? "is-active" : ""
         }`}
       >
-        <span className="[&>svg]:h-[22px] [&>svg]:w-[22px] [&>svg]:stroke-[2]">
+        <span className="relative z-[1] [&>svg]:h-[21px] [&>svg]:w-[21px] [&>svg]:stroke-[1.75]">
           {children}
         </span>
       </span>
       {label ? (
-        <span className="max-w-[3.4rem] truncate text-center text-[11px] font-semibold leading-none drop-shadow-[0_1px_4px_rgba(0,0,0,0.85)]">
+        <span className="slop-rail-label max-w-[3.6rem] truncate text-center font-display text-[10px] font-semibold uppercase tracking-[0.08em]">
           {label}
         </span>
       ) : null}
