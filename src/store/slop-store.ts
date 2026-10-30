@@ -330,10 +330,18 @@ export const useSlopStore = create<SlopState>()(
       },
 
       recordView: (videoId) => {
+        const video = get().videos.find((v) => v.id === videoId);
         set({
           videos: get().videos.map((v) =>
             v.id === videoId ? { ...v, viewCount: v.viewCount + 1 } : v,
           ),
+          dramas: video?.dramaId
+            ? get().dramas.map((d) =>
+                d.id === video.dramaId
+                  ? { ...d, viewCount: d.viewCount + 1 }
+                  : d,
+              )
+            : get().dramas,
         });
       },
 
@@ -434,7 +442,8 @@ export const useSlopStore = create<SlopState>()(
       },
     }),
     {
-      name: "slop-local-v3",
+      name: "slop-local-v4",
+      version: 4,
       partialize: (state) => ({
         currentUser: state.currentUser,
         videos: state.videos,
@@ -447,6 +456,35 @@ export const useSlopStore = create<SlopState>()(
         settings: state.settings,
         subscription: state.subscription,
       }),
+      migrate: () => {
+        // Drop fabricated seed counters from older localStorage versions.
+        // Fresh catalog metrics start at 0; comments match demo seeds only.
+        return {
+          currentUser: null,
+          videos: DEMO_VIDEOS,
+          dramas: DEMO_DRAMAS,
+          categories: DEMO_CATEGORIES,
+          comments: DEMO_COMMENTS,
+          likes: [],
+          saves: [],
+          reports: [
+            {
+              id: "rpt_1",
+              reporterId: "user_demo",
+              contentType: "comment" as const,
+              contentId: "cmt_1",
+              reason: "spam",
+              details: "Looks like spam to me",
+              status: "open" as const,
+              resolution: null,
+              createdAt: "2026-10-27T12:00:00.000Z",
+              reviewedAt: null,
+            },
+          ],
+          settings: DEFAULT_SETTINGS,
+          subscription: null,
+        };
+      },
       onRehydrateStorage: () => (state) => {
         state?.setHydrated(true);
       },

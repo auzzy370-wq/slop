@@ -290,4 +290,5 @@ export type DateRangeKey =
   | "this_month"
   | "last_month"
   | "this_year"
+  | "all_time"
   | "custom";

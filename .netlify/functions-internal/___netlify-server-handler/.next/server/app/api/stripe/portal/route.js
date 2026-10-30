@@ -1,0 +1,10 @@
+var R=require("../../../../chunks/[turbopack]_runtime.js")("server/app/api/stripe/portal/route.js")
+R.c("server/chunks/[externals]__1iq_n-93sn0w6._.js")
+R.c("server/chunks/node_modules_next_0g8xe7c6fvfgl._.js")
+R.c("server/chunks/node_modules_next_dist_compiled_@edge-runtime_cookies_index_03l45n-uz3kdi.js")
+R.c("server/chunks/[root-of-the-server]__00ou3dmqsje4t._.js")
+R.c("server/chunks/[root-of-the-server]__14cshovb7a6ek._.js")
+R.c("server/chunks/_0kw66wr0gan3y._.js")
+R.c("server/chunks/_next-internal_server_app_api_stripe_portal_route_actions_1ivx668kedf-l.js")
+R.m(10484)
+module.exports=R.m(10484).exports

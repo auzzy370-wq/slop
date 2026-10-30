@@ -11,6 +11,7 @@ const OPTIONS: { key: DateRangeKey; label: string }[] = [
   { key: "this_month", label: "This month" },
   { key: "last_month", label: "Last month" },
   { key: "this_year", label: "This year" },
+  { key: "all_time", label: "All time" },
   { key: "custom", label: "Custom" },
 ];
 

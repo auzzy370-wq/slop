@@ -42,7 +42,7 @@ See `.env.example`:
 ## Deployment notes
 
 - Ensure the host can persist `data/` **or** migrate the store layer to Supabase using the migration schema.
-- Never seed fake sessions/users for dashboards. Empty zeros mean no events yet.
+- Never seed fake sessions/users/views for dashboards or public counters. Catalog `viewCount` / admin overview cards start at **0** and only rise from recorded playback/session events. Empty zeros mean no events yet.
 - Admin routes remain client-gated by `role === "admin"` (demo). Harden with server auth when Supabase Auth is connected.
 
 ## Testing checklist (run locally)

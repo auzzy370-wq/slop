@@ -1,0 +1,3 @@
+module.exports=[66718,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(68114);let e=c.forwardRef(({className:a,...c},e)=>(0,b.jsx)("input",{ref:e,className:(0,d.c)("flex h-11 w-full rounded-xl border border-white/15 bg-white/5 px-4 text-sm text-white placeholder:text-[var(--slop-slate)] outline-none focus:border-[var(--slop-violet)]/60 focus:ring-2 focus:ring-[var(--slop-violet)]/20",a),...c}));e.displayName="Input",a.s(["f",0,e])}];
+
+//# sourceMappingURL=src_components_ui_input_tsx_0o9ns4ymwuwy8._.js.map

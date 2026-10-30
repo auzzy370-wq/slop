@@ -8,6 +8,7 @@ import {
   setConsent,
   track,
 } from "@/lib/analytics/client";
+import { ViewCountSync } from "@/components/analytics/view-count-sync";
 import { useSlopStore } from "@/store/slop-store";
 
 export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
@@ -56,6 +57,7 @@ export function AnalyticsProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <ViewCountSync />
       {children}
       {showBanner && (
         <div className="fixed inset-x-0 bottom-20 z-[60] mx-auto w-[min(560px,calc(100%-1.5rem))] rounded-2xl border border-white/10 bg-[var(--slop-panel)] p-4 shadow-2xl sm:bottom-6">

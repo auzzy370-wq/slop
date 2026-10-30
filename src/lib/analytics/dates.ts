@@ -53,6 +53,13 @@ export function resolveDateRange(
       const from = new Date(now.getFullYear(), 0, 1);
       return { from, to: endOfDay(now), label: "This year" };
     }
+    case "all_time": {
+      return {
+        from: new Date(0),
+        to: endOfDay(now),
+        label: "All time",
+      };
+    }
     case "custom": {
       const from = customFrom ? new Date(customFrom) : startOfDay(now);
       const to = customTo ? endOfDay(new Date(customTo)) : endOfDay(now);
