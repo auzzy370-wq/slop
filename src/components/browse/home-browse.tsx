@@ -98,7 +98,7 @@ export function HomeBrowse() {
             <span className="text-[var(--slop-violet)]">.</span>
           </p>
           <p className="slop-home-rise-delay mt-4 max-w-md text-[15px] leading-relaxed text-white/70 sm:text-base">
-            {settings.tagline} Vertical dramas made to keep you watching.
+            {settings.tagline} Short AI dramas, cut for the vertical binge.
           </p>
           <div className="slop-home-rise-delay2 mt-7 flex flex-wrap items-center gap-3">
             <Link
