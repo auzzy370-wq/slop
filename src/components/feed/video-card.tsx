@@ -64,6 +64,7 @@ export function VideoCard({
   const [loading, setLoading] = useState(!isScripted);
   /** Bumps to force a clean <video> remount after abort / retry. */
   const [mediaKey, setMediaKey] = useState(0);
+  const retryCount = useRef(0);
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -150,12 +151,42 @@ export function VideoCard({
       return;
     }
 
+    // Video node only exists while this card is active (Safari single-decoder).
+    if (!active) {
+      if (started.current) {
+        void track("video_abandoned", {
+          userId: user?.id,
+          episodeId: video.id,
+          dramaId: video.dramaId,
+          playbackSessionId: playbackId.current,
+          playback: {
+            durationMs: video.durationSeconds * 1000,
+            currentMs: progress * video.durationSeconds * 1000,
+            event: "abandon",
+          },
+        });
+        started.current = false;
+        playbackId.current = uid("pb");
+        lastProgressSent.current = 0;
+      }
+      return;
+    }
+
     const el = videoRef.current;
     if (!el) return;
     el.muted = muted;
-    if (active && !paused) {
-      const play = el.play();
-      if (play) play.catch(() => setPaused(true));
+
+    if (!paused) {
+      const tryPlay = () => {
+        const node = videoRef.current;
+        if (!node) return;
+        void node.play().catch(() => {
+          window.setTimeout(() => {
+            void videoRef.current?.play().catch(() => {});
+          }, 200);
+        });
+      };
+      tryPlay();
       if (!viewed.current) {
         viewed.current = true;
         recordView(video.id);
@@ -179,7 +210,7 @@ export function VideoCard({
           episodeId: video.id,
           dramaId: video.dramaId,
         });
-      } else if (paused === false) {
+      } else {
         void track("video_resumed", {
           userId: user?.id,
           episodeId: video.id,
@@ -189,7 +220,7 @@ export function VideoCard({
       }
     } else {
       el.pause();
-      if (active && paused && started.current) {
+      if (started.current) {
         void track("video_paused", {
           userId: user?.id,
           episodeId: video.id,
@@ -202,36 +233,22 @@ export function VideoCard({
           },
         });
       }
-      if (!active && started.current) {
-        const pct = el.duration ? el.currentTime / el.duration : 0;
-        void track(pct >= 0.95 ? "video_completed" : "video_abandoned", {
-          userId: user?.id,
-          episodeId: video.id,
-          dramaId: video.dramaId,
-          playbackSessionId: playbackId.current,
-          playback: {
-            durationMs: (el.duration || video.durationSeconds) * 1000,
-            currentMs: el.currentTime * 1000,
-            event: pct >= 0.95 ? "complete" : "abandon",
-          },
-        });
-        started.current = false;
-        playbackId.current = uid("pb");
-        lastProgressSent.current = 0;
-      }
     }
-  }, [active, muted, paused, recordView, video.id, video.dramaId, video.durationSeconds, user?.id, isScripted, progress]);
+  }, [active, muted, paused, recordView, video.id, video.dramaId, video.durationSeconds, user?.id, isScripted, progress, mediaKey]);
 
   useEffect(() => {
     if (!active) {
       setPaused(false);
       setProgress(0);
       setChromeVisible(true);
+      setFailed(false);
+      setLoading(false);
+      retryCount.current = 0;
       return;
     }
-    // Coming back onto a card after a fast swipe — clear abort failures.
     setFailed(false);
     setLoading(!isScripted);
+    retryCount.current = 0;
   }, [active, isScripted, video.id]);
 
   const clearChromeHideTimer = useCallback(() => {
@@ -519,7 +536,7 @@ export function VideoCard({
           onDuration={(sec) => setDuration(sec)}
           onTap={onVideoSurfaceTap}
         />
-      ) : !failed ? (
+      ) : active && !failed ? (
         <video
           key={`${video.id}-${mediaKey}`}
           ref={videoRef}
@@ -529,7 +546,7 @@ export function VideoCard({
           playsInline
           loop
           muted={muted}
-          preload={active ? "auto" : "metadata"}
+          preload="auto"
           onTimeUpdate={onTimeUpdate}
           onLoadedMetadata={(e) => {
             const d = e.currentTarget.duration;
@@ -539,19 +556,21 @@ export function VideoCard({
           onPlaying={() => {
             setLoading(false);
             setFailed(false);
+            retryCount.current = 0;
           }}
-          onLoadedData={() => setLoading(false)}
-          onError={(e) => {
-            const media = e.currentTarget;
-            const code = media.error?.code;
-            // 20 / MEDIA_ERR_ABORTED — normal when swiping away mid-load.
-            if (code === MediaError.MEDIA_ERR_ABORTED || code === 1) {
-              setLoading(false);
-              return;
-            }
-            // Empty src / transient network blip while inactive — don't brick the card.
-            if (!active || !media.currentSrc) {
-              setLoading(false);
+          onLoadedData={() => {
+            setLoading(false);
+            if (!paused) void videoRef.current?.play().catch(() => {});
+          }}
+          onCanPlay={() => {
+            if (!paused) void videoRef.current?.play().catch(() => {});
+          }}
+          onError={() => {
+            // Auto-recover on Safari transient decode / network errors.
+            if (retryCount.current < 3) {
+              retryCount.current += 1;
+              setLoading(true);
+              window.setTimeout(() => setMediaKey((k) => k + 1), 160);
               return;
             }
             setFailed(true);
@@ -559,17 +578,25 @@ export function VideoCard({
           }}
           onClick={onVideoSurfaceTap}
         />
-      ) : (
+      ) : failed && active ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#121212] px-6 text-center">
-          <p className="font-display text-xl text-white">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={video.thumbnailUrl}
+            alt=""
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40"
+          />
+          <p className="relative font-display text-xl text-white">
             Video failed to load
           </p>
-          <p className="text-sm text-white/60">
-            Check your connection or try the next clip.
+          <p className="relative text-sm text-white/60">
+            Safari sometimes drops the stream — tap retry.
           </p>
           <Button
             variant="secondary"
+            className="relative"
             onClick={() => {
+              retryCount.current = 0;
               setFailed(false);
               setLoading(true);
               setMediaKey((k) => k + 1);
@@ -578,6 +605,15 @@ export function VideoCard({
             Retry
           </Button>
         </div>
+      ) : (
+        // Inactive neighbor — poster only. Keeps Safari from fighting over decoders.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={video.thumbnailUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover"
+          draggable={false}
+        />
       )}
 
       <div className="pointer-events-none absolute inset-0 slop-player-vignette" />

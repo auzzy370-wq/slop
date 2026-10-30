@@ -314,8 +314,8 @@ export function VideoFeed({
         }}
       >
         {items.map((item, index) => {
-          // Keep ±2 mounted so the next swipe already has media warming up.
-          const near = Math.abs(index - activeIndex) <= 2;
+          // ±1 is enough — Safari only reliably decodes one video at a time.
+          const near = Math.abs(index - activeIndex) <= 1;
           if (item.kind === "ad") {
             return (
               <section

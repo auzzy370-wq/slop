@@ -1,4 +1,4 @@
-const CACHE = "slop-shell-v3";
+const CACHE = "slop-shell-v4";
 const SHELL = ["/", "/manifest.webmanifest", "/favicon.svg", "/icons/icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -21,11 +21,13 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-function isVideoRequest(url) {
+function isMediaRequest(url) {
   return (
     url.pathname.startsWith("/videos/") ||
+    url.pathname.startsWith("/thumbnails/") ||
     url.pathname.endsWith(".mp4") ||
-    url.pathname.endsWith(".webm")
+    url.pathname.endsWith(".webm") ||
+    url.pathname.endsWith(".m4v")
   );
 }
 
@@ -47,9 +49,9 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith("/api/")) return;
 
-  // Never cache episode MP4s — range requests + huge files break on swipe.
-  if (isVideoRequest(url)) {
-    event.respondWith(fetch(request));
+  // Critical for Safari: do NOT intercept media at all.
+  // respondWith(fetch()) breaks byte-range playback on iOS.
+  if (isMediaRequest(url)) {
     return;
   }
 
