@@ -143,6 +143,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok });
   }
 
+  if (
+    data.action === "admin_update_rule" ||
+    data.action === "admin_review_reward" ||
+    data.action === "admin_update_settings"
+  ) {
+    const { requireAdminKey } = await import("@/lib/admin-guard");
+    const denied = requireAdminKey(request);
+    if (denied) return denied;
+  }
+
   if (data.action === "admin_update_rule" && data.ruleId) {
     await updateAnalyticsStore((s) => {
       const rule = s.rewardRules.find((r) => r.id === data.ruleId);
@@ -216,8 +226,12 @@ export async function POST(request: Request) {
   return NextResponse.json({ error: "unhandled_action" }, { status: 400 });
 }
 
-export async function PUT() {
-  // Admin overview
+export async function PUT(request: Request) {
+  const { requireAdminKey } = await import("@/lib/admin-guard");
+  const denied = requireAdminKey(request);
+  // Allow read of overview locally; on Vercel without key, still allow GET-like overview
+  // but require key when SLOP_ADMIN_KEY is configured.
+  if (process.env.SLOP_ADMIN_KEY && denied) return denied;
   const store = await readAnalyticsStore();
   const clicks = store.referralClicks.length;
   const registrations = store.referralRelationships.length;

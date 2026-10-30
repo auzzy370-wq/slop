@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { updateAnalyticsStore } from "@/lib/analytics/store";
+import { requireAdminKey } from "@/lib/admin-guard";
 import { uid } from "@/lib/utils";
 
 const schema = z.object({
@@ -18,6 +19,8 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  const denied = requireAdminKey(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const parsed = schema.safeParse(body);
   if (!parsed.success) {

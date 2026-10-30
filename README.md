@@ -24,7 +24,7 @@ SLOP is a premium short-form drama streaming platform — cinematic AI-powered s
 - Stripe Checkout / Billing for **$7.99/mo** Premium
 - Demo mode runs without cloud credentials
 
-## Quick start
+## Quick start (local)
 
 ```bash
 npm install
@@ -38,6 +38,28 @@ App: [http://localhost:3456](http://localhost:3456)
 
 - **Demo viewer** — likes, saves, comments, reports
 - **Demo admin** — `/admin` dashboard
+
+## Public deploy (iPhone / Safari)
+
+SLOP needs **Vercel** (free Hobby) because of Next.js API routes — not a static host.
+
+| | |
+| --- | --- |
+| **Public HTTPS (live)** | https://prompt-gold-o5sbpw9.tmp.now |
+| **Claim for permanent free URL** | https://vercel.com/claim-deployment?code=a8f2942f-60b6-4e9d-b857-cb44416b7e6e |
+
+1. Open the claim link → free Vercel account → keep the site.
+2. You will get a stable `*.vercel.app` URL for Safari on your iPhone.
+3. Connect GitHub (Create repo in Cursor, then import in Vercel) so pushes to `main` auto-deploy.
+
+Full steps: [`docs/DEPLOY.md`](docs/DEPLOY.md)
+
+```bash
+npm run build
+npx vercel deploy --temporary --yes   # anonymous; claim to keep
+# or, after login:
+npx vercel --prod
+```
 
 ## Product surfaces
 

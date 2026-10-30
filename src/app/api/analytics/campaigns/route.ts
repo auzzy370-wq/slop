@@ -6,6 +6,7 @@ import {
   createCampaign,
   createTrackingLink,
 } from "@/lib/analytics/service";
+import { requireAdminKey } from "@/lib/admin-guard";
 import { uid } from "@/lib/utils";
 
 export async function GET() {
@@ -44,6 +45,8 @@ const createSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const denied = requireAdminKey(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => null);
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) {
@@ -80,6 +83,8 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const denied = requireAdminKey(request);
+  if (denied) return denied;
   const body = await request.json().catch(() => ({}));
   const id = typeof body.id === "string" ? body.id : null;
   if (!id) return NextResponse.json({ error: "missing_id" }, { status: 400 });
