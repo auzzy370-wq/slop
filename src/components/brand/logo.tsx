@@ -5,8 +5,8 @@ import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * SLOP brand mark — vertical short-drama frame + play.
- * Geometry is fill-based and optically centered in the tile.
+ * SLOP mark — violet gradient tile + centered geometric S.
+ * Restored after the frame/play experiment; optically centered.
  */
 export function SlopMark({ className }: { className?: string }) {
   const uid = useId().replace(/:/g, "");
@@ -22,40 +22,36 @@ export function SlopMark({ className }: { className?: string }) {
       <defs>
         <linearGradient
           id={bg}
-          x1="10"
+          x1="8"
           y1="2"
-          x2="54"
+          x2="56"
           y2="62"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#5B3DFF" />
-          <stop offset="0.5" stopColor="#A78BFA" />
-          <stop offset="1" stopColor="#EDE4FF" />
+          <stop stopColor="#7A5CFF" />
+          <stop offset="0.5" stopColor="#B99AFF" />
+          <stop offset="1" stopColor="#E9DEFF" />
         </linearGradient>
         <linearGradient
           id={sheen}
           x1="14"
           y1="4"
-          x2="38"
-          y2="30"
+          x2="36"
+          y2="28"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#fff" stopOpacity="0.4" />
+          <stop stopColor="#fff" stopOpacity="0.35" />
           <stop offset="1" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
       </defs>
-
       <rect width="64" height="64" rx="16" fill={`url(#${bg})`} />
       <rect width="64" height="64" rx="16" fill={`url(#${sheen})`} />
-
-      {/* Outer phone bezel — center x=32 */}
-      <rect x="19" y="11" width="26" height="42" rx="7" fill="#111116" />
-      {/* Inner screen */}
-      <rect x="23" y="16" width="18" height="32" rx="3.5" fill="#1A1528" />
-      {/* Screen highlight */}
-      <rect x="23" y="16" width="18" height="10" rx="3.5" fill="#2A2140" opacity="0.55" />
-      {/* Play — tip slightly past center for optical balance */}
-      <path d="M27.6 26.4v15.2L41 34 27.6 26.4z" fill="#F3ECFF" />
+      {/* Geometric S — shifted to optical center of the tile */}
+      <path
+        fill="#111116"
+        transform="translate(1.2 0)"
+        d="M42.6 19.8c-2.15-3.4-5.9-5.45-11-5.45-7.7 0-13.5 4.7-13.5 11.65 0 5.2 2.8 8.45 9.45 10.8l6.25 2.1c3.4 1.15 4.9 2.5 4.9 4.85 0 2.9-2.6 4.7-6.55 4.7-3.75 0-6.65-1.45-8.65-4.25l-5.9 4.25c3 4.35 8 6.75 14.45 6.75 8.65 0 14.55-4.7 14.55-12 0-5.4-3-8.85-9.9-11.25l-6-2.05c-3.1-1.05-4.45-2.4-4.45-4.55 0-2.6 2.3-4.25 5.8-4.25 3.1 0 5.4 1.35 6.95 3.55l5.7-4z"
+      />
     </svg>
   );
 }
@@ -73,46 +69,21 @@ export function SlopMarkMini({ className }: { className?: string }) {
       <defs>
         <linearGradient
           id={bg}
-          x1="10"
+          x1="8"
           y1="2"
-          x2="54"
+          x2="56"
           y2="62"
           gradientUnits="userSpaceOnUse"
         >
-          <stop stopColor="#5B3DFF" />
-          <stop offset="1" stopColor="#C4B0FF" />
+          <stop stopColor="#7A5CFF" />
+          <stop offset="1" stopColor="#C9B4FF" />
         </linearGradient>
       </defs>
       <rect width="64" height="64" rx="16" fill={`url(#${bg})`} />
-      <rect x="19" y="11" width="26" height="42" rx="7" fill="#111116" />
-      <rect x="23" y="16" width="18" height="32" rx="3.5" fill="#1A1528" />
-      <path d="M27.6 26.4v15.2L41 34 27.6 26.4z" fill="#F3ECFF" />
-    </svg>
-  );
-}
-
-/** Custom wordmark — signature play-O, not system type. */
-function SlopLetters({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 124 28"
-      className={cn("h-[1.05em] w-auto", className)}
-      aria-hidden
-    >
       <path
-        fill="currentColor"
-        d="M23.2 5.9c-1.55-2.15-4.2-3.45-7.55-3.45-5.25 0-9.15 3-9.15 7.4 0 3.4 1.85 5.45 6.35 7l4.2 1.45c2.35.8 3.35 1.65 3.35 3.15 0 1.95-1.75 3.15-4.5 3.15-2.55 0-4.5-.95-5.95-2.85l-4 2.85c2.05 2.95 5.45 4.55 9.85 4.55 5.85 0 9.85-3.15 9.85-8.05 0-3.55-1.95-5.9-6.65-7.55l-4-1.35c-2.05-.7-2.95-1.55-2.95-3 0-1.7 1.55-2.75 3.9-2.75 2.05 0 3.6.85 4.6 2.35l3.9-2.75z"
-      />
-      <path fill="currentColor" d="M36.4 2.8h4.35v18.6h10.9v3.7H36.4V2.8z" />
-      <path
-        fill="currentColor"
-        fillRule="evenodd"
-        d="M68.2 1.2c-7.4 0-12.95 5.5-12.95 12.7S60.8 26.6 68.2 26.6s12.95-5.5 12.95-12.7S75.6 1.2 68.2 1.2zm0 3.8c5.05 0 8.55 3.7 8.55 8.9s-3.5 8.9-8.55 8.9-8.55-3.7-8.55-8.9 3.5-8.9 8.55-8.9z"
-      />
-      <path fill="currentColor" d="M64.9 9.7v11l9.1-5.5-9.1-5.5z" />
-      <path
-        fill="currentColor"
-        d="M87 2.8h8.7c5.7 0 9.4 3.4 9.4 8.6 0 5.2-3.7 8.6-9.4 8.6H91.4V25.1H87V2.8zm4.35 3.7v9.85h4.15c3.2 0 5.05-1.75 5.05-4.9s-1.85-4.95-5.05-4.95h-4.15z"
+        fill="#111116"
+        transform="translate(1.2 0)"
+        d="M42.6 19.8c-2.15-3.4-5.9-5.45-11-5.45-7.7 0-13.5 4.7-13.5 11.65 0 5.2 2.8 8.45 9.45 10.8l6.25 2.1c3.4 1.15 4.9 2.5 4.9 4.85 0 2.9-2.6 4.7-6.55 4.7-3.75 0-6.65-1.45-8.65-4.25l-5.9 4.25c3 4.35 8 6.75 14.45 6.75 8.65 0 14.55-4.7 14.55-12 0-5.4-3-8.85-9.9-11.25l-6-2.05c-3.1-1.05-4.45-2.4-4.45-4.55 0-2.6 2.3-4.25 5.8-4.25 3.1 0 5.4 1.35 6.95 3.55l5.7-4z"
       />
     </svg>
   );
@@ -132,18 +103,21 @@ export function SlopWordmark({
   return (
     <Link
       href={href}
-      className={cn("inline-flex h-9 items-center gap-2.5 text-white", className)}
+      className={cn(
+        "inline-flex h-9 items-center gap-2.5 font-display text-[1.35rem] font-bold leading-none tracking-[-0.04em] text-white",
+        className,
+      )}
     >
       {showMark ? (
         <SlopMark
           className={cn(
-            "h-9 w-9 shrink-0 drop-shadow-[0_4px_16px_rgba(91,61,255,0.5)]",
+            "h-8 w-8 shrink-0 drop-shadow-[0_2px_10px_rgba(140,110,255,0.4)]",
             markClassName,
           )}
         />
       ) : null}
-      <SlopLetters className="h-[22px] text-white" />
-      <span className="sr-only">SLOP — Stories That Keep You Watching</span>
+      <span className="translate-y-px">SLOP</span>
+      <span className="sr-only"> — Stories That Keep You Watching</span>
     </Link>
   );
 }
