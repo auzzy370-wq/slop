@@ -25,7 +25,7 @@ import { useSlopStore } from "@/store/slop-store";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
+import { CommentsSheet } from "@/components/feed/comments-sheet";
 import Link from "next/link";
 import { track } from "@/lib/analytics/client";
 
@@ -644,45 +644,19 @@ export function VideoCard({
         </div>
       </div>
 
-      <Dialog open={commentsOpen} onClose={() => setCommentsOpen(false)} title="Comments">
-        {video.commentsDisabled ? (
-          <p className="text-sm text-white/60">Comments are disabled on this video.</p>
-        ) : (
-          <>
-            <div className="mb-4 max-h-64 space-y-3 overflow-y-auto">
-              {videoComments.length === 0 && (
-                <p className="text-sm text-white/50">No comments yet. Start the chaos.</p>
-              )}
-              {videoComments.map((c) => (
-                <div key={c.id} className="rounded-2xl bg-white/5 p-3">
-                  <div className="mb-1 flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-white">{c.displayName}</p>
-                    {(user?.id === c.userId || user?.role === "admin") && (
-                      <button
-                        type="button"
-                        className="text-xs text-white/40 hover:text-red-400"
-                        onClick={() => deleteComment(c.id)}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-sm text-white/75">{c.text}</p>
-                </div>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <Input
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                placeholder={user ? "Add a comment…" : "Sign in to comment"}
-                maxLength={500}
-              />
-              <Button onClick={onSubmitComment}>Post</Button>
-            </div>
-          </>
-        )}
-      </Dialog>
+      <CommentsSheet
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        comments={videoComments}
+        commentsDisabled={!!video.commentsDisabled}
+        commentText={commentText}
+        onCommentTextChange={setCommentText}
+        onSubmit={onSubmitComment}
+        canComment={!!user}
+        currentUserId={user?.id}
+        isAdmin={user?.role === "admin"}
+        onDelete={deleteComment}
+      />
 
       <Dialog open={shareOpen} onClose={() => setShareOpen(false)} title="Share this clip">
         <p className="mb-3 break-all rounded-xl bg-white/5 p-3 text-sm text-white/70">

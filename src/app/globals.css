@@ -380,6 +380,54 @@ a {
   -webkit-text-stroke: 1.5px rgba(233, 222, 255, 0.28);
 }
 
+/* TikTok-style comments bottom sheet */
+.slop-comments-scrim {
+  background: rgba(0, 0, 0, 0);
+  transition: background 220ms ease;
+}
+
+.slop-comments-scrim.is-on {
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.slop-comments-sheet {
+  background: rgba(22, 22, 28, 0.97);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px 14px 0 0;
+  box-shadow: 0 -12px 40px rgba(0, 0, 0, 0.45);
+  transform: translateY(110%);
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.slop-comments-sheet.is-open {
+  transform: translateY(0);
+}
+
+.slop-comments-handle {
+  display: block;
+  width: 36px;
+  height: 4px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.slop-comment-row {
+  animation: slop-comment-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes slop-comment-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .row-scroll {
   display: flex;
   gap: 0.75rem;
