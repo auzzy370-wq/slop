@@ -62,6 +62,8 @@ export function VideoCard({
   const [paused, setPaused] = useState(false);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(!isScripted);
+  /** Bumps to force a clean <video> remount after abort / retry. */
+  const [mediaKey, setMediaKey] = useState(0);
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -225,8 +227,12 @@ export function VideoCard({
       setPaused(false);
       setProgress(0);
       setChromeVisible(true);
+      return;
     }
-  }, [active]);
+    // Coming back onto a card after a fast swipe — clear abort failures.
+    setFailed(false);
+    setLoading(!isScripted);
+  }, [active, isScripted, video.id]);
 
   const clearChromeHideTimer = useCallback(() => {
     if (chromeHideTimer.current) {
@@ -515,9 +521,10 @@ export function VideoCard({
         />
       ) : !failed ? (
         <video
+          key={`${video.id}-${mediaKey}`}
           ref={videoRef}
           className="slop-feed-video"
-          src={active || loading ? video.videoUrl : undefined}
+          src={video.videoUrl}
           poster={video.thumbnailUrl}
           playsInline
           loop
@@ -534,7 +541,19 @@ export function VideoCard({
             setFailed(false);
           }}
           onLoadedData={() => setLoading(false)}
-          onError={() => {
+          onError={(e) => {
+            const media = e.currentTarget;
+            const code = media.error?.code;
+            // 20 / MEDIA_ERR_ABORTED — normal when swiping away mid-load.
+            if (code === MediaError.MEDIA_ERR_ABORTED || code === 1) {
+              setLoading(false);
+              return;
+            }
+            // Empty src / transient network blip while inactive — don't brick the card.
+            if (!active || !media.currentSrc) {
+              setLoading(false);
+              return;
+            }
             setFailed(true);
             setLoading(false);
           }}
@@ -553,6 +572,7 @@ export function VideoCard({
             onClick={() => {
               setFailed(false);
               setLoading(true);
+              setMediaKey((k) => k + 1);
             }}
           >
             Retry

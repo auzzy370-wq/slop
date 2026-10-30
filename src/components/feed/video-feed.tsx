@@ -314,7 +314,8 @@ export function VideoFeed({
         }}
       >
         {items.map((item, index) => {
-          const near = Math.abs(index - activeIndex) <= 1;
+          // Keep ±2 mounted so the next swipe already has media warming up.
+          const near = Math.abs(index - activeIndex) <= 2;
           if (item.kind === "ad") {
             return (
               <section
