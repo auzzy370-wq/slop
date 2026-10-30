@@ -47,15 +47,19 @@ export function VideoCard({
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(false);
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [scrubbing, setScrubbing] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [commentText, setCommentText] = useState("");
   const [reportReason, setReportReason] = useState("spam");
   const [reportDetails, setReportDetails] = useState("");
+  const scrubRef = useRef<HTMLDivElement>(null);
+  const wasPlayingBeforeScrub = useRef(false);
 
   const user = useSlopStore((s) => s.currentUser);
   const likes = useSlopStore((s) => s.likes);
@@ -161,6 +165,8 @@ export function VideoCard({
   const onTimeUpdate = () => {
     const el = videoRef.current;
     if (!el || !el.duration) return;
+    if (Number.isFinite(el.duration)) setDuration(el.duration);
+    if (scrubbing) return;
     const ratio = el.currentTime / el.duration;
     setProgress(ratio);
     const now = Date.now();
@@ -196,6 +202,55 @@ export function VideoCard({
         },
       });
     }
+  };
+
+  const formatTime = (seconds: number) => {
+    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
+    const m = Math.floor(seconds / 60);
+    const s = Math.floor(seconds % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  };
+
+  const seekToClientX = useCallback((clientX: number) => {
+    const el = videoRef.current;
+    const bar = scrubRef.current;
+    if (!el || !bar || !el.duration) return;
+    const rect = bar.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    el.currentTime = ratio * el.duration;
+    setProgress(ratio);
+  }, []);
+
+  const onScrubPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const el = videoRef.current;
+    wasPlayingBeforeScrub.current = !!el && !el.paused && !paused;
+    setScrubbing(true);
+    setPaused(true);
+    e.currentTarget.setPointerCapture(e.pointerId);
+    seekToClientX(e.clientX);
+  };
+
+  const onScrubPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrubbing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    seekToClientX(e.clientX);
+  };
+
+  const onScrubPointerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!scrubbing) return;
+    e.preventDefault();
+    e.stopPropagation();
+    seekToClientX(e.clientX);
+    setScrubbing(false);
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* already released */
+    }
+    if (wasPlayingBeforeScrub.current) setPaused(false);
   };
 
   const togglePlay = useCallback(() => {
@@ -270,15 +325,6 @@ export function VideoCard({
     }
   };
 
-  const seekFromPointer = (e: ReactPointerEvent<HTMLDivElement>) => {
-    const el = videoRef.current;
-    if (!el || !el.duration) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width));
-    el.currentTime = ratio * el.duration;
-    setProgress(ratio);
-  };
-
   return (
     <article className="relative h-full w-full snap-start overflow-hidden bg-black">
       {!failed ? (
@@ -292,6 +338,10 @@ export function VideoCard({
           muted={muted}
           preload={active ? "auto" : "metadata"}
           onTimeUpdate={onTimeUpdate}
+          onLoadedMetadata={(e) => {
+            const d = e.currentTarget.duration;
+            if (Number.isFinite(d)) setDuration(d);
+          }}
           onWaiting={() => setLoading(true)}
           onPlaying={() => {
             setLoading(false);
@@ -324,7 +374,7 @@ export function VideoCard({
         </div>
       )}
 
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/50 via-transparent to-black/75" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/45 via-transparent to-black/85" />
 
       {loading && active && !failed && (
         <div className="absolute inset-0 flex items-center justify-center">
@@ -332,7 +382,7 @@ export function VideoCard({
         </div>
       )}
 
-      {paused && active && (
+      {paused && active && !scrubbing && (
         <button
           type="button"
           onClick={togglePlay}
@@ -343,32 +393,8 @@ export function VideoCard({
         </button>
       )}
 
-      <div className="absolute bottom-24 left-0 right-16 z-20 px-4 sm:bottom-28">
-        <p className="mb-1 text-xs font-medium uppercase tracking-wider text-[var(--slop-violet)]">
-          {video.sourceAttribution} · EP {video.episodeNumber}
-        </p>
-        <h2 className="font-display text-xl leading-tight text-white drop-shadow-md sm:text-2xl">
-          {video.title}
-        </h2>
-        <p className="mt-2 line-clamp-2 text-sm text-white/80">{video.description}</p>
-        <div className="mt-3 flex flex-wrap gap-2">
-          {categoryNames.map((name) => (
-            <span
-              key={name}
-              className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/80 backdrop-blur"
-            >
-              {name}
-            </span>
-          ))}
-        </div>
-        {video.viewCount > 0 ? (
-          <p className="mt-2 text-xs text-white/50">
-            {formatCount(video.viewCount)} views
-          </p>
-        ) : null}
-      </div>
-
-      <div className="absolute bottom-28 right-3 z-20 flex flex-col items-center gap-4 sm:bottom-32">
+      {/* Side actions — sit above bottom chrome */}
+      <div className="absolute bottom-[9.5rem] right-3 z-20 flex flex-col items-center gap-3.5 pb-[env(safe-area-inset-bottom)] sm:bottom-40">
         <ActionButton
           label={video.likeCount > 0 ? formatCount(video.likeCount) : "Like"}
           active={liked}
@@ -422,15 +448,81 @@ export function VideoCard({
         </ActionButton>
       </div>
 
-      <div
-        className="absolute bottom-[5.5rem] left-0 right-0 z-30 px-3 sm:bottom-24"
-        onPointerDown={seekFromPointer}
-      >
-        <div className="h-1 overflow-hidden rounded-full bg-white/25">
+      {/* Title + description + scrub bar pinned to bottom */}
+      <div className="absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black via-black/70 to-transparent pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-16">
+        <div className="px-4 pr-16">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-[var(--slop-violet)]">
+            {video.sourceAttribution} · EP {video.episodeNumber}
+          </p>
+          <h2 className="font-display text-xl leading-tight text-white drop-shadow-md sm:text-2xl">
+            {video.title}
+          </h2>
+          <p className="mt-1.5 line-clamp-2 text-sm text-white/80">
+            {video.description}
+          </p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {categoryNames.map((name) => (
+              <span
+                key={name}
+                className="rounded-full bg-white/10 px-2.5 py-1 text-[11px] text-white/80 backdrop-blur"
+              >
+                {name}
+              </span>
+            ))}
+            {video.viewCount > 0 ? (
+              <span className="text-xs text-white/45">
+                {formatCount(video.viewCount)} views
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="mt-3 px-3">
+          <div className="mb-1 flex items-center justify-between text-[10px] font-medium tabular-nums text-white/55">
+            <span>{formatTime(progress * (duration || 0))}</span>
+            <span>{formatTime(duration || video.durationSeconds)}</span>
+          </div>
           <div
-            className="h-full rounded-full bg-[var(--slop-violet)] transition-[width] duration-100"
-            style={{ width: `${progress * 100}%` }}
-          />
+            ref={scrubRef}
+            role="slider"
+            aria-label="Seek"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(progress * 100)}
+            tabIndex={0}
+            className="relative flex h-8 cursor-pointer touch-none items-center"
+            onPointerDown={onScrubPointerDown}
+            onPointerMove={onScrubPointerMove}
+            onPointerUp={onScrubPointerUp}
+            onPointerCancel={onScrubPointerUp}
+            onKeyDown={(e) => {
+              const el = videoRef.current;
+              if (!el || !el.duration) return;
+              const step = el.duration * 0.05;
+              if (e.key === "ArrowRight") {
+                el.currentTime = Math.min(el.duration, el.currentTime + step);
+                setProgress(el.currentTime / el.duration);
+              } else if (e.key === "ArrowLeft") {
+                el.currentTime = Math.max(0, el.currentTime - step);
+                setProgress(el.currentTime / el.duration);
+              }
+            }}
+          >
+            <div
+              className={`relative w-full rounded-full bg-white/25 ${scrubbing ? "h-1.5" : "h-1"}`}
+            >
+              <div
+                className="absolute inset-y-0 left-0 rounded-full bg-[var(--slop-violet)]"
+                style={{ width: `${progress * 100}%` }}
+              />
+              <div
+                className={`absolute top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow ${
+                  scrubbing ? "h-4 w-4" : "h-3 w-3"
+                }`}
+                style={{ left: `${progress * 100}%` }}
+              />
+            </div>
+          </div>
         </div>
       </div>
 
