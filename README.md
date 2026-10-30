@@ -16,6 +16,7 @@ SLOP is a premium short-form drama streaming platform — **30 cinematic AI-powe
 | Headlines | Space Grotesk |
 | Body / buttons | Inter |
 | Tagline | Stories That Keep You Watching. |
+| Logo | Gradient violet app tile + geometric **S** monogram + `SLOP` wordmark (`src/components/brand/logo.tsx`) |
 
 ## Stack
 

@@ -18,6 +18,7 @@ import {
   VolumeX,
   Flag,
 } from "lucide-react";
+import { SlopMarkMini } from "@/components/brand/logo";
 import { toast } from "sonner";
 import type { Video } from "@/lib/types";
 import { formatCount, uid } from "@/lib/utils";
@@ -562,9 +563,9 @@ export function VideoCard({
       {/* Top strip — brand + episode chip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="mt-11 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="slop-live-pip" aria-hidden />
-            <p className="font-display text-[11px] font-bold tracking-[0.3em] text-[var(--slop-lavender)]">
+          <div className="flex items-center gap-1.5">
+            <SlopMarkMini className="h-3.5 w-3.5" />
+            <p className="font-display text-[11px] font-bold tracking-[0.22em] text-white/90">
               SLOP
             </p>
           </div>

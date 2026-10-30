@@ -15,6 +15,7 @@ import {
   Users,
   Video,
 } from "lucide-react";
+import { SlopWordmark } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
 import { useSlopStore } from "@/store/slop-store";
 
@@ -56,13 +57,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-[100dvh] bg-[var(--slop-black)] pb-16 md:pb-0">
       <div className="mx-auto flex max-w-6xl gap-0 md:gap-6 md:px-4 md:py-6">
         <aside className="hidden w-56 shrink-0 md:block">
-          <Link
-            href="/"
-            className="mb-6 block font-display text-2xl font-bold"
-          >
-            SLOP<span className="text-[var(--slop-violet)]">.</span>
-            <span className="ml-2 text-xs font-medium text-white/40">Admin</span>
-          </Link>
+          <div className="mb-6 flex items-center gap-2">
+            <SlopWordmark className="text-xl" />
+            <span className="text-xs font-medium text-white/40">Admin</span>
+          </div>
           <nav className="space-y-1">
             {nav.map(({ href, label, icon: Icon }) => {
               const active =
