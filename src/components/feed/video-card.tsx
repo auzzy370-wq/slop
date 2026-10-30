@@ -361,14 +361,16 @@ export function VideoCard({
             </span>
           ))}
         </div>
-        <p className="mt-2 text-xs text-white/50">
-          {formatCount(video.viewCount)} views
-        </p>
+        {video.viewCount > 0 ? (
+          <p className="mt-2 text-xs text-white/50">
+            {formatCount(video.viewCount)} views
+          </p>
+        ) : null}
       </div>
 
       <div className="absolute bottom-28 right-3 z-20 flex flex-col items-center gap-4 sm:bottom-32">
         <ActionButton
-          label={formatCount(video.likeCount)}
+          label={video.likeCount > 0 ? formatCount(video.likeCount) : "Like"}
           active={liked}
           onClick={onLike}
           ariaLabel="Like"
@@ -376,14 +378,22 @@ export function VideoCard({
           <Heart className={liked ? "fill-[var(--slop-violet)] text-[var(--slop-violet)]" : ""} />
         </ActionButton>
         <ActionButton
-          label={formatCount(video.commentCount)}
+          label={
+            video.commentCount > 0 ? formatCount(video.commentCount) : "Comment"
+          }
           onClick={() => setCommentsOpen(true)}
           ariaLabel="Comments"
         >
           <MessageCircle />
         </ActionButton>
         <ActionButton
-          label={saved ? "Saved" : formatCount(video.saveCount)}
+          label={
+            saved
+              ? "Saved"
+              : video.saveCount > 0
+                ? formatCount(video.saveCount)
+                : "Save"
+          }
           active={saved}
           onClick={onSave}
           ariaLabel="Save"

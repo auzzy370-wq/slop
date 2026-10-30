@@ -256,7 +256,7 @@ export const DEMO_VIDEOS: Video[] = [
     licensingNotes: "SLOP Original short-form drama.",
     viewCount: 0,
     likeCount: 0,
-    commentCount: 1,
+    commentCount: 0,
     saveCount: 0,
     createdAt: "2026-09-14T12:00:00.000Z",
     publishedAt: "2026-09-15T09:00:00.000Z",
@@ -312,7 +312,7 @@ export const DEMO_VIDEOS: Video[] = [
     licensingNotes: "SLOP Original short-form drama.",
     viewCount: 0,
     likeCount: 0,
-    commentCount: 1,
+    commentCount: 0,
     saveCount: 0,
     createdAt: "2026-09-21T12:00:00.000Z",
     publishedAt: "2026-09-22T18:00:00.000Z",
@@ -340,7 +340,7 @@ export const DEMO_VIDEOS: Video[] = [
     licensingNotes: "SLOP Original short-form drama.",
     viewCount: 0,
     likeCount: 0,
-    commentCount: 1,
+    commentCount: 0,
     saveCount: 0,
     createdAt: "2026-10-01T12:00:00.000Z",
     publishedAt: "2026-10-02T16:00:00.000Z",
@@ -488,38 +488,7 @@ export const DEMO_VIDEOS: Video[] = [
   },
 ];
 
-export const DEMO_COMMENTS: Comment[] = [
-  {
-    id: "cmt_1",
-    videoId: "ep_gilded_1",
-    userId: "user_demo",
-    displayName: "midnightreader",
-    avatarUrl: null,
-    text: "I was supposed to watch one episode. It is 2 a.m.",
-    createdAt: "2026-09-16T11:20:00.000Z",
-    moderationStatus: "visible",
-  },
-  {
-    id: "cmt_2",
-    videoId: "ep_ashes_1",
-    userId: "user_nova",
-    displayName: "nova_loop",
-    avatarUrl: null,
-    text: "That gala entrance hit harder than expected.",
-    createdAt: "2026-10-03T08:10:00.000Z",
-    moderationStatus: "visible",
-  },
-  {
-    id: "cmt_3",
-    videoId: "ep_night_1",
-    userId: "user_demo",
-    displayName: "midnightreader",
-    avatarUrl: null,
-    text: "Wrong door. Right amount of chaos.",
-    createdAt: "2026-09-23T01:02:00.000Z",
-    moderationStatus: "visible",
-  },
-];
+export const DEMO_COMMENTS: Comment[] = [];
 
 export const DEMO_ADMIN_PROFILE: Profile = {
   id: "admin_slop",
@@ -571,5 +540,5 @@ export const DEMO_STATS: AdminStats = {
   watchTimeHours: 0,
   activePremium: 0,
   estimatedMonthlyRevenue: 0,
-  openReports: 1,
+  openReports: 0,
 };

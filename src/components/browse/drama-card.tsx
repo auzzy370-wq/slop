@@ -31,7 +31,10 @@ export function DramaCard({
             {drama.title}
           </p>
           <p className="mt-1 text-[10px] text-[var(--slop-lavender)]/80">
-            {drama.episodeCount} eps · {formatCount(drama.viewCount)} views
+            {drama.episodeCount} eps
+            {drama.viewCount > 0
+              ? ` · ${formatCount(drama.viewCount)} views`
+              : ""}
           </p>
         </div>
         {drama.trendingRank && drama.trendingRank <= 3 && (

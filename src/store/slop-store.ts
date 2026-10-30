@@ -6,11 +6,13 @@ import {
   DEFAULT_SETTINGS,
   DEMO_ADMIN_PROFILE,
   DEMO_COMMENTS,
-  DEMO_DRAMAS,
   DEMO_USER_PROFILE,
-  DEMO_VIDEOS,
   DEMO_CATEGORIES,
 } from "@/lib/demo-data";
+import {
+  applyEngagementCounts,
+  catalogFromSeed,
+} from "@/lib/engagement";
 import type {
   Comment,
   Drama,
@@ -24,6 +26,8 @@ import type {
   Category,
 } from "@/lib/types";
 import { uid } from "@/lib/utils";
+
+const FRESH_CATALOG = catalogFromSeed();
 
 interface SlopState {
   hydrated: boolean;
@@ -139,50 +143,13 @@ export const useSlopStore = create<SlopState>()(
         });
       },
 
-      videos: DEMO_VIDEOS,
-      dramas: DEMO_DRAMAS,
+      videos: FRESH_CATALOG.videos,
+      dramas: FRESH_CATALOG.dramas,
       categories: DEMO_CATEGORIES,
       comments: DEMO_COMMENTS,
       likes: [],
       saves: [],
-      reports: [
-        {
-          id: "rpt_1",
-          reporterId: "user_demo",
-          contentType: "comment",
-          contentId: "cmt_1",
-          reason: "spam",
-          details: "Looks like spam to me",
-          status: "open",
-          resolution: null,
-          createdAt: "2026-10-27T12:00:00.000Z",
-          reviewedAt: null,
-        },
-        {
-          id: "rpt_2",
-          reporterId: null,
-          contentType: "video",
-          contentId: "vid_grocery_glitch",
-          reason: "misleading",
-          details: "Title oversells the glitch",
-          status: "open",
-          resolution: null,
-          createdAt: "2026-10-28T09:00:00.000Z",
-          reviewedAt: null,
-        },
-        {
-          id: "rpt_3",
-          reporterId: "user_nova",
-          contentType: "comment",
-          contentId: "cmt_2",
-          reason: "harassment",
-          details: "Borderline rude",
-          status: "open",
-          resolution: null,
-          createdAt: "2026-10-29T16:00:00.000Z",
-          reviewedAt: null,
-        },
-      ],
+      reports: [],
       settings: DEFAULT_SETTINGS,
       subscription: null,
 
@@ -442,50 +409,103 @@ export const useSlopStore = create<SlopState>()(
       },
     }),
     {
-      name: "slop-local-v4",
-      version: 4,
+      name: "slop-local-v5",
+      version: 5,
       partialize: (state) => ({
         currentUser: state.currentUser,
-        videos: state.videos,
-        dramas: state.dramas,
-        categories: state.categories,
+        // Persist only real interactions + view tallies by id — never seed fakes.
+        viewCounts: Object.fromEntries(
+          state.videos.map((v) => [v.id, v.viewCount] as const),
+        ),
         comments: state.comments,
         likes: state.likes,
         saves: state.saves,
         reports: state.reports,
         settings: state.settings,
         subscription: state.subscription,
+        categories: state.categories,
       }),
-      migrate: () => {
-        // Drop fabricated seed counters from older localStorage versions.
-        // Fresh catalog metrics start at 0; comments match demo seeds only.
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<{
+          currentUser: Profile | null;
+          viewCounts: Record<string, number>;
+          comments: Comment[];
+          likes: Like[];
+          saves: SavedVideo[];
+          reports: Report[];
+          settings: PlatformSettings;
+          subscription: SubscriptionRecord | null;
+          categories: Category[];
+          // legacy poisoned fields — ignored
+          videos: Video[];
+          dramas: Drama[];
+        }>;
+
+        const viewMap = new Map<string, number>();
+        if (p.viewCounts) {
+          for (const [id, n] of Object.entries(p.viewCounts)) {
+            if (typeof n === "number" && n >= 0 && n < 1_000_000) {
+              // Cap absurd persisted fakes from older builds
+              viewMap.set(id, n > 10_000 ? 0 : n);
+            }
+          }
+        } else if (p.videos) {
+          for (const v of p.videos) {
+            const n = v.viewCount ?? 0;
+            viewMap.set(v.id, n > 10_000 ? 0 : Math.max(0, n));
+          }
+        }
+
+        const likes = Array.isArray(p.likes) ? p.likes : [];
+        const saves = Array.isArray(p.saves) ? p.saves : [];
+        // Drop seed demo comments; keep only user-authored (or empty)
+        const comments = Array.isArray(p.comments)
+          ? p.comments.filter((c) => !String(c.id).startsWith("cmt_"))
+          : [];
+        const catalog = catalogFromSeed(viewMap);
+        const derived = applyEngagementCounts(
+          catalog.videos,
+          catalog.dramas,
+          likes,
+          saves,
+          comments,
+        );
+
         return {
-          currentUser: null,
-          videos: DEMO_VIDEOS,
-          dramas: DEMO_DRAMAS,
-          categories: DEMO_CATEGORIES,
-          comments: DEMO_COMMENTS,
-          likes: [],
-          saves: [],
-          reports: [
-            {
-              id: "rpt_1",
-              reporterId: "user_demo",
-              contentType: "comment" as const,
-              contentId: "cmt_1",
-              reason: "spam",
-              details: "Looks like spam to me",
-              status: "open" as const,
-              resolution: null,
-              createdAt: "2026-10-27T12:00:00.000Z",
-              reviewedAt: null,
-            },
-          ],
-          settings: DEFAULT_SETTINGS,
-          subscription: null,
+          ...current,
+          ...derived,
+          currentUser: p.currentUser ?? null,
+          comments,
+          likes,
+          saves,
+          reports: Array.isArray(p.reports) ? p.reports : [],
+          settings: p.settings ?? DEFAULT_SETTINGS,
+          subscription: p.subscription ?? null,
+          categories: p.categories ?? DEMO_CATEGORIES,
         };
       },
+      migrate: () => ({
+        currentUser: null,
+        viewCounts: {},
+        comments: [],
+        likes: [],
+        saves: [],
+        reports: [],
+        settings: DEFAULT_SETTINGS,
+        subscription: null,
+        categories: DEMO_CATEGORIES,
+      }),
       onRehydrateStorage: () => (state) => {
+        if (typeof window !== "undefined") {
+          for (const key of Object.keys(localStorage)) {
+            if (
+              key.startsWith("slop-local-v") &&
+              key !== "slop-local-v5"
+            ) {
+              localStorage.removeItem(key);
+            }
+          }
+        }
         state?.setHydrated(true);
       },
     },

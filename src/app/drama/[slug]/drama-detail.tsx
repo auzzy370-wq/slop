@@ -83,8 +83,10 @@ export function DramaDetail({ slug }: { slug: string }) {
             {drama.synopsis}
           </p>
           <p className="mt-3 text-xs text-[var(--slop-slate)]">
-            {drama.sourceAttribution} · {episodes.length} episodes ·{" "}
-            {formatCount(drama.viewCount)} views
+            {drama.sourceAttribution} · {episodes.length} episodes
+            {drama.viewCount > 0
+              ? ` · ${formatCount(drama.viewCount)} views`
+              : ""}
           </p>
           {first && (
             <Link
@@ -127,9 +129,11 @@ export function DramaDetail({ slug }: { slug: string }) {
                 <p className="mt-1 line-clamp-2 text-xs text-white/55">
                   {ep.description}
                 </p>
-                <p className="mt-2 text-[11px] text-[var(--slop-slate)]">
-                  {formatCount(ep.viewCount)} views
-                </p>
+                {ep.viewCount > 0 ? (
+                  <p className="mt-2 text-[11px] text-[var(--slop-slate)]">
+                    {formatCount(ep.viewCount)} views
+                  </p>
+                ) : null}
               </div>
             </Link>
           ))}

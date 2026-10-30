@@ -104,8 +104,11 @@ export function HomeBrowse() {
               </Link>
             </div>
             <p className="mt-4 text-xs text-[var(--slop-slate)]">
-              Featured · {formatCount(featured.viewCount)} views ·{" "}
-              {featured.episodeCount} episodes
+              Featured ·{" "}
+              {featured.viewCount > 0
+                ? `${formatCount(featured.viewCount)} views`
+                : "Just published"}{" "}
+              · {featured.episodeCount} episodes
             </p>
           </div>
         </section>
