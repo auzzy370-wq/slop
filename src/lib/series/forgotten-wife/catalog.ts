@@ -60,6 +60,9 @@ const RENDERED_DURATIONS: Record<number, number> = {
   22: 23,
   23: 24,
   24: 29,
+  25: 35,
+  26: 21,
+  27: 21,
 };
 
 function epMeta(n: number) {
