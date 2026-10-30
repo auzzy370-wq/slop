@@ -1,14 +1,15 @@
 # SLOP content sources
 
-Full-episode dramas currently on the shelf:
+All catalog titles are **SLOP Originals** — generated vertical episodes with AI scene stills, neural TTS dialogue, and burned-in subtitles.
 
-| Drama | Episodes | Runtime | Source |
+| Drama | Theme | Episodes | Notes |
 | --- | --- | --- | --- |
-| **The Billionaire's Forgotten Wife** | 60 | ~36–96s each | **SLOP Original** — generated vertical episodes (AI scene stills + neural TTS voices + burned-in subtitles). Eps 1–5 rendered as MP4; remaining eps play as scripted until rendered |
-| **The Second Key** | 4 | ~5.2 min total (~78s each) | Hugging Face `tungmtp/ai-drama-production-harness-demo-media` full vertical AI film, split into episodes |
-| **EXECUTE** | 3 | ~10 min total (~3.3 min each) | Wikimedia Commons [EXECUTE — dark Sci-Fi AI-short film](https://commons.wikimedia.org/wiki/File:EXECUTE_--_dark_Sci-Fi_AI-short_film.webm) (CC BY 3.0) |
-| **The Unsent Message** | 2 | ~1.5 min total | Hugging Face landscape AI drama harness demo film |
-| **Neon Bloom** | 1 | ~19s | Wikimedia Commons AI creative clip (CC BY-SA 4.0) |
-| **Coming Home** | 1 | ~15s | Wikimedia Commons Seedance short (public domain) |
+| **The Billionaire's Forgotten Wife** | Romance / Revenge / Suspense | 60 | Flagship. Sophia vs Alexander Sterling. |
+| **Blood Contract** | Revenge / Drama | 8 | Ava's secret marriage clause. |
+| **Crown of Ash** | Fantasy / Romance | 8 | Cursed princess + immune prince. |
+| **Apartment 7** | Thriller / Suspense | 6 | Smart apartment that predicts murder. |
+| **Draft Saved** | Romance / Drama | 6 | A year of unsent texts all send. |
+| **Neon Vow** | Romance / Thriller | 6 | Street racer + rival heiress. |
 
-Scripted originals play through the in-app subtitled player (`playback: "scripted"`). Other titles under `/public/videos` are re-encoded to vertical `720×1280` H.264 for the short-form player.
+Playback files live under `/public/videos/{series}-ep{n}.mp4`.
+Render with `scripts/render-bfw-episode.py` and `scripts/render-original-series.py`, then `scripts/sync-rendered-durations.py`.

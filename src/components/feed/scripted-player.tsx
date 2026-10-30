@@ -36,6 +36,7 @@ function cumulativeStarts(beats: ScriptBeat[]): number[] {
 
 export function ScriptedPlayer({
   script,
+  seriesTitle = "SLOP Original",
   active,
   paused,
   progress,
@@ -45,6 +46,7 @@ export function ScriptedPlayer({
   onTap,
 }: {
   script: EpisodeScript;
+  seriesTitle?: string;
   active: boolean;
   paused: boolean;
   progress: number;
@@ -160,7 +162,7 @@ export function ScriptedPlayer({
           SLOP Original
         </p>
         <p className="mt-2 font-display text-2xl font-bold tracking-tight text-white/90 sm:text-3xl">
-          The Billionaire&apos;s Forgotten Wife
+          {seriesTitle}
         </p>
         <p className="mt-2 text-xs uppercase tracking-[0.2em] text-white/35">
           Ep {String(script.episodeNumber).padStart(2, "0")} · {script.title}

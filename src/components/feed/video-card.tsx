@@ -30,6 +30,7 @@ import { ScriptedPlayer } from "@/components/feed/scripted-player";
 import Link from "next/link";
 import { track } from "@/lib/analytics/client";
 import { getForgottenWifeScript } from "@/lib/series/forgotten-wife/scripts";
+import { getOriginalScript } from "@/lib/series/originals/catalog";
 
 interface VideoCardProps {
   video: Video;
@@ -48,10 +49,13 @@ export function VideoCard({
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isScripted = video.playback === "scripted";
-  const script =
-    isScripted && video.scriptSeriesId === "forgotten-wife"
-      ? getForgottenWifeScript(video.episodeNumber)
-      : undefined;
+  const script = (() => {
+    if (!isScripted || !video.scriptSeriesId) return undefined;
+    if (video.scriptSeriesId === "forgotten-wife") {
+      return getForgottenWifeScript(video.episodeNumber);
+    }
+    return getOriginalScript(video.scriptSeriesId, video.episodeNumber);
+  })();
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -464,6 +468,7 @@ export function VideoCard({
       {script ? (
         <ScriptedPlayer
           script={script}
+          seriesTitle={drama?.title ?? "SLOP Original"}
           active={active}
           paused={paused || scrubbing}
           progress={progress}

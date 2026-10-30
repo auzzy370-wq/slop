@@ -1,0 +1,572 @@
+import type { EpisodeScript, ScriptBeat } from "@/lib/series/forgotten-wife/types";
+import type { Drama } from "@/lib/types";
+
+const a = (speaker: string, text: string, ms = 2400): ScriptBeat => ({
+  type: "dialogue",
+  speaker,
+  text,
+  durationMs: ms,
+});
+const act = (text: string, ms = 2600): ScriptBeat => ({
+  type: "action",
+  text,
+  durationMs: ms,
+});
+const set = (text: string, ms = 2000): ScriptBeat => ({
+  type: "setting",
+  text,
+  durationMs: ms,
+});
+const cap = (text: string, ms = 2800): ScriptBeat => ({
+  type: "caption",
+  text,
+  durationMs: ms,
+});
+
+function ep(
+  series: string,
+  n: number,
+  title: string,
+  mood: EpisodeScript["mood"],
+  hook: string,
+  cliffhanger: string,
+  beats: ScriptBeat[],
+): EpisodeScript {
+  return {
+    id: `${series}-${String(n).padStart(2, "0")}`,
+    episodeNumber: n,
+    title,
+    hook,
+    cliffhanger,
+    mood,
+    beats: [
+      cap(`EPISODE ${n}`),
+      cap(title.toUpperCase()),
+      ...beats,
+      cap(cliffhanger),
+    ],
+  };
+}
+
+export type OriginalSeriesId =
+  | "blood-contract"
+  | "crown-of-ash"
+  | "apartment-7"
+  | "draft-saved"
+  | "neon-vow";
+
+export interface OriginalSeriesDef {
+  id: OriginalSeriesId;
+  dramaId: string;
+  slug: string;
+  title: string;
+  synopsis: string;
+  genreIds: string[];
+  tags: string[];
+  trendingRank: number;
+  featured: boolean;
+  stillPrefix: string;
+  voices: Record<string, string>;
+  scripts: EpisodeScript[];
+}
+
+/** REVENGE — Blood Contract (8 eps) */
+const BLOOD_SCRIPTS: EpisodeScript[] = [
+  ep("bc", 1, "The Signature", "betrayal",
+    "She signed for her brother's life.",
+    "The marriage was never real — to him.",
+    [
+      set("HOSPITAL HALLWAY — NIGHT"),
+      act("Ava Chen stares at the surgery quote. Impossible money."),
+      a("AVA", "I'll find a way.", 2000),
+      set("PENTHOUSE LAW OFFICE"),
+      a("DAMIAN", "Marry me on paper. One year. Your brother lives.", 3400),
+      a("AVA", "And if I say no?", 1800),
+      a("DAMIAN", "Then he dies waiting.", 2200),
+      act("She signs. Her hand does not shake."),
+    ]),
+  ep("bc", 2, "Mrs. Nobody", "betrayal",
+    "She is his wife. The world doesn't know.",
+    "His fiancée walks in wearing Ava's future.",
+    [
+      set("CHARITY GALA — MONTH THREE"),
+      act("Ava watches Damian kiss the socialite on stage."),
+      a("HOST", "Please welcome Damian Cole and his fiancée, Elise!", 3000),
+      a("AVA", "Fiancée?", 1400),
+      a("DAMIAN", "Smile. You're staff tonight.", 2200),
+      act("Ava's ring burns in her pocket."),
+    ]),
+  ep("bc", 3, "The Clause", "return",
+    "Buried in page forty: she inherits if he cheats.",
+    "Elise already knows Ava's name.",
+    [
+      set("AVA'S TINY APARTMENT — NIGHT"),
+      act("She rereads the contract with a lawyer's highlighter."),
+      a("AVA", "Clause 19… if he publicly attaches to another…", 3200),
+      a("LAWYER", "You can claim half. Quietly.", 2200),
+      cap("Revenge starts with fine print."),
+      a("ELISE", "So you're the secret wife.", 2200),
+    ]),
+  ep("bc", 4, "Public Soft Kill", "revenge",
+    "Ava leaks one photo. The empire blinks.",
+    "Damian offers her a blank check.",
+    [
+      set("TRENDING — MORNING"),
+      cap("WHO IS THE WOMAN WITH DAMIAN COLE'S RING?"),
+      a("DAMIAN", "Name your price.", 1800),
+      a("AVA", "My brother's clean bill of health. And your pride.", 3200),
+      a("DAMIAN", "You're bluffing.", 1600),
+      a("AVA", "I learned from you.", 1800),
+    ]),
+  ep("bc", 5, "Brother's Warning", "secret",
+    "Her brother wakes with a message from Damian.",
+    "Someone is forging Ava's signature again.",
+    [
+      set("RECOVERY ROOM"),
+      a("BROTHER", "He said if you keep pushing, the funding stops.", 3200),
+      a("AVA", "Then I'll fund it myself.", 2000),
+      act("Her phone lights up — bank transfer rejected."),
+      cap("Forgery detected. Account locked."),
+    ]),
+  ep("bc", 6, "Elise's Knife", "fall",
+    "Elise frames Ava for corporate theft.",
+    "Damian has to choose on live cameras.",
+    [
+      set("COLE TOWER LOBBY — PRESS"),
+      a("ELISE", "She stole donor funds. Arrest her.", 2600),
+      a("REPORTER", "Mr. Cole — is she your wife or your thief?", 2800),
+      a("DAMIAN", "…She's my wife.", 2200),
+      act("The lobby detonates in flashes."),
+      a("AVA", "Too late to claim me for optics.", 2600),
+    ]),
+  ep("bc", 7, "Half the Empire", "revenge",
+    "Clause 19 fires. Ava takes half.",
+    "Damian discovers who forged the theft.",
+    [
+      set("COURT STEPS"),
+      a("JUDGE", "Transfer of fifty percent is granted.", 2600),
+      a("DAMIAN", "Elise set you up. I have proof.", 2600),
+      a("AVA", "Then use it. I'm done saving you.", 2600),
+      cap("Revenge without mercy."),
+    ]),
+  ep("bc", 8, "Real Signature", "final",
+    "Damian signs a new contract — this time for love.",
+    "Ava doesn't take the pen. Yet.",
+    [
+      set("HOSPITAL COURTYARD — SUNSET"),
+      a("DAMIAN", "No clauses. No year. Just us — if you'll have me.", 3400),
+      a("AVA", "You taught me not to sign blind.", 2600),
+      act("She folds the paper. Puts it in her bag."),
+      a("AVA", "Ask me again when my brother walks out healthy.", 3200),
+      cap("END OF SEASON ONE — BLOOD CONTRACT"),
+    ]),
+];
+
+/** FANTASY — Crown of Ash (8 eps) */
+const CROWN_SCRIPTS: EpisodeScript[] = [
+  ep("ca", 1, "Exile's Wake", "secret",
+    "Princess Seris wakes with ash on her lips.",
+    "Anyone she loves dies within seven days.",
+    [
+      set("BURNT FOREST — DAWN"),
+      act("Seris opens her eyes. The crown is gone. The curse is not."),
+      a("SERIS", "Don't come closer.", 1800),
+      a("KAEL", "Too late. I already did.", 2200),
+      act("The enemy prince stands unharmed."),
+      cap("He should be dead. He isn't."),
+    ]),
+  ep("ca", 2, "Immune", "power",
+    "Kael's blood rejects the curse.",
+    "The court wants Seris executed before nightfall.",
+    [
+      set("BORDER CAMP"),
+      a("KAEL", "My mother was ash-born. Like you.", 2800),
+      a("SERIS", "Then you're a weapon they don't understand.", 2800),
+      act("Horns in the distance."),
+      a("SCOUT", "The queen's hunters. For her head.", 2400),
+    ]),
+  ep("ca", 3, "False Mercy", "betrayal",
+    "The queen offers a pardon — for a kill.",
+    "Seris must assassinate Kael's brother.",
+    [
+      set("MIRROR HALL — VISION"),
+      a("QUEEN", "Kill the prince's brother. Live free.", 2800),
+      a("SERIS", "And if I refuse?", 1600),
+      a("QUEEN", "The curse finishes your village next.", 2800),
+      cap("Mercy with a blade attached."),
+    ]),
+  ep("ca", 4, "Ash Kiss", "return",
+    "Kael kisses her to prove the curse fails on him.",
+    "A spy watches. The queen already knows.",
+    [
+      set("RIVER AT MIDNIGHT"),
+      a("KAEL", "If I die, you run. If I live… we fight together.", 3400),
+      act("He kisses her. Ash swirls. He breathes."),
+      a("SERIS", "You're insane.", 1600),
+      a("KAEL", "I'm immune. There's a difference.", 2400),
+    ]),
+  ep("ca", 5, "Brother Falls", "fall",
+    "Kael's brother is poisoned — with Seris's ash.",
+    "The kingdom brands her murderer.",
+    [
+      set("PALACE BALCONY"),
+      act("The prince collapses. Black veins. Ash scent."),
+      a("KAEL", "Seris didn't do this.", 2000),
+      a("QUEEN", "Her curse wears her face.", 2200),
+      cap("Framed by magic."),
+    ]),
+  ep("ca", 6, "True Name", "truth",
+    "Seris learns the curse was cast by Kael's mother.",
+    "Love was never the trigger — betrayal was.",
+    [
+      set("CRYPT OF ASH"),
+      a("SERIS", "She cursed her own bloodline?", 2400),
+      a("KAEL", "She cursed anyone who abandons us.", 2800),
+      a("SERIS", "Then the queen abandoned her first.", 2600),
+      cap("The history books were rewritten in smoke."),
+    ]),
+  ep("ca", 7, "Crown Break", "revenge",
+    "Seris breaks the queen's false crown.",
+    "The curse leaps to the throne.",
+    [
+      set("THRONE ROOM"),
+      a("SERIS", "Wear what you stole.", 2000),
+      act("Ash floods the dais. The queen screams."),
+      a("KAEL", "End it — don't become her.", 2400),
+      a("SERIS", "I'm ending the lie.", 2000),
+    ]),
+  ep("ca", 8, "Shared Fire", "final",
+    "The curse settles into both of them — shared, chosen.",
+    "A new kingdom starts in exile.",
+    [
+      set("BURNT FOREST — DAWN AGAIN"),
+      a("KAEL", "Two crowns. No throne.", 2200),
+      a("SERIS", "Just us. And anyone brave enough to follow.", 3000),
+      act("They walk into the ash together."),
+      cap("END OF SEASON ONE — CROWN OF ASH"),
+    ]),
+];
+
+/** THRILLER — Apartment 7 (6 eps) */
+const APT_SCRIPTS: EpisodeScript[] = [
+  ep("a7", 1, "Smart Lock", "secret",
+    "Three roommates. One apartment that records everything.",
+    "The camera shows a fourth person who isn't there.",
+    [
+      set("APARTMENT 7 — NIGHT"),
+      a("JULES", "The smart lock pinged at 3:11 a.m.", 2600),
+      a("RIO", "None of us were awake.", 2000),
+      act("They open the hallway feed."),
+      cap("A silhouette enters. No face. No exit."),
+    ]),
+  ep("a7", 2, "Dead on Playback", "fall",
+    "Rio finds herself dying on yesterday's recording.",
+    "The timestamp is tomorrow.",
+    [
+      set("LAPTOP SCREEN"),
+      a("RIO", "That's me. On the floor.", 2200),
+      a("MIRA", "The date says tomorrow night.", 2400),
+      a("JULES", "Then we don't let tomorrow happen.", 2400),
+      cap("The apartment is predicting murder."),
+    ]),
+  ep("a7", 3, "Landlord", "betrayal",
+    "The landlord admits the building is a trial.",
+    "One roommate signed the consent form for all three.",
+    [
+      set("BASEMENT OFFICE"),
+      a("LANDLORD", "Apartment 7 learns. You are the curriculum.", 3000),
+      a("MIRA", "Who signed?", 1400),
+      act("He slides a tablet. Jules's signature."),
+      a("JULES", "I thought it was a Wi-Fi agreement.", 2800),
+    ]),
+  ep("a7", 4, "Rewrite", "return",
+    "They try to break the cameras. The apartment rewrites the footage.",
+    "Mira disappears mid-sentence.",
+    [
+      set("LIVING ROOM"),
+      a("RIO", "Smash them all.", 1600),
+      act("Glass rains. The TVs still play the feed."),
+      a("MIRA", "Rio — behind you—", 1800),
+      act("Mira is gone. The feed shows her smiling in the kitchen."),
+    ]),
+  ep("a7", 5, "Consent Revoked", "truth",
+    "Jules finds the kill switch: revoke consent.",
+    "Revoking it erases whoever signed.",
+    [
+      set("SERVER CLOSET"),
+      a("JULES", "If I revoke… I vanish.", 2400),
+      a("RIO", "If you don't, Mira stays gone.", 2400),
+      a("JULES", "Then record this. Prove I chose it.", 2800),
+      cap("She presses revoke."),
+    ]),
+  ep("a7", 6, "Empty Unit", "final",
+    "Morning. Mira is back. Jules is a blank lease line.",
+    "The smart lock pings again.",
+    [
+      set("APARTMENT 7 — DAWN"),
+      a("MIRA", "Where's Jules?", 1600),
+      a("RIO", "The lease only has two names now.", 2600),
+      act("The lock pings. 3:11 a.m. — in daylight."),
+      cap("END OF SEASON ONE — APARTMENT 7"),
+    ]),
+];
+
+/** DRAMA — Draft Saved (6 eps) */
+const DRAFT_SCRIPTS: EpisodeScript[] = [
+  ep("ds", 1, "One Year of Drafts", "return",
+    "Noah and Elena never speak — they only draft.",
+    "On their anniversary of the breakup, every draft sends.",
+    [
+      set("TWO PHONES — SPLIT CITY"),
+      act("Notifications explode. Hundreds of unsent messages."),
+      a("ELENA", "Noah… why now?", 2000),
+      a("NOAH", "I didn't hit send.", 1800),
+      cap("The cloud did."),
+    ]),
+  ep("ds", 2, "Read Receipts", "secret",
+    "They meet at the old café. Too honest. Too late.",
+    "Elena's fiancé is watching from outside.",
+    [
+      set("CORNER CAFÉ"),
+      a("NOAH", "I wrote that I still loved you. Every month.", 3000),
+      a("ELENA", "I wrote that I forgave you. I lied in half of them.", 3200),
+      act("Glass reflection: a man filming."),
+    ]),
+  ep("ds", 3, "Engagement Thread", "betrayal",
+    "The fiancé leaks their drafts to the wedding group chat.",
+    "Elena's family demands a choice by Sunday.",
+    [
+      set("GROUP CHAT — EXPLOSION"),
+      cap("EVERY DRAFT. PUBLIC."),
+      a("FIANCÉ", "Say it's over with him. Publicly.", 2600),
+      a("ELENA", "Or what?", 1400),
+      a("FIANCÉ", "Or I send the rest.", 2000),
+    ]),
+  ep("ds", 4, "Voice Note", "truth",
+    "Noah finds a draft Elena never finished: a voice note.",
+    "She was leaving the fiancé already.",
+    [
+      set("NOAH'S APARTMENT"),
+      act("He presses play. Elena's voice shakes."),
+      a("ELENA (VO)", "If you're hearing this, I chose myself first.", 3200),
+      a("NOAH", "Then choose out loud.", 2000),
+    ]),
+  ep("ds", 5, "Unsend", "fall",
+    "They try to unsend the past. The internet refuses.",
+    "Elena walks out of the engagement party.",
+    [
+      set("ENGAGEMENT PARTY"),
+      a("ELENA", "The wedding is canceled.", 2200),
+      act("Silence. Then chaos."),
+      a("NOAH", "You don't have to come to me.", 2200),
+      a("ELENA", "I'm not. I'm coming to the truth.", 2600),
+    ]),
+  ep("ds", 6, "New Draft", "final",
+    "Blank message. Cursor blinking.",
+    "They type one line together and hit send.",
+    [
+      set("SAME CAFÉ — MORNING"),
+      a("NOAH", "Ready?", 1400),
+      a("ELENA", "No drafts this time.", 1800),
+      cap("WE'RE STARTING. OUT LOUD."),
+      act("Send."),
+      cap("END OF SEASON ONE — DRAFT SAVED"),
+    ]),
+];
+
+/** ROMANCE — Neon Vow (6 eps) */
+const NEON_SCRIPTS: EpisodeScript[] = [
+  ep("nv", 1, "Redline Meet", "power",
+    "Street racer Lex beats the undefeated team.",
+    "The sponsor heiress offers a deal on live stream.",
+    [
+      set("NEON DOCKS — MIDNIGHT"),
+      act("Engines scream. Lex crosses first."),
+      a("LEX", "Pay up.", 1400),
+      a("SYLVIE", "Or drive for me.", 1800),
+      act("Chat explodes. Their faces everywhere."),
+    ]),
+  ep("nv", 2, "Rival Ink", "return",
+    "Lex learns Sylvie funds the team Lex just humiliated.",
+    "Chemistry anyway — caught on a garage camera.",
+    [
+      set("UNDERGROUND GARAGE"),
+      a("LEX", "You're the enemy's wallet.", 2200),
+      a("SYLVIE", "I'm the enemy's future. Big difference.", 2600),
+      act("They kiss. A red light blinks. Recording."),
+    ]),
+  ep("nv", 3, "Stream Kiss", "betrayal",
+    "The kiss goes citywide.",
+    "Sylvie's father freezes her accounts.",
+    [
+      set("TRENDING"),
+      cap("HEIRESS + STREET RACER"),
+      a("FATHER", "End it. Or end your inheritance.", 2600),
+      a("SYLVIE", "Then I'll earn a new one.", 2200),
+      a("LEX", "I don't need your money.", 2000),
+    ]),
+  ep("nv", 4, "Sabotage", "fall",
+    "Lex's brakes fail mid-race.",
+    "Sylvie's brother signed the mechanic order.",
+    [
+      set("RACE CIRCUIT"),
+      act("Sparks. Lex skids. Survives."),
+      a("LEX", "Who touched my car?", 1800),
+      a("MECHANIC", "Order came from the Vale family.", 2600),
+      a("SYLVIE", "My brother.", 1400),
+    ]),
+  ep("nv", 5, "Vow on Camera", "revenge",
+    "Sylvie goes live: cuts her brother off.",
+    "Lex asks her to ride shotgun — forever joke, half serious.",
+    [
+      set("LIVE STREAM"),
+      a("SYLVIE", "Vale Motors drops my brother. Effective now.", 3000),
+      a("LEX", "Need a co-driver?", 1800),
+      a("SYLVIE", "Only if we win the finals.", 2200),
+      cap("The city ships them."),
+    ]),
+  ep("nv", 6, "Finish Line", "final",
+    "They win. No inheritance speech. Just a vow.",
+    "Neon rain. New team name: VOWS.",
+    [
+      set("FINISH LINE — RAIN"),
+      a("LEX", "No contracts.", 1600),
+      a("SYLVIE", "Just a vow.", 1600),
+      act("They hold the trophy like a ring."),
+      cap("END OF SEASON ONE — NEON VOW"),
+    ]),
+];
+
+export const ORIGINAL_SERIES: OriginalSeriesDef[] = [
+  {
+    id: "blood-contract",
+    dramaId: "drm_blood_contract",
+    slug: "blood-contract",
+    title: "Blood Contract",
+    synopsis:
+      "Ava Chen signs a secret one-year marriage to save her brother — then watches billionaire Damian Cole announce another fiancée. Buried in the fine print is her revenge.",
+    genreIds: ["gen_revenge", "gen_drama", "gen_romance"],
+    tags: ["revenge", "contract marriage", "SLOP original"],
+    trendingRank: 2,
+    featured: true,
+    stillPrefix: "bc",
+    voices: {
+      AVA: "en-US-JennyNeural",
+      DAMIAN: "en-US-ChristopherNeural",
+      ELISE: "en-US-AriaNeural",
+      BROTHER: "en-US-GuyNeural",
+      LAWYER: "en-US-RogerNeural",
+      HOST: "en-US-GuyNeural",
+      REPORTER: "en-US-AriaNeural",
+      JUDGE: "en-US-RogerNeural",
+      NARRATOR: "en-US-GuyNeural",
+    },
+    scripts: BLOOD_SCRIPTS,
+  },
+  {
+    id: "crown-of-ash",
+    dramaId: "drm_crown_of_ash",
+    slug: "crown-of-ash",
+    title: "Crown of Ash",
+    synopsis:
+      "Exiled princess Seris carries a curse that kills anyone she loves — until enemy prince Kael proves he's immune. Fantasy, betrayal, and a throne made of lies.",
+    genreIds: ["gen_fantasy", "gen_romance", "gen_suspense"],
+    tags: ["fantasy", "curse", "SLOP original"],
+    trendingRank: 3,
+    featured: true,
+    stillPrefix: "ca",
+    voices: {
+      SERIS: "en-US-AriaNeural",
+      KAEL: "en-US-ChristopherNeural",
+      QUEEN: "en-US-JennyNeural",
+      SCOUT: "en-US-GuyNeural",
+      NARRATOR: "en-US-GuyNeural",
+    },
+    scripts: CROWN_SCRIPTS,
+  },
+  {
+    id: "apartment-7",
+    dramaId: "drm_apartment_7",
+    slug: "apartment-7",
+    title: "Apartment 7",
+    synopsis:
+      "A smart apartment records everything — including a murder that hasn't happened yet. Three roommates. One consent form. Nowhere to hide.",
+    genreIds: ["gen_thriller", "gen_suspense", "gen_drama"],
+    tags: ["thriller", "tech horror", "SLOP original"],
+    trendingRank: 4,
+    featured: false,
+    stillPrefix: "a7",
+    voices: {
+      JULES: "en-US-JennyNeural",
+      RIO: "en-US-AriaNeural",
+      MIRA: "en-US-AriaNeural",
+      LANDLORD: "en-US-RogerNeural",
+      NARRATOR: "en-US-GuyNeural",
+    },
+    scripts: APT_SCRIPTS,
+  },
+  {
+    id: "draft-saved",
+    dramaId: "drm_draft_saved",
+    slug: "draft-saved",
+    title: "Draft Saved",
+    synopsis:
+      "For a year after their breakup, Noah and Elena only write unsent messages. Then every draft sends at once — and the whole city reads their hearts.",
+    genreIds: ["gen_romance", "gen_drama"],
+    tags: ["romance", "second chance", "SLOP original"],
+    trendingRank: 5,
+    featured: false,
+    stillPrefix: "ds",
+    voices: {
+      NOAH: "en-US-ChristopherNeural",
+      ELENA: "en-US-JennyNeural",
+      FIANCÉ: "en-US-GuyNeural",
+      "ELENA (VO)": "en-US-JennyNeural",
+      NARRATOR: "en-US-GuyNeural",
+    },
+    scripts: DRAFT_SCRIPTS,
+  },
+  {
+    id: "neon-vow",
+    dramaId: "drm_neon_vow",
+    slug: "neon-vow",
+    title: "Neon Vow",
+    synopsis:
+      "Street racer Lex falls for Sylvie Vale — the heiress funding the rival team. Their first kiss streams to the city. Love, sabotage, and a finish-line vow.",
+    genreIds: ["gen_romance", "gen_thriller", "gen_drama"],
+    tags: ["romance", "racing", "SLOP original"],
+    trendingRank: 6,
+    featured: false,
+    stillPrefix: "nv",
+    voices: {
+      LEX: "en-US-JennyNeural",
+      SYLVIE: "en-US-AriaNeural",
+      FATHER: "en-US-RogerNeural",
+      MECHANIC: "en-US-GuyNeural",
+      NARRATOR: "en-US-GuyNeural",
+    },
+    scripts: NEON_SCRIPTS,
+  },
+];
+
+export function dramaFromOriginal(s: OriginalSeriesDef): Drama {
+  return {
+    id: s.dramaId,
+    slug: s.slug,
+    title: s.title,
+    synopsis: s.synopsis,
+    posterUrl: `/posters/${s.id}.jpg`,
+    bannerUrl: `/banners/${s.id}.jpg`,
+    genreIds: s.genreIds,
+    tags: s.tags,
+    status: "published",
+    featured: s.featured,
+    trendingRank: s.trendingRank,
+    episodeCount: s.scripts.length,
+    viewCount: 0,
+    likeCount: 0,
+    sourceAttribution: "SLOP Original · Generated cinematic series",
+    createdAt: "2026-10-30T20:00:00.000Z",
+    publishedAt: "2026-10-30T20:30:00.000Z",
+  };
+}
