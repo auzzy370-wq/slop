@@ -30,7 +30,7 @@ export function VideoShareClient({ slug }: { slug: string }) {
     <div className="relative">
       <Link
         href="/"
-        className="absolute left-4 top-4 z-50 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur"
+        className="absolute left-4 z-50 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur top-[max(1rem,env(safe-area-inset-top))]"
       >
         <ArrowLeft className="h-4 w-4" /> Back to feed
       </Link>

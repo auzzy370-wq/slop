@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { getFeed } from "@/lib/feed";
 import type { FeedSection } from "@/lib/types";
@@ -35,6 +35,8 @@ export function VideoFeed({
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const scrollerRef = useRef<HTMLDivElement>(null);
+  const settlingRef = useRef(false);
+  const scrollEndTimer = useRef<number | null>(null);
 
   const savedIds = useMemo(
     () =>
@@ -73,36 +75,98 @@ export function VideoFeed({
     return out;
   }, [feedVideos, showAds, settings.adPlacementEvery]);
 
+  const pageHeight = useCallback(() => {
+    const root = scrollerRef.current;
+    return root?.clientHeight || window.innerHeight || 1;
+  }, []);
+
+  const snapToIndex = useCallback(
+    (idx: number, behavior: ScrollBehavior = "smooth") => {
+      const root = scrollerRef.current;
+      if (!root) return;
+      const clamped = Math.max(0, Math.min(items.length - 1, idx));
+      const top = clamped * pageHeight();
+      settlingRef.current = true;
+      root.scrollTo({ top, behavior });
+      setActiveIndex(clamped);
+      window.setTimeout(
+        () => {
+          settlingRef.current = false;
+        },
+        behavior === "smooth" ? 280 : 40,
+      );
+    },
+    [items.length, pageHeight],
+  );
+
+  const nearestIndex = useCallback(() => {
+    const root = scrollerRef.current;
+    if (!root) return 0;
+    const h = pageHeight();
+    return Math.max(
+      0,
+      Math.min(items.length - 1, Math.round(root.scrollTop / h)),
+    );
+  }, [items.length, pageHeight]);
+
+  /** Force settle onto a full slide — CSS snap alone can stall mid-card on iOS. */
+  const settleSnap = useCallback(() => {
+    if (settlingRef.current) return;
+    const root = scrollerRef.current;
+    if (!root) return;
+    const h = pageHeight();
+    const idx = nearestIndex();
+    const target = idx * h;
+    if (Math.abs(root.scrollTop - target) > 1.5) {
+      snapToIndex(idx, "smooth");
+    } else if (idx !== activeIndex) {
+      setActiveIndex(idx);
+    }
+  }, [activeIndex, nearestIndex, pageHeight, snapToIndex]);
+
   useEffect(() => {
-    if (!startVideoId || !scrollerRef.current) return;
+    if (!startVideoId || !scrollerRef.current || items.length === 0) return;
     const idx = items.findIndex(
       (item) => item.kind === "video" && item.videoId === startVideoId,
     );
     if (idx >= 0) {
-      const child = scrollerRef.current.children[idx] as HTMLElement | undefined;
-      child?.scrollIntoView({ behavior: "instant" as ScrollBehavior });
-      setActiveIndex(idx);
+      // Wait a frame so layout height is correct on mobile browsers.
+      requestAnimationFrame(() => snapToIndex(idx, "instant" as ScrollBehavior));
     }
-  }, [startVideoId, items]);
+  }, [startVideoId, items, snapToIndex]);
 
   useEffect(() => {
     const root = scrollerRef.current;
     if (!root) return;
-    const nodes = Array.from(root.children);
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!visible) return;
-        const idx = nodes.indexOf(visible.target);
-        if (idx >= 0) setActiveIndex(idx);
-      },
-      { root, threshold: [0.6, 0.75, 0.9] },
-    );
-    nodes.forEach((n) => observer.observe(n));
-    return () => observer.disconnect();
-  }, [items.length, hydrated]);
+
+    const onScroll = () => {
+      if (settlingRef.current) return;
+      const idx = nearestIndex();
+      if (idx !== activeIndex) setActiveIndex(idx);
+      if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
+      // Debounced settle for browsers without scrollend (older iOS).
+      scrollEndTimer.current = window.setTimeout(settleSnap, 90);
+    };
+
+    const onScrollEnd = () => settleSnap();
+
+    root.addEventListener("scroll", onScroll, { passive: true });
+    root.addEventListener("scrollend", onScrollEnd);
+    // Re-snap after orientation / URL bar resize so pages stay full-bleed.
+    const onResize = () => {
+      snapToIndex(nearestIndex(), "instant" as ScrollBehavior);
+    };
+    window.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("resize", onResize);
+
+    return () => {
+      root.removeEventListener("scroll", onScroll);
+      root.removeEventListener("scrollend", onScrollEnd);
+      window.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("resize", onResize);
+      if (scrollEndTimer.current) window.clearTimeout(scrollEndTimer.current);
+    };
+  }, [activeIndex, items.length, nearestIndex, settleSnap, snapToIndex, hydrated]);
 
   if (!hydrated) {
     return (
@@ -115,9 +179,7 @@ export function VideoFeed({
   if (feedVideos.length === 0) {
     return (
       <div className="flex h-[100dvh] flex-col items-center justify-center gap-3 bg-[var(--slop-ink)] px-6 text-center">
-        <p className="font-display text-2xl text-white">
-          Nothing here yet
-        </p>
+        <p className="font-display text-2xl text-white">Nothing here yet</p>
         <p className="max-w-sm text-sm text-white/60">
           {section === "saved"
             ? "Save videos from the feed to find them here later."
@@ -136,20 +198,29 @@ export function VideoFeed({
   return (
     <div
       ref={scrollerRef}
-      className="h-[100dvh] snap-y snap-mandatory overflow-y-scroll overscroll-y-contain scrollbar-none"
+      className="slop-feed-scroller"
+      aria-label="Episode feed"
     >
       {items.map((item, index) => {
         const near = Math.abs(index - activeIndex) <= 1;
         if (item.kind === "ad") {
           return (
-            <section key={item.key} className="h-[100dvh] w-full shrink-0">
+            <section
+              key={item.key}
+              className="slop-feed-slide"
+              data-index={index}
+            >
               <AdSlot index={index} />
             </section>
           );
         }
         const video = feedVideos.find((v) => v.id === item.videoId)!;
         return (
-          <section key={video.id} className="h-[100dvh] w-full shrink-0">
+          <section
+            key={video.id}
+            className="slop-feed-slide"
+            data-index={index}
+          >
             {near ? (
               <VideoCard
                 video={video}

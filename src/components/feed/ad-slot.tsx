@@ -5,7 +5,7 @@ import { Megaphone } from "lucide-react";
 
 export function AdSlot({ index }: { index: number }) {
   return (
-    <div className="relative flex h-full w-full snap-start flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top,_#1c1630_0%,_#111116_55%)] px-6 text-center">
+    <div className="relative flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top,_#1c1630_0%,_#111116_55%)] px-6 text-center">
       <div className="absolute left-4 top-4 rounded-md border border-white/20 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/70">
         Advertisement
       </div>

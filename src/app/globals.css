@@ -51,6 +51,40 @@ a {
   display: none;
 }
 
+/* TikTok-style vertical episode pager */
+.slop-feed-scroller {
+  position: fixed;
+  inset: 0;
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  background: #000;
+  touch-action: pan-y;
+}
+
+.slop-feed-scroller::-webkit-scrollbar {
+  display: none;
+}
+
+.slop-feed-slide {
+  position: relative;
+  height: 100%;
+  height: 100dvh;
+  width: 100%;
+  flex-shrink: 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+  overflow: hidden;
+  background: #000;
+}
+
 .animate-in-up {
   animation: slop-up 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }

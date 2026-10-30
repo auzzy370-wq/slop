@@ -468,7 +468,7 @@ export function VideoCard({
   };
 
   return (
-    <article className="relative h-full w-full snap-start overflow-hidden bg-[var(--slop-black)]">
+    <article className="relative h-full w-full overflow-hidden bg-[var(--slop-black)]">
       {script ? (
         <ScriptedPlayer
           script={script}
