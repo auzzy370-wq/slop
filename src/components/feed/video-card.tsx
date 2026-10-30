@@ -485,8 +485,8 @@ export function VideoCard({
 
       {/* TikTok-style right action rail */}
       <div
-        className={`absolute right-2 z-30 flex flex-col items-center gap-4 transition-[bottom] duration-300 ease-out sm:right-3 sm:gap-[1.15rem] ${
-          chromeVisible ? "bottom-[7.5rem]" : "bottom-[3.75rem]"
+        className={`slop-action-rail absolute right-2 z-30 flex flex-col items-center gap-3.5 transition-[bottom] duration-300 ease-out sm:right-3 sm:gap-4 ${
+          chromeVisible ? "bottom-[7.25rem]" : "bottom-[3.5rem]"
         }`}
       >
         <RailButton
@@ -525,7 +525,7 @@ export function VideoCard({
           ariaLabel="Save"
           label={saved ? "Saved" : "Save"}
         >
-          <Bookmark className={saved ? "fill-white" : ""} />
+          <Bookmark className={saved ? "fill-[var(--slop-lavender)] text-[var(--slop-lavender)]" : ""} />
         </RailButton>
         <RailButton
           onClick={() => {
@@ -781,16 +781,16 @@ function RailButton({
       className="slop-rail-btn group flex flex-col items-center gap-1.5 text-white"
     >
       <span
-        className={`slop-rail-orb flex h-[3.25rem] w-[3.25rem] items-center justify-center ${
+        className={`slop-rail-orb flex h-12 w-12 items-center justify-center sm:h-[3.35rem] sm:w-[3.35rem] ${
           active ? "is-active" : ""
         }`}
       >
-        <span className="relative z-[1] [&>svg]:h-[21px] [&>svg]:w-[21px] [&>svg]:stroke-[1.75]">
+        <span className="relative z-[1] text-white/95 drop-shadow-[0_1px_2px_rgba(0,0,0,0.55)] [&>svg]:h-[20px] [&>svg]:w-[20px] [&>svg]:stroke-[1.6] sm:[&>svg]:h-[21px] sm:[&>svg]:w-[21px]">
           {children}
         </span>
       </span>
       {label ? (
-        <span className="slop-rail-label max-w-[3.6rem] truncate text-center font-display text-[10px] font-semibold uppercase tracking-[0.08em]">
+        <span className="slop-rail-label max-w-[3.5rem] truncate text-center font-display text-[9px] font-semibold uppercase tracking-[0.12em]">
           {label}
         </span>
       ) : null}
