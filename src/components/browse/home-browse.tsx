@@ -136,7 +136,7 @@ export function HomeBrowse() {
               See all
             </Link>
           </div>
-          <div className="row-scroll gap-3 lg:grid lg:grid-cols-4 lg:gap-4 xl:grid-cols-6 lg:overflow-visible">
+          <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible xl:grid-cols-6">
             {activeCats.map((cat) => (
               <GenreTile
                 key={cat.id}
@@ -276,7 +276,7 @@ function BrowseRow({
           See all
         </Link>
       </div>
-      <div className="row-scroll lg:grid lg:grid-cols-5 lg:gap-4 xl:grid-cols-6 lg:overflow-visible">
+      <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none lg:grid lg:grid-cols-5 lg:gap-4 lg:overflow-visible xl:grid-cols-6">
         {children}
       </div>
     </section>

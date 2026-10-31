@@ -554,6 +554,7 @@ a {
   scroll-snap-align: start;
 }
 
+
 /* Keep sonner toasts clear of notches / home indicator */
 [data-sonner-toaster][data-y-position="top"] {
   top: max(0.75rem, env(safe-area-inset-top, 0px)) !important;

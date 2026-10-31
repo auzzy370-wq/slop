@@ -84,7 +84,7 @@ function SearchInner() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--slop-slate)]">
               Dramas
             </h2>
-            <div className="row-scroll lg:grid lg:grid-cols-4 lg:gap-4 xl:grid-cols-5 lg:overflow-visible">
+            <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-none lg:grid lg:grid-cols-4 lg:gap-4 lg:overflow-visible xl:grid-cols-5">
               {dramaResults.map((d) => (
                 <DramaCard key={d.id} drama={d} />
               ))}
