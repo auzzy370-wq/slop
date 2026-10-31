@@ -98,17 +98,24 @@ export function VideoFeed({
   itemsLenRef.current = items.length;
 
   const measure = useCallback(() => {
+    const el = viewportRef.current;
+    const parent = el?.parentElement;
+    // Prefer the staging container (desktop phone frame) over the window.
+    const fromParent = parent?.clientHeight ?? 0;
+    const fromSelf = el?.clientHeight ?? 0;
+    const fromVv = window.visualViewport?.height ?? 0;
     const h = Math.round(
-      window.visualViewport?.height ||
-        viewportRef.current?.clientHeight ||
+      (fromParent > 40 ? fromParent : 0) ||
+        (fromSelf > 40 ? fromSelf : 0) ||
+        fromVv ||
         window.innerHeight ||
         1,
     );
     pageHRef.current = h;
     setPageH(h);
-    if (viewportRef.current) {
-      viewportRef.current.style.setProperty("--slop-feed-page", `${h}px`);
-      viewportRef.current.style.height = `${h}px`;
+    if (el) {
+      el.style.setProperty("--slop-feed-page", `${h}px`);
+      el.style.height = `${h}px`;
     }
     return h;
   }, []);
@@ -164,11 +171,36 @@ export function VideoFeed({
     };
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
+    const parent = viewportRef.current?.parentElement;
+    const ro =
+      parent && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(onResize)
+        : null;
+    if (parent && ro) ro.observe(parent);
     return () => {
       window.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
+      ro?.disconnect();
     };
   }, [hydrated, goTo, measure]);
+
+  // Desktop keyboard paging
+  useEffect(() => {
+    if (!hydrated) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key === "ArrowDown" || e.key === "j" || e.key === "PageDown") {
+        e.preventDefault();
+        goTo(indexRef.current + 1, true);
+      } else if (e.key === "ArrowUp" || e.key === "k" || e.key === "PageUp") {
+        e.preventDefault();
+        goTo(indexRef.current - 1, true);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [hydrated, goTo]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;

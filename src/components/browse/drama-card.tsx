@@ -23,7 +23,11 @@ export function DramaCard({
   return (
     <Link
       href={`/drama/${drama.slug}`}
-      className={cn(width, "shrink-0 snap-start group")}
+      className={cn(
+        width,
+        "shrink-0 snap-start group lg:w-full",
+        size !== "fluid" && "lg:min-w-0",
+      )}
     >
       <div className="relative aspect-[2/3] overflow-hidden rounded-xl border border-white/10 bg-[var(--slop-panel)] transition duration-300 group-hover:border-[var(--slop-violet)]/50">
         {/* eslint-disable-next-line @next/next/no-img-element */}

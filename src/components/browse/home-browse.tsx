@@ -36,7 +36,7 @@ export function HomeBrowse() {
     published[0];
   const trending = [...published]
     .sort((a, b) => (a.trendingRank ?? 99) - (b.trendingRank ?? 99))
-    .slice(0, 6);
+    .slice(0, 8);
   const newest = [...published].sort(
     (a, b) =>
       new Date(b.publishedAt ?? b.createdAt).getTime() -
@@ -48,10 +48,14 @@ export function HomeBrowse() {
       v.status === "published" &&
       v.episodeNumber === 1,
   );
+  const activeCats = categories
+    .filter((c) => c.active)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
 
   return (
-    <div className="slop-cinematic min-h-[100dvh] pb-28">
-      <header className="slop-safe-header sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-white/5 bg-[rgba(17,17,22,0.92)] px-4 backdrop-blur-xl">
+    <div className="slop-cinematic min-h-[100dvh] pb-28 lg:pb-16">
+      {/* Mobile header — desktop uses DesktopNav */}
+      <header className="slop-safe-header sticky top-0 z-40 flex items-center justify-between gap-3 border-b border-white/5 bg-[rgba(17,17,22,0.92)] px-4 backdrop-blur-xl lg:hidden">
         <SlopWordmark className="min-w-0" />
         <div className="flex shrink-0 items-center gap-2">
           {user?.isPremium && (
@@ -70,7 +74,7 @@ export function HomeBrowse() {
       </header>
 
       {featured && (
-        <section className="relative isolate min-h-[72vw] overflow-hidden sm:min-h-[420px] lg:min-h-[520px]">
+        <section className="relative isolate min-h-[72vw] overflow-hidden sm:min-h-[420px] lg:mt-0 lg:min-h-[min(72vh,640px)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={featured.bannerUrl}
@@ -78,68 +82,70 @@ export function HomeBrowse() {
             className="absolute inset-0 h-full w-full object-cover animate-fade"
           />
           <div className="slop-hero-mask absolute inset-0" />
-          <div className="relative z-10 flex h-full min-h-[72vw] flex-col justify-end px-4 pb-10 pt-24 sm:min-h-[420px] sm:max-w-2xl sm:px-8 lg:min-h-[520px] lg:px-12">
-            <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[var(--slop-violet)]">
-              {settings.tagline}
-            </p>
-            <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Find Your Next Obsession.
-            </h1>
-            <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
-              Discover original AI-powered dramas across romance, thriller,
-              revenge, fantasy, and more. Watch anywhere. Discover something
-              new. Get hooked.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center gap-3">
-              <Link
-                href={
-                  firstEpisode
-                    ? `/watch?start=${firstEpisode.id}`
-                    : `/drama/${featured.slug}`
-                }
-                className="inline-flex h-12 items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110"
-              >
-                <Play className="h-4 w-4 fill-current" />
-                Watch {featured.title}
-              </Link>
-              <Link
-                href={`/drama/${featured.slug}`}
-                className="inline-flex h-12 items-center rounded-xl border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white backdrop-blur hover:bg-white/10"
-              >
-                Details
-              </Link>
+          <div className="relative z-10 mx-auto flex h-full min-h-[72vw] w-full max-w-[1400px] flex-col justify-end px-4 pb-10 pt-24 sm:min-h-[420px] sm:px-8 lg:min-h-[min(72vh,640px)] lg:justify-center lg:px-12 lg:pb-16 lg:pt-20">
+            <div className="max-w-2xl">
+              <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[var(--slop-violet)]">
+                {settings.tagline}
+              </p>
+              <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl">
+                Find Your Next Obsession.
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base lg:text-lg">
+                Discover original AI-powered dramas across romance, thriller,
+                revenge, fantasy, and more. Watch anywhere. Discover something
+                new. Get hooked.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Link
+                  href={
+                    firstEpisode
+                      ? `/watch?start=${firstEpisode.id}`
+                      : `/drama/${featured.slug}`
+                  }
+                  className="inline-flex h-12 items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                  Watch {featured.title}
+                </Link>
+                <Link
+                  href={`/drama/${featured.slug}`}
+                  className="inline-flex h-12 items-center rounded-xl border border-white/20 bg-white/5 px-5 text-sm font-semibold text-white backdrop-blur hover:bg-white/10"
+                >
+                  Details
+                </Link>
+              </div>
+              <p className="mt-4 text-xs text-[var(--slop-slate)]">
+                Featured ·{" "}
+                {featured.viewCount > 0
+                  ? `${formatCount(featured.viewCount)} views`
+                  : "Just published"}{" "}
+                · {featured.episodeCount} episodes
+              </p>
             </div>
-            <p className="mt-4 text-xs text-[var(--slop-slate)]">
-              Featured ·{" "}
-              {featured.viewCount > 0
-                ? `${formatCount(featured.viewCount)} views`
-                : "Just published"}{" "}
-              · {featured.episodeCount} episodes
-            </p>
           </div>
         </section>
       )}
 
-      <div className="mx-auto max-w-6xl space-y-10 px-4 pt-8 sm:px-6">
+      <div className="mx-auto max-w-[1400px] space-y-10 px-4 pt-8 sm:px-6 lg:space-y-14 lg:px-12 lg:pt-12">
         <section>
-          <div className="mb-3 flex items-end justify-between">
-            <h2 className="font-display text-xl font-bold">Genres</h2>
+          <div className="mb-3 flex items-end justify-between lg:mb-5">
+            <h2 className="font-display text-xl font-bold lg:text-2xl">
+              Genres
+            </h2>
             <Link href="/explore" className="text-sm text-[var(--slop-violet)]">
               See all
             </Link>
           </div>
-          <div className="row-scroll gap-3">
-            {categories
-              .filter((c) => c.active)
-              .sort((a, b) => a.displayOrder - b.displayOrder)
-              .map((cat) => (
-                <GenreTile
-                  key={cat.id}
-                  category={cat}
-                  coverUrl={genreCover(cat.id, published)}
-                  count={genreCount(cat.id, published)}
-                />
-              ))}
+          <div className="row-scroll gap-3 lg:grid lg:grid-cols-4 lg:gap-4 xl:grid-cols-6 lg:overflow-visible">
+            {activeCats.map((cat) => (
+              <GenreTile
+                key={cat.id}
+                category={cat}
+                coverUrl={genreCover(cat.id, published)}
+                count={genreCount(cat.id, published)}
+                className="lg:w-full lg:min-h-[7.5rem]"
+              />
+            ))}
           </div>
         </section>
 
@@ -160,7 +166,7 @@ export function HomeBrowse() {
               See all
             </Link>
           </div>
-          <ol className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-[var(--slop-panel)]/60">
+          <ol className="divide-y divide-white/10 overflow-hidden rounded-2xl border border-white/10 bg-[var(--slop-panel)]/60 lg:grid lg:grid-cols-2 lg:divide-y-0 lg:gap-px lg:bg-white/10">
             {trending.map((drama, index) => (
               <RankRow key={drama.id} drama={drama} rank={index + 1} />
             ))}
@@ -168,44 +174,43 @@ export function HomeBrowse() {
         </section>
 
         <BrowseRow title="Recently Added" href="/explore?sort=newest">
-          {newest.map((d) => (
+          {newest.slice(0, 12).map((d) => (
             <DramaCard key={d.id} drama={d} />
           ))}
         </BrowseRow>
 
-        {categories
-          .filter((c) => c.active)
-          .slice(0, 4)
-          .map((cat) => {
-            const row = published.filter((d) => d.genreIds.includes(cat.id));
-            if (row.length === 0) return null;
-            return (
-              <BrowseRow
-                key={cat.id}
-                title={cat.name}
-                href={`/categories/${cat.slug}`}
-              >
-                {row.map((d) => (
-                  <DramaCard key={d.id} drama={d} />
-                ))}
-              </BrowseRow>
-            );
-          })}
+        {activeCats.slice(0, 4).map((cat) => {
+          const row = published.filter((d) => d.genreIds.includes(cat.id));
+          if (row.length === 0) return null;
+          return (
+            <BrowseRow
+              key={cat.id}
+              title={cat.name}
+              href={`/categories/${cat.slug}`}
+            >
+              {row.slice(0, 12).map((d) => (
+                <DramaCard key={d.id} drama={d} />
+              ))}
+            </BrowseRow>
+          );
+        })}
 
-        <section className="overflow-hidden rounded-3xl border border-[var(--slop-violet)]/25 bg-gradient-to-br from-[rgba(185,154,255,0.16)] to-transparent p-6 sm:p-8">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--slop-lavender)]">
-            SLOP Premium
-          </p>
-          <h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">
-            Drama without the interruptions
-          </h2>
-          <p className="mt-2 max-w-lg text-sm text-white/70">
-            Go ad-free for {settings.premiumPriceLabel}. Same stories. Cleaner
-            binge. Cancel anytime.
-          </p>
+        <section className="overflow-hidden rounded-3xl border border-[var(--slop-violet)]/25 bg-gradient-to-br from-[rgba(185,154,255,0.16)] to-transparent p-6 sm:p-8 lg:flex lg:items-center lg:justify-between lg:gap-10 lg:p-10">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--slop-lavender)]">
+              SLOP Premium
+            </p>
+            <h2 className="mt-2 font-display text-2xl font-bold sm:text-3xl">
+              Drama without the interruptions
+            </h2>
+            <p className="mt-2 max-w-lg text-sm text-white/70 lg:text-base">
+              Go ad-free for {settings.premiumPriceLabel}. Same stories. Cleaner
+              binge. Cancel anytime.
+            </p>
+          </div>
           <Link
             href="/premium"
-            className="mt-5 inline-flex h-11 items-center justify-center rounded-xl bg-[var(--slop-violet)] px-5 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110"
+            className="mt-5 inline-flex h-11 shrink-0 items-center justify-center rounded-xl bg-[var(--slop-violet)] px-5 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110 lg:mt-0"
           >
             Start Premium
           </Link>
@@ -218,7 +223,7 @@ export function HomeBrowse() {
 function RankRow({ drama, rank }: { drama: Drama; rank: number }) {
   const n = String(rank).padStart(2, "0");
   return (
-    <li>
+    <li className="bg-[var(--slop-panel)]/60 lg:bg-[rgba(17,17,22,0.92)]">
       <Link
         href={`/drama/${drama.slug}`}
         className="group flex items-center gap-3 px-3 py-3.5 transition hover:bg-white/[0.03] sm:gap-4 sm:px-4"
@@ -265,13 +270,15 @@ function BrowseRow({
 }) {
   return (
     <section>
-      <div className="mb-3 flex items-end justify-between">
-        <h2 className="font-display text-xl font-bold">{title}</h2>
+      <div className="mb-3 flex items-end justify-between lg:mb-5">
+        <h2 className="font-display text-xl font-bold lg:text-2xl">{title}</h2>
         <Link href={href} className="text-sm text-[var(--slop-violet)]">
           See all
         </Link>
       </div>
-      <div className="row-scroll">{children}</div>
+      <div className="row-scroll lg:grid lg:grid-cols-5 lg:gap-4 xl:grid-cols-6 lg:overflow-visible">
+        {children}
+      </div>
     </section>
   );
 }

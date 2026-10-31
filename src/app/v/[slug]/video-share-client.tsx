@@ -27,16 +27,20 @@ export function VideoShareClient({ slug }: { slug: string }) {
   }
 
   return (
-    <div className="relative min-h-[100dvh] overflow-hidden bg-black">
+    <div className="slop-watch-shell">
       <Link
         href="/"
-        className="fixed left-4 z-50 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur top-[max(1rem,env(safe-area-inset-top))]"
+        className="fixed left-4 z-50 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur top-[max(1rem,env(safe-area-inset-top))] lg:left-[max(1.5rem,calc((100vw-420px)/2-12rem))] lg:top-20"
       >
         <ArrowLeft className="h-4 w-4" /> Back to feed
       </Link>
-      <Suspense fallback={null}>
-        <VideoFeed section="for-you" startVideoId={video.id} />
-      </Suspense>
+      <div className="hidden lg:block" aria-hidden />
+      <div className="slop-watch-stage">
+        <Suspense fallback={null}>
+          <VideoFeed section="for-you" startVideoId={video.id} />
+        </Suspense>
+      </div>
+      <div className="hidden lg:block" aria-hidden />
     </div>
   );
 }

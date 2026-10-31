@@ -34,7 +34,7 @@ export function BottomNav() {
   }
 
   return (
-    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+    <nav className="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-center p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] lg:hidden">
       <div className="pointer-events-auto flex w-full max-w-lg items-center justify-between gap-1 rounded-2xl border border-white/10 bg-[rgba(17,17,22,0.88)] px-2 py-2 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-xl">
         {items.map(({ href, label, icon: Icon }) => {
           const active =

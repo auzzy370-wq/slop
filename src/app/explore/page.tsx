@@ -37,23 +37,25 @@ function ExploreInner() {
     .sort((a, b) => a.displayOrder - b.displayOrder);
 
   return (
-    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28">
-      <div className="mx-auto max-w-6xl animate-fade">
-        <SlopWordmark className="mb-6" />
+    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28 lg:pb-16 lg:pt-20">
+      <div className="mx-auto max-w-[1400px] animate-fade lg:px-8">
+        <SlopWordmark className="mb-6 lg:hidden" />
         <p className="mb-2 text-xs font-bold uppercase tracking-[0.2em] text-[var(--slop-violet)]">
           Explore
         </p>
-        <h1 className="mb-2 font-display text-4xl font-bold tracking-tight">
+        <h1 className="mb-2 font-display text-4xl font-bold tracking-tight lg:text-5xl">
           Genres & trending dramas
         </h1>
-        <p className="mb-8 max-w-xl text-[var(--slop-slate)]">
+        <p className="mb-8 max-w-xl text-[var(--slop-slate)] lg:mb-10 lg:text-base">
           Browse romance, thriller, revenge, fantasy, and more — then dive into
           the next episode.
         </p>
 
-        <section className="mb-10">
-          <h2 className="mb-4 font-display text-xl font-bold">Genres</h2>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <section className="mb-10 lg:mb-14">
+          <h2 className="mb-4 font-display text-xl font-bold lg:text-2xl">
+            Genres
+          </h2>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 lg:gap-4">
             {activeCats.map((cat) => (
               <GenreTile
                 key={cat.id}
@@ -61,15 +63,15 @@ function ExploreInner() {
                 coverUrl={genreCover(cat.id, published)}
                 count={genreCount(cat.id, dramas)}
                 size="lg"
-                className="w-full min-h-[7rem]"
+                className="w-full min-h-[7rem] lg:min-h-[8.5rem]"
               />
             ))}
           </div>
         </section>
 
         <section>
-          <div className="mb-4 flex items-end justify-between gap-3">
-            <h2 className="font-display text-xl font-bold">
+          <div className="mb-4 flex items-end justify-between gap-3 lg:mb-6">
+            <h2 className="font-display text-xl font-bold lg:text-2xl">
               {sort === "newest" ? "Recently added" : "Trending now"}
             </h2>
             <div className="flex gap-2 text-sm">
@@ -96,7 +98,7 @@ function ExploreInner() {
               </Link>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 lg:gap-4">
             {published.map((drama) => (
               <DramaCard key={drama.id} drama={drama} size="fluid" />
             ))}

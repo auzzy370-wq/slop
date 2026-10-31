@@ -50,8 +50,8 @@ export function CategoryFeed({ slug }: { slug: string }) {
     : undefined;
 
   return (
-    <div className="slop-cinematic min-h-[100dvh] pb-28">
-      <section className="relative isolate min-h-[42vw] overflow-hidden sm:min-h-[320px]">
+    <div className="slop-cinematic min-h-[100dvh] pb-28 lg:pb-16">
+      <section className="relative isolate min-h-[42vw] overflow-hidden sm:min-h-[320px] lg:min-h-[380px]">
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -64,10 +64,10 @@ export function CategoryFeed({ slug }: { slug: string }) {
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--slop-black)] via-[rgba(17,17,22,0.72)] to-[rgba(17,17,22,0.45)]" />
 
-        <div className="relative z-10 mx-auto flex min-h-[42vw] max-w-6xl flex-col justify-end px-4 pb-8 pt-6 sm:min-h-[320px] sm:px-6">
+        <div className="relative z-10 mx-auto flex min-h-[42vw] max-w-[1400px] flex-col justify-end px-4 pb-8 pt-6 sm:min-h-[320px] sm:px-6 lg:min-h-[380px] lg:px-12 lg:pb-12 lg:pt-20">
           <Link
             href="/explore"
-            className="mb-auto inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white/80 backdrop-blur-md transition hover:bg-black/50"
+            className="mb-auto inline-flex w-fit items-center gap-1.5 rounded-full border border-white/15 bg-black/35 px-3 py-1.5 text-xs font-semibold text-white/80 backdrop-blur-md transition hover:bg-black/50 lg:mb-8"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
             All genres
@@ -99,13 +99,13 @@ export function CategoryFeed({ slug }: { slug: string }) {
         </div>
       </section>
 
-      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6">
+      <div className="mx-auto max-w-[1400px] px-4 pt-6 sm:px-6 lg:px-12 lg:pt-10">
         {otherGenres.length > 0 ? (
           <section className="mb-8">
             <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.22em] text-white/40">
               Jump to
             </p>
-            <div className="row-scroll gap-2">
+            <div className="row-scroll gap-2 lg:flex-wrap lg:overflow-visible">
               {otherGenres.map((cat) => (
                 <Link
                   key={cat.id}
@@ -121,12 +121,12 @@ export function CategoryFeed({ slug }: { slug: string }) {
 
         <section>
           <div className="mb-4 flex items-end justify-between">
-            <h2 className="font-display text-xl font-bold">
+            <h2 className="font-display text-xl font-bold lg:text-2xl">
               {category.name} on SLOP
             </h2>
           </div>
           {list.length > 0 ? (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 md:gap-4">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 md:gap-4">
               {list.map((drama) => (
                 <DramaCard key={drama.id} drama={drama} size="fluid" />
               ))}
@@ -152,7 +152,7 @@ export function CategoryFeed({ slug }: { slug: string }) {
         {otherGenres.length > 0 ? (
           <section className="mt-12">
             <h2 className="mb-4 font-display text-xl font-bold">More moods</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 lg:gap-4">
               {otherGenres.slice(0, 6).map((cat) => (
                 <GenreTile
                   key={cat.id}
@@ -160,7 +160,7 @@ export function CategoryFeed({ slug }: { slug: string }) {
                   coverUrl={genreCover(cat.id, published)}
                   count={genreCount(cat.id, published)}
                   size="lg"
-                  className="w-full min-h-[6.5rem]"
+                  className="w-full min-h-[6.5rem] lg:min-h-[7.5rem]"
                 />
               ))}
             </div>

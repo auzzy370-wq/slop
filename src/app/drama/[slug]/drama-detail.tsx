@@ -51,12 +51,12 @@ export function DramaDetail({ slug }: { slug: string }) {
   const first = episodes[0];
 
   return (
-    <div className="slop-cinematic min-h-[100dvh] pb-28">
-      <header className="slop-safe-header absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4">
+    <div className="slop-cinematic min-h-[100dvh] pb-28 lg:pb-16">
+      <header className="slop-safe-header absolute left-0 right-0 top-0 z-20 flex items-center justify-between px-4 lg:hidden">
         <SlopWordmark />
       </header>
 
-      <div className="relative min-h-[360px] sm:min-h-[420px]">
+      <div className="relative min-h-[360px] sm:min-h-[420px] lg:min-h-[480px]">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={drama.bannerUrl}
@@ -64,44 +64,46 @@ export function DramaDetail({ slug }: { slug: string }) {
           className="absolute inset-0 h-full w-full object-cover"
         />
         <div className="slop-hero-mask absolute inset-0" />
-        <div className="relative z-10 flex min-h-[360px] flex-col justify-end px-4 pb-8 pt-24 sm:min-h-[420px] sm:px-8">
-          <div className="flex flex-wrap gap-2">
-            {genres.map((g) => (
+        <div className="relative z-10 mx-auto flex min-h-[360px] w-full max-w-[1400px] flex-col justify-end px-4 pb-8 pt-24 sm:min-h-[420px] sm:px-8 lg:min-h-[480px] lg:justify-center lg:px-12 lg:pb-14 lg:pt-20">
+          <div className="max-w-2xl">
+            <div className="flex flex-wrap gap-2">
+              {genres.map((g) => (
+                <Link
+                  key={g.id}
+                  href={`/categories/${g.slug}`}
+                  className="rounded-full bg-white/10 px-3 py-1 text-xs text-[var(--slop-lavender)]"
+                >
+                  {g.name}
+                </Link>
+              ))}
+            </div>
+            <h1 className="mt-3 font-display text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+              {drama.title}
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/75 sm:text-base">
+              {drama.synopsis}
+            </p>
+            <p className="mt-3 text-xs text-[var(--slop-slate)]">
+              {drama.sourceAttribution} · {episodes.length} episodes
+              {drama.viewCount > 0
+                ? ` · ${formatCount(drama.viewCount)} views`
+                : ""}
+            </p>
+            {first && (
               <Link
-                key={g.id}
-                href={`/categories/${g.slug}`}
-                className="rounded-full bg-white/10 px-3 py-1 text-xs text-[var(--slop-lavender)]"
+                href={`/watch?drama=${drama.id}&dramaSlug=${drama.slug}&start=${first.id}`}
+                className="mt-6 inline-flex h-12 w-fit items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)]"
               >
-                {g.name}
+                <Play className="h-4 w-4 fill-current" /> Play Episode 1
               </Link>
-            ))}
+            )}
           </div>
-          <h1 className="mt-3 font-display text-4xl font-bold tracking-tight sm:text-5xl">
-            {drama.title}
-          </h1>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-white/75 sm:text-base">
-            {drama.synopsis}
-          </p>
-          <p className="mt-3 text-xs text-[var(--slop-slate)]">
-            {drama.sourceAttribution} · {episodes.length} episodes
-            {drama.viewCount > 0
-              ? ` · ${formatCount(drama.viewCount)} views`
-              : ""}
-          </p>
-          {first && (
-            <Link
-              href={`/watch?drama=${drama.id}&dramaSlug=${drama.slug}&start=${first.id}`}
-              className="mt-6 inline-flex h-12 w-fit items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)]"
-            >
-              <Play className="h-4 w-4 fill-current" /> Play Episode 1
-            </Link>
-          )}
         </div>
       </div>
 
-      <section className="mx-auto max-w-3xl px-4 pt-8 sm:px-6">
-        <h2 className="font-display text-xl font-bold">Episodes</h2>
-        <div className="mt-4 space-y-3">
+      <section className="mx-auto max-w-[1400px] px-4 pt-8 sm:px-6 lg:px-12 lg:pt-12">
+        <h2 className="font-display text-xl font-bold lg:text-2xl">Episodes</h2>
+        <div className="mt-4 space-y-3 lg:grid lg:grid-cols-2 lg:gap-3 lg:space-y-0 xl:grid-cols-3">
           {episodes.length === 0 && (
             <p className="text-sm text-[var(--slop-slate)]">
               Episodes coming soon.

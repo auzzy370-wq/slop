@@ -49,7 +49,7 @@ export default function AccountPage() {
   const savedCount = saves.filter((s) => s.userId === user.id).length;
 
   return (
-    <div className="slop-grid-bg min-h-[100dvh] px-4 pb-28 pt-8">
+    <div className="slop-grid-bg min-h-[100dvh] px-4 pb-28 pt-8 lg:pb-16 lg:pt-24">
       <div className="mx-auto max-w-lg space-y-6">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--slop-violet)]">

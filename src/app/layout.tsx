@@ -3,6 +3,7 @@ import { Space_Grotesk, Inter } from "next/font/google";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { DesktopNav } from "@/components/layout/desktop-nav";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { PwaRegister } from "@/components/pwa-register";
 import { StoreHygiene } from "@/components/store-hygiene";
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={null}>
           <StoreHygiene />
           <AnalyticsProvider>
+            <DesktopNav />
             <main className="min-h-full flex-1">{children}</main>
             <BottomNav />
           </AnalyticsProvider>

@@ -44,10 +44,12 @@ function SearchInner() {
   };
 
   return (
-    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28">
-      <div className="mx-auto max-w-2xl">
-        <SlopWordmark className="mb-6" />
-        <h1 className="mb-4 font-display text-3xl font-bold">Search SLOP</h1>
+    <div className="slop-cinematic slop-safe-page min-h-[100dvh] px-4 pb-28 lg:pb-16 lg:pt-20">
+      <div className="mx-auto max-w-2xl lg:max-w-4xl">
+        <SlopWordmark className="mb-6 lg:hidden" />
+        <h1 className="mb-4 font-display text-3xl font-bold lg:text-4xl">
+          Search SLOP
+        </h1>
         <form onSubmit={submit} className="mb-6 flex gap-2">
           <div className="relative flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--slop-slate)]" />
@@ -82,7 +84,7 @@ function SearchInner() {
             <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-[var(--slop-slate)]">
               Dramas
             </h2>
-            <div className="row-scroll">
+            <div className="row-scroll lg:grid lg:grid-cols-4 lg:gap-4 xl:grid-cols-5 lg:overflow-visible">
               {dramaResults.map((d) => (
                 <DramaCard key={d.id} drama={d} />
               ))}
