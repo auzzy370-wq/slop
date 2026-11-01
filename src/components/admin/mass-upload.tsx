@@ -20,7 +20,7 @@ import {
 } from "@/lib/admin-upload-checkpoint";
 import {
   enqueueMassUpload,
-  episodeAlreadyDurable,
+  episodeAlreadyExists,
   isUploadRunning,
   subscribeUploadQueue,
   type CloudTarget,
@@ -217,10 +217,50 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       return;
     }
     const ranked = rankUploadFiles(files);
-    setPicked(ranked);
-    toast.success(
-      `Sorted ${ranked.length} file${ranked.length === 1 ? "" : "s"} by episode number`,
-    );
+    const dramaForFilter =
+      dramaId !== NEW_DRAMA
+        ? dramas.find((d) => d.id === dramaId)
+        : null;
+
+    let kept = ranked.files;
+    let alreadyInCatalog = 0;
+    if (dramaForFilter && !forceReplace) {
+      kept = ranked.files.filter((f) => {
+        const exists = episodeAlreadyExists(
+          dramaForFilter.id,
+          f.episodeNumber,
+        );
+        if (exists) alreadyInCatalog += 1;
+        return !exists;
+      });
+    }
+
+    setPicked(kept);
+
+    const bits: string[] = [
+      `Ready: ${kept.length} file${kept.length === 1 ? "" : "s"}`,
+    ];
+    if (ranked.duplicateEpisodeNumbers.length > 0) {
+      bits.push(
+        `dropped ${ranked.duplicateEpisodeNumbers.length} duplicate EP## in the selection`,
+      );
+    }
+    if (alreadyInCatalog > 0) {
+      bits.push(
+        `skipped ${alreadyInCatalog} already in this series`,
+      );
+    }
+    if (kept.length === 0) {
+      toast.error(
+        alreadyInCatalog > 0
+          ? "Every selected episode already exists for this series. Enable “Force re-upload” only to replace them."
+          : ranked.duplicateEpisodeNumbers.length > 0
+            ? "Only duplicate episode numbers were selected."
+            : "No files to upload.",
+      );
+      return;
+    }
+    toast.success(bits.join(" · "));
   };
 
   const resolveDrama = (): Drama | null => {
@@ -585,9 +625,10 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           disabled={queueBusy}
         />
         <span>
-          Force re-upload episodes that are already on cloud storage
+          Force re-upload episodes that already exist
           <span className="block text-xs text-white/40">
-            Leave off for resume. Turn on only if you want to replace R2 files.
+            Leave off to block doubles / resume safely. Turn on only to replace
+            an existing EP##.
           </span>
         </span>
       </label>

@@ -9,27 +9,33 @@ import {
   formatEpisodeTitle,
   type RankedUploadFile,
 } from "@/lib/episodes/filename";
-import { isVercelBlobUrl } from "@/lib/media-url";
 import type { Drama, PublicationStatus, Video } from "@/lib/types";
 import { slugify, uid } from "@/lib/utils";
 import { useSlopStore } from "@/store/slop-store";
 
 const ADMIN_KEY_STORAGE = "slop_admin_key";
 
-/** Episode already on durable cloud (R2/local) — safe to skip on resume. */
+/** Episode already exists for this drama — block double uploads unless forceReplace. */
+export function episodeAlreadyExists(
+  dramaId: string,
+  episodeNumber: number,
+): boolean {
+  return useSlopStore
+    .getState()
+    .videos.some(
+      (v) =>
+        v.dramaId === dramaId &&
+        v.episodeNumber === episodeNumber &&
+        Boolean(v.videoUrl?.trim()),
+    );
+}
+
+/** @deprecated use episodeAlreadyExists */
 export function episodeAlreadyDurable(
   dramaId: string,
   episodeNumber: number,
 ): boolean {
-  const hit = useSlopStore
-    .getState()
-    .videos.find(
-      (v) => v.dramaId === dramaId && v.episodeNumber === episodeNumber,
-    );
-  if (!hit?.videoUrl) return false;
-  // Blob URLs are broken while suspended — do not skip those (allow R2 replace).
-  if (isVercelBlobUrl(hit.videoUrl)) return false;
-  return Boolean(hit.videoUrl.trim());
+  return episodeAlreadyExists(dramaId, episodeNumber);
 }
 
 let wakeLock: WakeLockSentinel | null = null;
@@ -326,11 +332,10 @@ async function processQueue() {
   for (const job of batch.jobs) {
     if (job.status === "done") continue;
 
-    // Resume safety: if this EP was already saved to R2 before the tab died,
-    // skip re-uploading the bytes.
+    // Never double-upload the same EP for a drama unless forceReplace is on.
     if (
       !batch.forceReplace &&
-      episodeAlreadyDurable(drama.id, job.episodeNumber)
+      episodeAlreadyExists(drama.id, job.episodeNumber)
     ) {
       patchJob(job.id, {
         status: "done",
@@ -565,11 +570,19 @@ export function enqueueMassUpload(opts: {
     opts.cloudTarget || (opts.preferBlob === false ? "local" : "r2");
   const forceReplace = Boolean(opts.forceReplace);
 
+  // Also drop duplicate EP## inside this batch (keep first only).
+  const seenEp = new Set<number>();
+  const dedupedFiles = opts.files.filter((f) => {
+    if (seenEp.has(f.episodeNumber)) return false;
+    seenEp.add(f.episodeNumber);
+    return true;
+  });
+
   let skippedDurable = 0;
   const files = forceReplace
-    ? opts.files
-    : opts.files.filter((f) => {
-        const skip = episodeAlreadyDurable(opts.drama.id, f.episodeNumber);
+    ? dedupedFiles
+    : dedupedFiles.filter((f) => {
+        const skip = episodeAlreadyExists(opts.drama.id, f.episodeNumber);
         if (skip) skippedDurable += 1;
         return !skip;
       });
@@ -580,7 +593,7 @@ export function enqueueMassUpload(opts: {
       ok: false,
       error:
         skippedDurable > 0
-          ? `All ${skippedDurable} selected episode${skippedDurable === 1 ? "" : "s"} are already on cloud storage. Nothing left to upload.`
+          ? `All ${skippedDurable} selected episode${skippedDurable === 1 ? "" : "s"} already exist for this series. Turn on “Force re-upload” only if you mean to replace them.`
           : "No files to upload.",
     };
   }

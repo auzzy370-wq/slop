@@ -29,10 +29,19 @@ export type RankedUploadFile = {
   label: string;
 };
 
+export type RankUploadResult = {
+  files: RankedUploadFile[];
+  /** Files dropped because another file already claimed that EP##. */
+  duplicateEpisodeNumbers: number[];
+  duplicateFileNames: string[];
+};
+
 /** Sort files by EP## ascending; unparseable files get sequential numbers after the max. */
-export function rankUploadFiles(files: File[]): RankedUploadFile[] {
+export function rankUploadFiles(files: File[]): RankUploadResult {
   const parsed: RankedUploadFile[] = [];
   const orphan: File[] = [];
+  const duplicateEpisodeNumbers: number[] = [];
+  const duplicateFileNames: string[] = [];
 
   for (const file of files) {
     const n = parseEpisodeNumber(file.name);
@@ -50,20 +59,24 @@ export function rankUploadFiles(files: File[]): RankedUploadFile[] {
 
   parsed.sort((a, b) => a.episodeNumber - b.episodeNumber);
 
-  // Deduplicate episode numbers — keep first, bump later duplicates
+  // Deduplicate episode numbers — keep the first file, drop later duplicates.
   const used = new Set<number>();
+  const unique: RankedUploadFile[] = [];
   for (const item of parsed) {
-    let n = item.episodeNumber;
-    while (used.has(n)) n += 1;
-    item.episodeNumber = n;
-    used.add(n);
+    if (used.has(item.episodeNumber)) {
+      duplicateEpisodeNumbers.push(item.episodeNumber);
+      duplicateFileNames.push(item.file.name);
+      continue;
+    }
+    used.add(item.episodeNumber);
+    unique.push(item);
   }
 
   let next =
-    parsed.reduce((max, item) => Math.max(max, item.episodeNumber), 0) + 1;
+    unique.reduce((max, item) => Math.max(max, item.episodeNumber), 0) + 1;
   for (const file of orphan) {
     while (used.has(next)) next += 1;
-    parsed.push({
+    unique.push({
       file,
       episodeNumber: next,
       parsed: false,
@@ -73,7 +86,13 @@ export function rankUploadFiles(files: File[]): RankedUploadFile[] {
     next += 1;
   }
 
-  return parsed.sort((a, b) => a.episodeNumber - b.episodeNumber);
+  return {
+    files: unique.sort((a, b) => a.episodeNumber - b.episodeNumber),
+    duplicateEpisodeNumbers: [...new Set(duplicateEpisodeNumbers)].sort(
+      (a, b) => a - b,
+    ),
+    duplicateFileNames,
+  };
 }
 
 export function formatEpisodeTitle(episodeNumber: number, filename: string) {
