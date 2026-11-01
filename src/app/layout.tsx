@@ -9,6 +9,7 @@ import { PwaRegister } from "@/components/pwa-register";
 import { StoreHygiene } from "@/components/store-hygiene";
 import { UploadsHydrator } from "@/components/uploads-hydrator";
 import { UploadProgressDock } from "@/components/admin/upload-progress-dock";
+import { AdsenseScript } from "@/components/ads/adsense-script";
 import "./globals.css";
 
 export const instant = false;
@@ -100,6 +101,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           }}
         />
         <PwaRegister />
+        <AdsenseScript />
       </body>
     </html>
   );

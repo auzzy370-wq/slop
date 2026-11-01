@@ -95,3 +95,21 @@ Production-ready event analytics, attribution, campaigns, content/revenue dashbo
 - Free sees ads; verified Premium does not
 - Premium status comes from trusted backend/Stripe data
 - Analytics never invent traffic, revenue, or users
+
+## Ads
+
+Between-episode placements for free users (Premium skips them).
+
+1. Open **Admin → Ads** for the checklist and frequency control
+2. Default provider is **house** (Premium upsell CTA) so the feed monetization path works before AdSense approval
+3. After Google AdSense approves your site, set on Vercel and redeploy:
+
+```bash
+NEXT_PUBLIC_ADS_PROVIDER=adsense
+NEXT_PUBLIC_ADS_CLIENT_ID=ca-pub-xxxxxxxxxxxxxxxx
+NEXT_PUBLIC_ADS_SLOT_FEED=##########
+# optional while testing:
+NEXT_PUBLIC_ADS_TEST_MODE=true
+```
+
+`/ads.txt` is generated from your publisher id. Import daily AdSense totals under **Admin → Analytics → Revenue** (never invented).

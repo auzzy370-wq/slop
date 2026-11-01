@@ -10,6 +10,7 @@ import {
   Gift,
   LayoutDashboard,
   Link2,
+  Megaphone,
   Menu,
   Settings,
   Share2,
@@ -23,6 +24,7 @@ import { useSlopStore } from "@/store/slop-store";
 const nav = [
   { href: "/admin", label: "Overview", icon: LayoutDashboard },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/admin/ads", label: "Ads", icon: Megaphone },
   { href: "/admin/campaigns", label: "Campaigns", icon: Link2 },
   { href: "/admin/referrals", label: "Rewards", icon: Gift },
   { href: "/admin/videos", label: "Episodes", icon: Video },

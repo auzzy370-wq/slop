@@ -38,25 +38,8 @@ export default function AdminSettingsPage() {
             onChange={(e) => updateSettings({ tagline: e.target.value })}
           />
         </label>
-        <label className="block text-xs uppercase tracking-wide text-white/45">
-          Ad every N videos
-          <Input
-            className="mt-1"
-            type="number"
-            min={2}
-            max={20}
-            value={settings.adPlacementEvery}
-            onChange={(e) =>
-              updateSettings({
-                adPlacementEvery: Math.max(2, Number(e.target.value) || 4),
-              })
-            }
-          />
-        </label>
-
         {(
           [
-            ["adsEnabled", "Show ads to free users"],
             ["commentsEnabled", "Allow comments"],
             ["registrationEnabled", "Allow registration"],
             ["maintenanceMode", "Maintenance mode"],
@@ -71,6 +54,14 @@ export default function AdminSettingsPage() {
             {label}
           </label>
         ))}
+
+        <p className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-xs text-white/55">
+          Ads on/off, frequency, and AdSense wiring live under{" "}
+          <a href="/admin/ads" className="font-semibold text-[var(--slop-violet)]">
+            Ads
+          </a>
+          .
+        </p>
 
         <Button onClick={() => toast.success("Settings saved locally")}>
           Save settings
