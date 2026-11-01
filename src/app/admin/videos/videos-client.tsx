@@ -144,11 +144,13 @@ export default function VideosClient() {
   const dramas = useSlopStore((s) => s.dramas);
   const categories = useSlopStore((s) => s.categories);
   const upsertVideo = useSlopStore((s) => s.upsertVideo);
+  const upsertDrama = useSlopStore((s) => s.upsertDrama);
   const deleteVideo = useSlopStore((s) => s.deleteVideo);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkBusy, setBulkBusy] = useState(false);
+  const [seriesBusyId, setSeriesBusyId] = useState<string | null>(null);
   const [storage, setStorage] = useState<StorageReportPayload | null>(null);
   const [storageLoading, setStorageLoading] = useState(false);
   const [purgeBusy, setPurgeBusy] = useState(false);
@@ -163,6 +165,106 @@ export default function VideosClient() {
         return a.episodeNumber - b.episodeNumber;
       }),
     [videos],
+  );
+
+  const seriesRows = useMemo(() => {
+    return [...dramas]
+      .map((drama) => {
+        const eps = videos.filter((v) => v.dramaId === drama.id);
+        const published = eps.filter((v) => v.status === "published").length;
+        return {
+          drama,
+          episodeCount: eps.length,
+          publishedCount: published,
+          unpublishedCount: eps.length - published,
+        };
+      })
+      .sort((a, b) => a.drama.title.localeCompare(b.drama.title));
+  }, [dramas, videos]);
+
+  const persistCatalogOverlay = useCallback(
+    async (input: {
+      dramas?: typeof dramas;
+      videos?: Video[];
+    }) => {
+      const res = await fetch("/api/admin/catalog/uploads", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({
+          dramas: input.dramas ?? [],
+          videos: input.videos ?? [],
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (!res.ok || data.ok === false) {
+        throw new Error(
+          data.message || data.error || "Failed to update uploads catalog",
+        );
+      }
+    },
+    [],
+  );
+
+  const setSeriesPublication = useCallback(
+    async (dramaId: string, nextStatus: PublicationStatus) => {
+      const drama = dramas.find((d) => d.id === dramaId);
+      if (!drama) return;
+      const eps = videos.filter((v) => v.dramaId === dramaId);
+      if (eps.length === 0) {
+        toast.error("This series has no episodes yet");
+        return;
+      }
+      const publishing = nextStatus === "published";
+      const confirmed = window.confirm(
+        publishing
+          ? `Publish “${drama.title}” and all ${eps.length} episode${eps.length === 1 ? "" : "s"}?`
+          : `Unpublish “${drama.title}” and all ${eps.length} episode${eps.length === 1 ? "" : "s"}? It will disappear from the public site and the server catalog will be updated.`,
+      );
+      if (!confirmed) return;
+
+      setSeriesBusyId(dramaId);
+      const toastId = toast.loading(
+        publishing ? "Publishing series…" : "Unpublishing series…",
+      );
+      const now = new Date().toISOString();
+      const nextDrama = {
+        ...drama,
+        status: nextStatus,
+        publishedAt: publishing ? drama.publishedAt ?? now : drama.publishedAt,
+      };
+      const nextVideos = eps.map((v) => ({
+        ...v,
+        status: nextStatus,
+        publishedAt: publishing ? v.publishedAt ?? now : v.publishedAt,
+      }));
+
+      try {
+        upsertDrama(nextDrama);
+        for (const v of nextVideos) upsertVideo(v);
+        await persistCatalogOverlay({
+          dramas: [nextDrama],
+          videos: nextVideos,
+        });
+        toast.success(
+          publishing
+            ? `Published “${drama.title}” (${eps.length} episodes) — catalog updated`
+            : `Unpublished “${drama.title}” (${eps.length} episodes) — removed from public catalog`,
+          { id: toastId },
+        );
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Series update failed",
+          { id: toastId },
+        );
+      } finally {
+        setSeriesBusyId(null);
+      }
+    },
+    [dramas, videos, upsertDrama, upsertVideo, persistCatalogOverlay],
   );
 
   const allSelected =
@@ -1034,6 +1136,67 @@ export default function VideosClient() {
       <MassUpload dramas={dramas} />
 
       <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div>
+          <h2 className="font-semibold">Series publish controls</h2>
+          <p className="mt-0.5 text-xs text-white/45">
+            Publish or unpublish an entire show at once. Unpublish updates the
+            server catalog so the series leaves Home, Explore, and Watch.
+          </p>
+        </div>
+        {seriesRows.length === 0 ? (
+          <p className="text-sm text-white/45">No series yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {seriesRows.map(
+              ({ drama, episodeCount, publishedCount, unpublishedCount }) => {
+                const busy = seriesBusyId === drama.id;
+                const allPublished =
+                  episodeCount > 0 && publishedCount === episodeCount;
+                return (
+                  <div
+                    key={drama.id}
+                    className="flex flex-col gap-3 rounded-xl border border-white/10 bg-black/25 p-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-white">
+                        {drama.title}
+                      </p>
+                      <p className="text-xs text-white/45">
+                        Series {drama.status} · {publishedCount} published ·{" "}
+                        {unpublishedCount} not published · {episodeCount} total
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy || allPublished || episodeCount === 0}
+                        onClick={() =>
+                          void setSeriesPublication(drama.id, "published")
+                        }
+                      >
+                        {busy ? "Working…" : "Publish series"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy || publishedCount === 0}
+                        onClick={() =>
+                          void setSeriesPublication(drama.id, "unpublished")
+                        }
+                      >
+                        {busy ? "Working…" : "Unpublish series"}
+                      </Button>
+                    </div>
+                  </div>
+                );
+              },
+            )}
+          </div>
+        )}
+      </section>
+
+      <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="font-semibold">
           {editingId ? "Edit episode" : "Add / publish episode"}
         </h2>
@@ -1269,6 +1432,15 @@ export default function VideosClient() {
                       : video.publishedAt,
                   };
                   upsertVideo(next);
+                  try {
+                    await persistCatalogOverlay({ videos: [next] });
+                  } catch (err) {
+                    toast.error(
+                      err instanceof Error
+                        ? err.message
+                        : "Saved locally but catalog sync failed",
+                    );
+                  }
                   if (publishing && video.episodeNumber <= 2) {
                     const drama = dramas.find((d) => d.id === video.dramaId);
                     if (drama) {
