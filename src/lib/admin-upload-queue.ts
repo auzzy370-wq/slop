@@ -79,7 +79,8 @@ export type QueueJob = {
   url?: string;
 };
 
-export type CloudTarget = "r2" | "blob" | "local";
+export type CloudTarget = "auto" | "r2" | "supabase" | "blob" | "local";
+export type ResolvedCloudTarget = "r2" | "supabase" | "blob" | "local";
 
 export type UploadBatch = {
   id: string;
@@ -89,6 +90,8 @@ export type UploadBatch = {
   /** @deprecated use cloudTarget */
   preferBlob: boolean;
   cloudTarget: CloudTarget;
+  /** Spillover order for auto (R2 → Supabase → Blob). */
+  autoOrder: ResolvedCloudTarget[];
   /** When true, re-upload even if episode already has a durable (non-Blob) URL. */
   forceReplace: boolean;
   jobs: QueueJob[];
@@ -138,22 +141,34 @@ function friendlyUploadError(raw: string) {
     return "Admin key missing or wrong — paste SLOP_ADMIN_KEY, then retry.";
   }
   if (/store has been suspended|store is blocked|blob.*suspended/i.test(raw)) {
-    return "Vercel Blob is suspended. Switch mass upload to Cloudflare R2 (free) or unsuspend Blob.";
+    return "Vercel Blob is suspended. Switch mass upload to Auto / Cloudflare R2 / Supabase, or unsuspend Blob.";
   }
   if (/r2_not_configured|R2_/i.test(raw)) {
     return "Cloudflare R2 is not configured — set R2_* env vars (see README).";
   }
+  if (/supabase_not_configured|SUPABASE_SERVICE_ROLE/i.test(raw)) {
+    return "Supabase Storage is not configured — set NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY.";
+  }
   if (/blob_not_configured|BLOB_READ_WRITE_TOKEN/i.test(raw)) {
-    return "Cloud storage not configured (set R2_* or BLOB_READ_WRITE_TOKEN).";
+    return "Cloud storage not configured (set R2_*, Supabase, or BLOB_READ_WRITE_TOKEN).";
   }
   if (/use_blob/i.test(raw)) {
-    return "This host needs cloud storage (R2 or Blob) for MP4 uploads.";
+    return "This host needs cloud storage (R2, Supabase, or Blob) for MP4 uploads.";
+  }
+  if (/no_cloud_storage|free.?tier pool|none ready/i.test(raw)) {
+    return "No free-tier cloud storage is ready. Configure R2, Supabase Storage, or Blob.";
   }
   return raw;
 }
 
 function isFatalUploadError(raw: string) {
-  return /store has been suspended|store is blocked|blob.*suspended|r2_not_configured|BLOB_READ_WRITE_TOKEN|not configured|use_blob|Admin key missing/i.test(
+  return /store has been suspended|store is blocked|blob.*suspended|r2_not_configured|supabase_not_configured|BLOB_READ_WRITE_TOKEN|not configured|use_blob|no_cloud_storage|Admin key missing/i.test(
+    raw,
+  );
+}
+
+function isSpillableCloudError(raw: string) {
+  return /suspended|blocked|not configured|r2_not_configured|supabase_not_configured|BLOB_READ_WRITE_TOKEN|quota|storage.*limit|payload too large|entity too large|413/i.test(
     raw,
   );
 }
@@ -276,6 +291,144 @@ async function uploadR2(
   return presign.publicUrl;
 }
 
+async function uploadSupabase(
+  file: File,
+  dramaId: string,
+  episodeNumber: number,
+  adminKey?: string,
+): Promise<string> {
+  const contentType = file.type || "video/mp4";
+  const presignRes = await fetch("/api/admin/videos/supabase", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...adminHeaders(adminKey),
+    },
+    body: JSON.stringify({
+      action: "presign",
+      dramaId,
+      episodeNumber,
+      filename: file.name,
+      contentType,
+    }),
+  });
+  const presign = (await presignRes.json().catch(() => ({}))) as {
+    ok?: boolean;
+    uploadUrl?: string;
+    publicUrl?: string;
+    message?: string;
+    error?: string;
+  };
+  if (!presignRes.ok || !presign.uploadUrl || !presign.publicUrl) {
+    throw new Error(
+      friendlyUploadError(
+        presign.message ||
+          presign.error ||
+          "Supabase signed upload failed",
+      ),
+    );
+  }
+
+  const putRes = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: {
+      "content-type": contentType,
+      "x-upsert": "true",
+    },
+    body: file,
+  });
+  if (!putRes.ok) {
+    const text = await putRes.text().catch(() => "");
+    throw new Error(
+      friendlyUploadError(
+        text || `Supabase upload failed (HTTP ${putRes.status})`,
+      ),
+    );
+  }
+  return presign.publicUrl;
+}
+
+async function uploadToTarget(
+  target: ResolvedCloudTarget,
+  file: File,
+  dramaId: string,
+  episodeNumber: number,
+  adminKey?: string,
+): Promise<string> {
+  if (target === "r2") {
+    return uploadR2(file, dramaId, episodeNumber, adminKey);
+  }
+  if (target === "supabase") {
+    return uploadSupabase(file, dramaId, episodeNumber, adminKey);
+  }
+  if (target === "blob") {
+    return uploadBlob(file, dramaId, episodeNumber, adminKey);
+  }
+  return uploadLocal(file, dramaId, episodeNumber, adminKey);
+}
+
+async function resolveAutoOrder(
+  adminKey: string,
+): Promise<ResolvedCloudTarget[]> {
+  try {
+    const res = await fetch("/api/admin/videos/upload-status", {
+      headers: adminHeaders(adminKey),
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      order?: string[];
+      preferred?: string;
+    };
+    const order = (data.order || []).filter(
+      (id): id is ResolvedCloudTarget =>
+        id === "r2" || id === "supabase" || id === "blob",
+    );
+    if (order.length) return order;
+    if (
+      data.preferred === "r2" ||
+      data.preferred === "supabase" ||
+      data.preferred === "blob"
+    ) {
+      return [data.preferred];
+    }
+  } catch {
+    /* fall through */
+  }
+  return ["r2", "supabase", "blob"];
+}
+
+async function uploadWithSpillover(
+  order: ResolvedCloudTarget[],
+  file: File,
+  dramaId: string,
+  episodeNumber: number,
+  adminKey?: string,
+): Promise<string> {
+  const errors: string[] = [];
+  for (let i = 0; i < order.length; i++) {
+    const target = order[i]!;
+    try {
+      return await uploadToTarget(
+        target,
+        file,
+        dramaId,
+        episodeNumber,
+        adminKey,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`${target}: ${msg}`);
+      const canSpill =
+        i < order.length - 1 && isSpillableCloudError(msg);
+      if (!canSpill) throw err;
+    }
+  }
+  throw new Error(
+    friendlyUploadError(
+      errors.join(" · ") || "no_cloud_storage — free-tier pool none ready",
+    ),
+  );
+}
+
 /**
  * Persist drama + every known episode for that series.
  * Sending the full set avoids lost updates when Blob catalog reads are stale
@@ -362,48 +515,63 @@ async function processQueue() {
 
     try {
       let url: string;
-      const target = batch.cloudTarget || (batch.preferBlob ? "blob" : "local");
-      if (target === "r2") {
-        url = await uploadR2(
+      const target = batch.cloudTarget || (batch.preferBlob ? "blob" : "auto");
+      if (target === "auto") {
+        const order =
+          batch.autoOrder.length > 0
+            ? batch.autoOrder
+            : await resolveAutoOrder(batch.adminKey);
+        if (activeBatch) activeBatch.autoOrder = order;
+        url = await uploadWithSpillover(
+          order,
           job.file,
           drama.id,
           job.episodeNumber,
           batch.adminKey,
         );
-      } else if (target === "blob") {
-        try {
-          url = await uploadBlob(
-            job.file,
-            drama.id,
-            job.episodeNumber,
-            batch.adminKey,
-          );
-        } catch (blobErr) {
-          const msg =
-            blobErr instanceof Error ? blobErr.message : String(blobErr);
-          if (
-            /Blob storage not configured|BLOB_READ_WRITE_TOKEN|not configured|suspended|blocked/i.test(
-              msg,
-            )
-          ) {
-            // Never fall back to local on Vercel — force R2 so reuploads land on Cloudflare.
-            url = await uploadR2(
-              job.file,
-              drama.id,
-              job.episodeNumber,
-              batch.adminKey,
-            );
-          } else {
-            throw blobErr;
-          }
-        }
-      } else {
+      } else if (target === "local") {
         url = await uploadLocal(
           job.file,
           drama.id,
           job.episodeNumber,
           batch.adminKey,
         );
+      } else {
+        try {
+          url = await uploadToTarget(
+            target,
+            job.file,
+            drama.id,
+            job.episodeNumber,
+            batch.adminKey,
+          );
+        } catch (primaryErr) {
+          const msg =
+            primaryErr instanceof Error
+              ? primaryErr.message
+              : String(primaryErr);
+          // Forced target failed — spill into the free-tier pool when possible.
+          if (isSpillableCloudError(msg)) {
+            const order = (
+              batch.autoOrder.length
+                ? batch.autoOrder
+                : await resolveAutoOrder(batch.adminKey)
+            ).filter((id) => id !== target);
+            if (order.length) {
+              url = await uploadWithSpillover(
+                order,
+                job.file,
+                drama.id,
+                job.episodeNumber,
+                batch.adminKey,
+              );
+            } else {
+              throw primaryErr;
+            }
+          } else {
+            throw primaryErr;
+          }
+        }
       }
 
       patchJob(job.id, { progress: 55 });
@@ -507,8 +675,8 @@ async function processQueue() {
 
       // Fatal cloud/config errors will fail every remaining job — abort the rest.
       if (isFatalUploadError(message) && activeBatch) {
-        const skipMsg = /suspended|blocked/i.test(message)
-          ? `Skipped — cloud storage unavailable (fix R2/Blob, then re-upload from EP ${String(job.episodeNumber).padStart(2, "0")} onward)`
+        const skipMsg = /suspended|blocked|no_cloud|none ready/i.test(message)
+          ? `Skipped — free-tier pool unavailable (fix R2 / Supabase / Blob, then re-upload from EP ${String(job.episodeNumber).padStart(2, "0")} onward)`
           : `Skipped — ${message}`;
         activeBatch = {
           ...activeBatch,
@@ -547,6 +715,7 @@ export function enqueueMassUpload(opts: {
   adminKey: string;
   preferBlob?: boolean;
   cloudTarget?: CloudTarget;
+  autoOrder?: ResolvedCloudTarget[];
   files: RankedUploadFile[];
   /** Re-upload episodes that already have durable cloud URLs. */
   forceReplace?: boolean;
@@ -567,7 +736,11 @@ export function enqueueMassUpload(opts: {
   useSlopStore.getState().upsertDrama(opts.drama);
 
   const cloudTarget: CloudTarget =
-    opts.cloudTarget || (opts.preferBlob === false ? "local" : "r2");
+    opts.cloudTarget || (opts.preferBlob === false ? "local" : "auto");
+  const autoOrder = (opts.autoOrder || []).filter(
+    (id): id is ResolvedCloudTarget =>
+      id === "r2" || id === "supabase" || id === "blob",
+  );
   const forceReplace = Boolean(opts.forceReplace);
 
   // Also drop duplicate EP## inside this batch (keep first only).
@@ -605,6 +778,7 @@ export function enqueueMassUpload(opts: {
     adminKey: opts.adminKey,
     preferBlob: cloudTarget === "blob",
     cloudTarget,
+    autoOrder,
     forceReplace,
     skippedDurable,
     startedAt: Date.now(),

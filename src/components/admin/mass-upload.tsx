@@ -58,15 +58,23 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
   const [dramaId, setDramaId] = useState(dramas[0]?.id ?? NEW_DRAMA);
   const [status, setStatus] = useState<PublicationStatus>("published");
   const [picked, setPicked] = useState<PickedRow[]>([]);
-  const [cloudTarget, setCloudTarget] = useState<CloudTarget>("r2");
+  const [cloudTarget, setCloudTarget] = useState<CloudTarget>("auto");
   const [adminKey, setAdminKey] = useState("");
   const [uploadReady, setUploadReady] = useState<
     "unknown" | "ready" | "needs-key" | "no-cloud" | "suspended"
   >("unknown");
   const [readyMessage, setReadyMessage] = useState("");
-  const [preferredCloud, setPreferredCloud] = useState<"r2" | "blob" | "none">(
-    "none",
-  );
+  const [preferredCloud, setPreferredCloud] = useState<
+    "r2" | "supabase" | "blob" | "none"
+  >("none");
+  const [autoOrder, setAutoOrder] = useState<
+    Array<"r2" | "supabase" | "blob">
+  >([]);
+  const [providerReady, setProviderReady] = useState({
+    r2: false,
+    supabase: false,
+    blob: false,
+  });
   const [batch, setBatch] = useState<UploadBatch | null>(null);
   const [checkpoint, setCheckpoint] = useState<UploadCheckpoint | null>(null);
   const [forceReplace, setForceReplace] = useState(false);
@@ -107,33 +115,62 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           return;
         }
         const preferred =
-          data.preferred === "r2" || data.preferred === "blob"
+          data.preferred === "r2" ||
+          data.preferred === "supabase" ||
+          data.preferred === "blob"
             ? data.preferred
             : "none";
         setPreferredCloud(preferred);
-        if (preferred !== "none") {
-          setCloudTarget(preferred);
-        }
+        const order = Array.isArray(data.order)
+          ? (data.order as Array<"r2" | "supabase" | "blob">).filter(
+              (id) => id === "r2" || id === "supabase" || id === "blob",
+            )
+          : [];
+        setAutoOrder(order);
+        const providers = (data.pool?.providers || []) as Array<{
+          id: string;
+          ok: boolean;
+        }>;
+        setProviderReady({
+          r2: Boolean(
+            data.r2Ok || providers.find((p) => p.id === "r2")?.ok,
+          ),
+          supabase: Boolean(
+            data.supabaseOk ||
+              providers.find((p) => p.id === "supabase")?.ok,
+          ),
+          blob: Boolean(providers.find((p) => p.id === "blob")?.ok),
+        });
+        setCloudTarget((prev) =>
+          prev === "local" ||
+          prev === "r2" ||
+          prev === "supabase" ||
+          prev === "blob"
+            ? prev
+            : preferred !== "none"
+              ? "auto"
+              : prev,
+        );
 
         if (preferred === "none") {
-          if (data.blobSuspended && !data.r2Ok) {
+          if (data.blobSuspended && !data.r2Ok && !data.supabaseOk) {
             setUploadReady("suspended");
             setReadyMessage(
               data.message ||
-                "Vercel Blob is suspended. Add free Cloudflare R2 credentials (R2_*) to keep uploading.",
+                "Vercel Blob is suspended. Add free Cloudflare R2 and/or Supabase Storage to keep uploading.",
             );
             return;
           }
           setUploadReady("no-cloud");
           setReadyMessage(
             data.message ||
-              "No cloud storage ready. Configure Cloudflare R2 (free) or Vercel Blob.",
+              "No free-tier cloud storage ready. Configure R2, Supabase Storage, or Blob.",
           );
           return;
         }
 
         setUploadReady("ready");
-        setReadyMessage(data.message || "Ready for cloud mass upload");
+        setReadyMessage(data.message || "Ready for free-tier pool mass upload");
       } catch {
         if (!cancelled) {
           setUploadReady("unknown");
@@ -323,7 +360,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
     if (uploadReady === "suspended" || uploadReady === "no-cloud") {
       toast.error(
         readyMessage ||
-          "Cloud storage is not ready. Configure Cloudflare R2 (free) first.",
+          "Cloud storage is not ready. Configure R2 and/or Supabase Storage first.",
       );
       return;
     }
@@ -331,21 +368,21 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
     const drama = resolveDrama();
     if (!drama) return;
 
-    // Always prefer R2 for production reuploads — Blob is suspended on Hobby.
     const target: CloudTarget =
-      preferredCloud === "r2" || cloudTarget === "r2"
-        ? "r2"
-        : preferredCloud === "blob" && cloudTarget === "blob"
-          ? "blob"
-          : cloudTarget === "local"
-            ? "local"
-            : "r2";
+      cloudTarget === "local"
+        ? "local"
+        : cloudTarget === "r2" ||
+            cloudTarget === "supabase" ||
+            cloudTarget === "blob"
+          ? cloudTarget
+          : "auto";
 
     const result = enqueueMassUpload({
       drama,
       publishStatus: status,
       adminKey,
       cloudTarget: target,
+      autoOrder,
       files: picked,
       forceReplace,
     });
@@ -465,17 +502,15 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           <div className="space-y-1">
             <p className="font-semibold text-amber-50">
-              Cloud storage needs Cloudflare R2
+              Free-tier cloud pool needs credentials
             </p>
             <p className="text-xs text-amber-100/80">
-              Vercel Blob on Hobby is suspended. Use free Cloudflare R2 instead:
-              create a public bucket + API token, set{" "}
-              <code className="text-amber-50">R2_ACCOUNT_ID</code>,{" "}
-              <code className="text-amber-50">R2_ACCESS_KEY_ID</code>,{" "}
-              <code className="text-amber-50">R2_SECRET_ACCESS_KEY</code>,{" "}
-              <code className="text-amber-50">R2_BUCKET_NAME</code>, and{" "}
-              <code className="text-amber-50">R2_PUBLIC_BASE_URL</code> in Vercel
-              env, redeploy, then re-drop remaining EP## files.
+              Wire Cloudflare R2 (10 GB free) and optionally Supabase Storage
+              (1 GB free). Set <code className="text-amber-50">R2_*</code> and/or{" "}
+              <code className="text-amber-50">NEXT_PUBLIC_SUPABASE_URL</code> +{" "}
+              <code className="text-amber-50">SUPABASE_SERVICE_ROLE_KEY</code> in
+              Vercel, redeploy, then re-drop remaining EP## files. Auto mode
+              spills across every healthy free backend.
             </p>
           </div>
         </div>
@@ -602,17 +637,32 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           onChange={(e) => setCloudTarget(e.target.value as CloudTarget)}
           disabled={queueBusy || uploadReady !== "ready"}
         >
-          <option value="r2">Cloudflare R2 (free — reuploads go here)</option>
-          <option value="blob" disabled={preferredCloud !== "blob"}>
+          <option value="auto">
+            Auto free-tier pool
+            {autoOrder.length
+              ? ` (${autoOrder.join(" → ")})`
+              : preferredCloud !== "none"
+                ? ` → ${preferredCloud}`
+                : ""}
+          </option>
+          <option value="r2" disabled={!providerReady.r2}>
+            Cloudflare R2 (10 GB free)
+            {!providerReady.r2 ? " (not ready)" : ""}
+          </option>
+          <option value="supabase" disabled={!providerReady.supabase}>
+            Supabase Storage (1 GB free)
+            {!providerReady.supabase ? " (not ready)" : ""}
+          </option>
+          <option value="blob" disabled={!providerReady.blob}>
             Vercel Blob
-            {preferredCloud !== "blob" ? " (suspended)" : ""}
+            {!providerReady.blob ? " (suspended / unavailable)" : ""}
           </option>
           <option value="local">Local public/uploads (dev only)</option>
         </select>
         <p className="text-xs text-white/40">
-          Re-drop the same EP## files into the same drama — they upload to
-          Cloudflare R2 and replace old Blob URLs. Episodes already on R2 are
-          skipped automatically so you can resume after closing the browser.
+          Auto picks the healthy free backend with the most headroom (R2 →
+          Supabase → Blob) and spills over if one fills or fails. Re-drop the
+          same EP## files to resume — finished episodes are skipped.
         </p>
       </label>
 

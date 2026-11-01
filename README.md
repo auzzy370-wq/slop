@@ -73,7 +73,17 @@ Publishing **episode 1 or 2** of a show triggers posts to Discord / Telegram / X
 2. Under **Mass upload**, pick a drama and drop many MP4s named `EP01`, `EP49`, etc.
 3. Files auto-sort by episode number (ascending) and publish into that series
 
-Locally, files save under `public/uploads/`. On Vercel, use **Cloudflare R2** (free tier) for large MP4s:
+Locally, files save under `public/uploads/`. On Vercel, mass upload uses a **free-tier storage pool** that spills across every healthy backend:
+
+| Backend | Soft free cap | Role |
+| --- | --- | --- |
+| Cloudflare R2 | ~10 GB | Primary (preferred when healthy) |
+| Supabase Storage | ~1 GB | Spillover when R2 is full / missing |
+| Vercel Blob | ~512 MB soft | Last resort (Hobby can suspend) |
+
+**Auto** (default in Mass upload) picks the healthy provider with the most remaining headroom and spills to the next on quota/config failures.
+
+#### Cloudflare R2 (primary)
 
 1. Cloudflare dashboard → **R2** → Create bucket (e.g. `slop-videos`)
 2. Enable **public access** (R2.dev subdomain or custom domain) → copy the public base URL (no trailing slash)
@@ -105,13 +115,26 @@ Locally, files save under `public/uploads/`. On Vercel, use **Cloudflare R2** (f
 | `R2_BUCKET_NAME` | `slop-videos` |
 | `R2_PUBLIC_BASE_URL` | `https://pub-xxxxx.r2.dev` |
 
-Mass upload prefers R2 automatically when healthy. Resume unfinished series from the next episode number (e.g. EP57+).
+#### Supabase Storage (1 GB spillover)
+
+1. Create a free Supabase project (or reuse an existing one)
+2. Set in Vercel:
+
+| Variable | Notes |
+| --- | --- |
+| `NEXT_PUBLIC_SUPABASE_URL` | Project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role (server-only) |
+| `SUPABASE_STORAGE_BUCKET` | Optional; default `slop-videos` |
+
+The app auto-creates a **public** `slop-videos` bucket on first use. Admin → Videos shows pool usage for R2 + Supabase + Blob.
+
+Resume unfinished series by re-dropping the same EP## files — finished episodes are skipped (e.g. EP57+).
 
 ### Keep existing Blob videos (no reupload)
 
-You can **use both** stores at once:
+You can **use the whole free pool** at once:
 
-- **New uploads** → Cloudflare R2 (preferred)
+- **New uploads** → Auto free-tier pool (R2 → Supabase → Blob)
 - **Existing Blob episodes** → stay in the catalog; For You hides them while Blob is blocked so seed series still play
 - **Auto-migrate** → once `R2_*` is set **and** Blob content reads work again, episodes copy Blob → R2 automatically (Admin → Videos polls + daily Cron). Catalog URLs rewrite themselves — no manual reupload
 
@@ -119,7 +142,7 @@ You can **use both** stores at once:
 
 Optional: set `CRON_SECRET` in Vercel so `/api/cron/migrate-blob` is locked to Vercel Cron.
 
-`BLOB_READ_WRITE_TOKEN` remains available as a fallback; Hobby Blob can suspend when limits are exceeded.
+`BLOB_READ_WRITE_TOKEN` remains available as a last-resort fallback; Hobby Blob can suspend when limits are exceeded.
 
 Episode **metadata** (titles, drama, episode numbers, cloud URLs) is saved to a server catalog (`/api/catalog/uploads`) so uploads survive refresh and show for everyone — not just the browser that uploaded them. Paste `SLOP_ADMIN_KEY` in the Mass upload key field on the public deploy.
 

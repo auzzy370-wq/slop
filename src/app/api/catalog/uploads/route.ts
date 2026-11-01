@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getBlobHealth } from "@/lib/admin/blob-health";
 import { isR2Configured } from "@/lib/r2";
+import { isSupabaseStorageConfigured } from "@/lib/supabase/storage";
 import { loadUploadsCatalog } from "@/lib/uploads-catalog";
 
 /** Public read of admin-uploaded dramas/episodes overlay. */
@@ -23,6 +24,14 @@ export async function GET() {
     const blobSuspended = Boolean(
       blobHealth.suspended || (blobHealth.configured && !blobHealth.readOk),
     );
+    const supabaseConfigured = isSupabaseStorageConfigured();
+    const preferred = isR2Configured()
+      ? "r2"
+      : supabaseConfigured
+        ? "supabase"
+        : blobHealth.writeOk && !blobSuspended
+          ? "blob"
+          : "none";
 
     return NextResponse.json(
       {
@@ -32,13 +41,10 @@ export async function GET() {
           blobSuspended,
           blobReadable: Boolean(blobHealth.readOk),
           r2Configured: isR2Configured(),
-          preferred: isR2Configured()
-            ? "r2"
-            : blobHealth.writeOk && !blobSuspended
-              ? "blob"
-              : "none",
+          supabaseConfigured,
+          preferred,
           message: blobSuspended
-            ? "Vercel Blob is blocked — uploaded episodes can’t play until you unsuspend Blob or re-upload to Cloudflare R2."
+            ? "Vercel Blob is blocked — uploaded episodes can’t play until you unsuspend Blob or re-upload via the free-tier pool (R2 / Supabase)."
             : undefined,
         },
       },

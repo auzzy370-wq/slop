@@ -34,8 +34,30 @@ const emptyForm = {
 
 type StorageReportPayload = {
   ok?: boolean;
-  preferred?: "r2" | "blob" | "none";
+  preferred?: "r2" | "supabase" | "blob" | "none";
+  order?: Array<"r2" | "supabase" | "blob">;
   dualMode?: boolean;
+  freePool?: {
+    preferred: "r2" | "supabase" | "blob" | "none";
+    order: Array<"r2" | "supabase" | "blob">;
+    totalFreeBytes: number;
+    totalUsedBytes: number;
+    totalLimitBytes: number;
+    message: string;
+    providers: Array<{
+      id: "r2" | "supabase" | "blob";
+      label: string;
+      configured: boolean;
+      ok: boolean;
+      suspended?: boolean;
+      objects: number;
+      bytes: number;
+      freeBytes: number;
+      limitBytes: number;
+      usedRatio: number;
+      message: string;
+    }>;
+  };
   migrate?: {
     pending: number;
     pendingBytes: number;
@@ -69,6 +91,20 @@ type StorageReportPayload = {
     message: string;
     objects?: number;
     bytes?: number;
+  };
+  supabaseHealth?: {
+    configured: boolean;
+    ok: boolean;
+    message: string;
+    objects?: number;
+    bytes?: number;
+  };
+  supabase?: {
+    configured: boolean;
+    objects: number;
+    videos: number;
+    bytes: number;
+    videoBytes: number;
   };
   r2?: {
     configured: boolean;
@@ -123,6 +159,11 @@ type StorageReportPayload = {
     duplicates: string;
     r2Total?: string;
     r2Videos?: string;
+    supabaseTotal?: string;
+    supabaseVideos?: string;
+    poolFree?: string;
+    poolUsed?: string;
+    poolLimit?: string;
   };
   error?: string;
   message?: string;
@@ -743,10 +784,10 @@ export default function VideosClient() {
       <section className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold">Cloud storage</h2>
+            <h2 className="font-semibold">Free-tier cloud pool</h2>
             <p className="mt-0.5 text-xs text-white/45">
-              Cloudflare R2 is preferred (free tier). Vercel Blob remains a
-              fallback — orphans there can still be purged.
+              Auto spillover uses Cloudflare R2 (10 GB) → Supabase Storage
+              (1 GB) → Vercel Blob. Orphans on Blob can still be purged.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -798,7 +839,7 @@ export default function VideosClient() {
         <div className="flex flex-wrap gap-2 text-xs">
           <span
             className={`rounded-full px-2.5 py-1 ${
-              preferred === "r2"
+              preferred === "r2" || preferred === "supabase"
                 ? "bg-emerald-400/15 text-emerald-200"
                 : preferred === "blob"
                   ? "bg-[var(--slop-violet)]/20 text-[var(--slop-lavender)]"
@@ -808,11 +849,63 @@ export default function VideosClient() {
             Preferred:{" "}
             {preferred === "r2"
               ? "Cloudflare R2"
-              : preferred === "blob"
-                ? "Vercel Blob"
-                : "none configured"}
+              : preferred === "supabase"
+                ? "Supabase Storage"
+                : preferred === "blob"
+                  ? "Vercel Blob"
+                  : "none configured"}
           </span>
+          {(storage?.order?.length ?? 0) > 0 && (
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-white/60">
+              Auto order: {storage?.order?.join(" → ")}
+            </span>
+          )}
+          {storage?.formatted?.poolFree && (
+            <span className="rounded-full bg-white/10 px-2.5 py-1 text-white/60">
+              ~{storage.formatted.poolFree} free /{" "}
+              {storage.formatted.poolLimit} soft cap
+            </span>
+          )}
         </div>
+
+        {storage?.freePool && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            {storage.freePool.providers.map((p) => (
+              <div
+                key={p.id}
+                className={`rounded-xl border px-3 py-3 text-sm ${
+                  p.ok
+                    ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-50"
+                    : p.configured
+                      ? "border-amber-400/30 bg-amber-400/10 text-amber-50"
+                      : "border-white/15 bg-white/[0.04] text-white/70"
+                }`}
+              >
+                <p className="font-semibold">{p.label}</p>
+                <p className="mt-1 text-xs opacity-80">{p.message}</p>
+                <div className="mt-3">
+                  <div className="mb-1 flex justify-between text-[11px] uppercase tracking-wide opacity-60">
+                    <span>Used</span>
+                    <span>
+                      {formatBytes(p.bytes)} / {formatBytes(p.limitBytes)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-black/30">
+                    <div
+                      className="h-full rounded-full bg-current opacity-70"
+                      style={{
+                        width: `${Math.min(100, Math.round(p.usedRatio * 100))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="mt-1 text-xs opacity-70">
+                    {p.objects} objects · {formatBytes(p.freeBytes)} free
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {storage?.r2Health && (
           <div
@@ -938,13 +1031,84 @@ export default function VideosClient() {
           </div>
         )}
 
+        {storage?.supabaseHealth && (
+          <div
+            className={`rounded-xl border px-3 py-3 text-sm ${
+              storage.supabaseHealth.ok
+                ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-50"
+                : storage.supabaseHealth.configured
+                  ? "border-red-400/30 bg-red-400/10 text-red-50"
+                  : "border-white/15 bg-white/[0.04] text-white/80"
+            }`}
+          >
+            <p className="font-semibold">
+              Supabase Storage{" "}
+              {storage.supabaseHealth.ok
+                ? "ready"
+                : storage.supabaseHealth.configured
+                  ? "misconfigured"
+                  : "not configured"}
+            </p>
+            <p className="mt-1 text-xs opacity-80">
+              {storage.supabaseHealth.message}
+            </p>
+            {storage.supabase?.configured && (
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    Total
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">
+                    {storage.formatted?.supabaseTotal ??
+                      formatBytes(storage.supabase.bytes)}
+                  </p>
+                  <p className="text-xs opacity-60">
+                    {storage.supabase.objects} objects
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    Videos
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">
+                    {storage.formatted?.supabaseVideos ??
+                      formatBytes(storage.supabase.videoBytes)}
+                  </p>
+                  <p className="text-xs opacity-60">
+                    {storage.supabase.videos} files
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    Soft free cap
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">1 GB</p>
+                </div>
+              </div>
+            )}
+            {!storage.supabaseHealth.configured && (
+              <p className="mt-2 text-xs opacity-75">
+                Set{" "}
+                <code className="text-white/80">NEXT_PUBLIC_SUPABASE_URL</code>{" "}
+                and{" "}
+                <code className="text-white/80">
+                  SUPABASE_SERVICE_ROLE_KEY
+                </code>{" "}
+                in Vercel for 1 GB free spillover (optional{" "}
+                <code className="text-white/80">SUPABASE_STORAGE_BUCKET</code>
+                ).
+              </p>
+            )}
+          </div>
+        )}
+
         {storage?.dualMode && (
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/75">
-            <p className="font-semibold text-white/90">Dual storage on</p>
+            <p className="font-semibold text-white/90">Free-tier pool on</p>
             <p className="mt-1 text-xs text-white/55">
-              New mass uploads prefer R2. Existing Blob episodes auto-move to R2
-              when Blob reads work again. Catalog URLs update automatically —
-              no reupload.
+              Mass upload Auto mode spills across every healthy free backend.
+              Existing Blob episodes still auto-move to R2 when Blob reads work
+              again — catalog URLs update without reupload.
             </p>
           </div>
         )}

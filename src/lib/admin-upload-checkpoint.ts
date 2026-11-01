@@ -3,7 +3,7 @@
 export type UploadCheckpoint = {
   dramaId: string;
   dramaTitle: string;
-  cloudTarget: "r2" | "blob" | "local";
+  cloudTarget: "auto" | "r2" | "supabase" | "blob" | "local";
   publishStatus: string;
   /** Episode numbers successfully saved to catalog this run / prior runs. */
   completedEpisodeNumbers: number[];
@@ -51,7 +51,7 @@ export function clearUploadCheckpoint() {
 export function markCheckpointEpisodeDone(input: {
   dramaId: string;
   dramaTitle: string;
-  cloudTarget: "r2" | "blob" | "local";
+  cloudTarget: "auto" | "r2" | "supabase" | "blob" | "local";
   publishStatus: string;
   episodeNumber: number;
   fileName: string;

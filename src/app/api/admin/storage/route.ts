@@ -9,6 +9,12 @@ import {
 import { getAutoMigrateStatus } from "@/lib/admin/auto-migrate";
 import { previewBlobToR2Migration } from "@/lib/admin/migrate-blob-to-r2";
 import { getR2Health, isR2Configured, r2ListObjects } from "@/lib/r2";
+import { getFreeStoragePool } from "@/lib/storage/free-pool";
+import {
+  getSupabaseStorageHealth,
+  isSupabaseStorageConfigured,
+  listSupabaseVideoUsage,
+} from "@/lib/supabase/storage";
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -23,14 +29,23 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   try {
-    const [report, health, r2Health, migratePreview, autoMigrate] =
-      await Promise.all([
-        getStorageReport(),
-        getBlobHealth({ probeWrite: false }),
-        getR2Health(),
-        previewBlobToR2Migration().catch(() => null),
-        getAutoMigrateStatus().catch(() => null),
-      ]);
+    const [
+      report,
+      health,
+      r2Health,
+      supabaseHealth,
+      freePool,
+      migratePreview,
+      autoMigrate,
+    ] = await Promise.all([
+      getStorageReport(),
+      getBlobHealth({ probeWrite: false }),
+      getR2Health(),
+      getSupabaseStorageHealth(),
+      getFreeStoragePool(),
+      previewBlobToR2Migration().catch(() => null),
+      getAutoMigrateStatus().catch(() => null),
+    ]);
 
     let r2 = {
       configured: isR2Configured(),
@@ -83,6 +98,37 @@ export async function GET(request: Request) {
       };
     }
 
+    let supabase = {
+      configured: isSupabaseStorageConfigured(),
+      objects: 0,
+      videos: 0,
+      bytes: 0,
+      videoBytes: 0,
+    };
+    if (supabaseHealth.ok) {
+      try {
+        const usage = await listSupabaseVideoUsage();
+        const videos = usage.files.filter((f) =>
+          /\.(mp4|mov|webm)$/i.test(f.path),
+        );
+        supabase = {
+          configured: true,
+          objects: usage.objects,
+          videos: videos.length,
+          bytes: usage.bytes,
+          videoBytes: videos.reduce((s, f) => s + f.size, 0),
+        };
+      } catch {
+        supabase = {
+          configured: true,
+          objects: supabaseHealth.objects ?? 0,
+          videos: 0,
+          bytes: supabaseHealth.bytes ?? 0,
+          videoBytes: 0,
+        };
+      }
+    }
+
     const plan =
       report.reclaimableBytes > 0 && !health.suspended
         ? await planOrphanPurge()
@@ -91,9 +137,15 @@ export async function GET(request: Request) {
       ok: true,
       health,
       r2Health,
+      supabaseHealth,
       r2,
-      preferred: r2Health.ok ? "r2" : health.writeOk ? "blob" : "none",
-      dualMode: Boolean(r2Health.ok && health.configured),
+      supabase,
+      freePool,
+      preferred: freePool.preferred,
+      order: freePool.order,
+      dualMode: Boolean(
+        freePool.providers.filter((p) => p.ok || p.configured).length > 1,
+      ),
       migrate: migratePreview
         ? {
             pending: migratePreview.pending,
@@ -124,6 +176,11 @@ export async function GET(request: Request) {
         duplicates: formatBytes(report.duplicates.bytes),
         r2Total: formatBytes(r2.bytes),
         r2Videos: formatBytes(r2.videoBytes),
+        supabaseTotal: formatBytes(supabase.bytes),
+        supabaseVideos: formatBytes(supabase.videoBytes),
+        poolFree: formatBytes(freePool.totalFreeBytes),
+        poolUsed: formatBytes(freePool.totalUsedBytes),
+        poolLimit: formatBytes(freePool.totalLimitBytes),
       },
     });
   } catch (err) {

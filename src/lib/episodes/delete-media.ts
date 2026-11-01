@@ -51,7 +51,7 @@ export async function deleteEpisodeMedia(input: {
   const videoUrl = input.videoUrl?.trim() || null;
 
   const tryDelBlobUrl = async (url: string) => {
-    if (!url || seen.has(url)) return;
+    if (!url || seen.has(url) || !isBlobUrl(url)) return;
     seen.add(url);
     if (!process.env.BLOB_READ_WRITE_TOKEN) {
       errors.push("BLOB_READ_WRITE_TOKEN missing — could not delete cloud file");
@@ -70,10 +70,10 @@ export async function deleteEpisodeMedia(input: {
 
   const tryDelR2Url = async (url: string) => {
     if (!url || seen.has(url)) return;
-    seen.add(url);
     try {
       const { isR2PublicUrl, r2DeleteByUrl } = await import("@/lib/r2");
       if (!isR2PublicUrl(url)) return;
+      seen.add(url);
       const ok = await r2DeleteByUrl(url);
       if (ok) deletedUrls.push(url);
     } catch (err) {
@@ -83,12 +83,32 @@ export async function deleteEpisodeMedia(input: {
     }
   };
 
-  // 1) Exact URL from the episode row (Blob or R2)
+  const tryDelSupabaseUrl = async (url: string) => {
+    if (!url || seen.has(url)) return;
+    try {
+      const { deleteSupabaseObjectByUrl, isSupabasePublicUrl } = await import(
+        "@/lib/supabase/storage"
+      );
+      if (!isSupabasePublicUrl(url)) return;
+      seen.add(url);
+      const ok = await deleteSupabaseObjectByUrl(url);
+      if (ok) deletedUrls.push(url);
+    } catch (err) {
+      errors.push(
+        err instanceof Error
+          ? err.message
+          : `Failed to delete Supabase ${url}`,
+      );
+    }
+  };
+
+  // 1) Exact URL from the episode row (Blob / R2 / Supabase)
   if (videoUrl && isBlobUrl(videoUrl)) {
     await tryDelBlobUrl(videoUrl);
   }
   if (videoUrl) {
     await tryDelR2Url(videoUrl);
+    await tryDelSupabaseUrl(videoUrl);
   }
 
   // 2) Sweep Blob prefix for this drama/episode (covers renamed re-uploads)
@@ -166,6 +186,49 @@ export async function deleteEpisodeMedia(input: {
         err instanceof Error
           ? `R2 list failed: ${err.message}`
           : "R2 list failed",
+      );
+    }
+  }
+
+  // 3b) Sweep Supabase Storage prefix for this drama/episode
+  if (dramaId && episodeNumber != null) {
+    try {
+      const {
+        isSupabaseStorageConfigured,
+        listSupabaseVideoUsage,
+        deleteSupabaseObjectByUrl,
+        supabasePublicUrl,
+      } = await import("@/lib/supabase/storage");
+      if (isSupabaseStorageConfigured()) {
+        const usage = await listSupabaseVideoUsage();
+        const dramaRe = new RegExp(
+          `^slop/${dramaId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/ep-0*${episodeNumber}(?:[-_.]|$)`,
+          "i",
+        );
+        for (const file of usage.files) {
+          if (!/\.(mp4|mov|webm)$/i.test(file.path)) continue;
+          if (!dramaRe.test(file.path)) continue;
+          const url = supabasePublicUrl(file.path);
+          if (seen.has(url) || seen.has(file.path)) continue;
+          seen.add(url);
+          seen.add(file.path);
+          try {
+            const ok = await deleteSupabaseObjectByUrl(url);
+            if (ok) deletedUrls.push(url);
+          } catch (err) {
+            errors.push(
+              err instanceof Error
+                ? `Supabase delete failed: ${err.message}`
+                : "Supabase delete failed",
+            );
+          }
+        }
+      }
+    } catch (err) {
+      errors.push(
+        err instanceof Error
+          ? `Supabase list failed: ${err.message}`
+          : "Supabase list failed",
       );
     }
   }
