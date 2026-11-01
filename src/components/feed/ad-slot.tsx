@@ -13,7 +13,13 @@ declare global {
   }
 }
 
-function HouseAd({ index }: { index: number }) {
+function HouseAd({
+  index,
+  note,
+}: {
+  index: number;
+  note?: string;
+}) {
   const settings = useSlopStore((s) => s.settings);
 
   useEffect(() => {
@@ -52,69 +58,148 @@ function HouseAd({ index }: { index: number }) {
         Go ad-free for {settings.premiumPriceLabel}
       </Link>
       <p className="mt-4 text-[11px] text-white/40">
-        House ad — connect AdSense in Admin → Ads for live network fill.
+        {note ??
+          "Sponsored slot — network ads appear here when AdSense has fill."}
       </p>
     </div>
   );
 }
 
+function isAdFilled(slot: HTMLElement | null): boolean {
+  if (!slot) return false;
+  const status = slot.getAttribute("data-ad-status");
+  if (status === "filled") return true;
+  if (status === "unfilled") return false;
+
+  // AdSense usually injects an iframe when it fills. Ignore our own min-height.
+  const iframe = slot.querySelector("iframe");
+  if (iframe) {
+    const h = iframe.clientHeight || Number(iframe.getAttribute("height")) || 0;
+    return h > 80;
+  }
+  return false;
+}
+
 function AdSenseSlot({ index }: { index: number }) {
   const ads = getAdsPublicConfig();
   const pushed = useRef(false);
-  const [failed, setFailed] = useState(false);
+  const [phase, setPhase] = useState<"loading" | "filled" | "empty">("loading");
   const reactId = useId();
+  const slotDomId = `slop-ad-${reactId.replace(/:/g, "")}`;
 
   useEffect(() => {
     void track("advertisement_requested", {
       properties: { provider: "adsense", placement: "feed", index },
     });
 
-    if (pushed.current) return;
-    pushed.current = true;
+    if (!ads.clientId || !ads.feedSlotId) {
+      setPhase("empty");
+      return;
+    }
 
-    const timer = window.setTimeout(() => {
+    let cancelled = false;
+    const slot = () => document.getElementById(slotDomId);
+
+    const markFilled = () => {
+      if (cancelled) return;
+      setPhase("filled");
+      void track("advertisement_displayed", {
+        properties: { provider: "adsense", placement: "feed", index },
+      });
+    };
+
+    const markEmpty = () => {
+      if (cancelled) return;
+      setPhase((p) => (p === "filled" ? p : "empty"));
+    };
+
+    const push = () => {
+      if (pushed.current) return;
+      pushed.current = true;
       try {
         (window.adsbygoogle = window.adsbygoogle || []).push({});
-        void track("advertisement_displayed", {
-          properties: { provider: "adsense", placement: "feed", index },
-        });
       } catch {
-        setFailed(true);
+        markEmpty();
       }
-    }, 120);
+    };
 
-    // If the unit stays empty (blocked / unfilled), fall back to house CTA.
-    const fallback = window.setTimeout(() => {
-      const slot = document.getElementById(`slop-ad-${reactId}`);
-      const filled = Boolean(
-        slot?.getAttribute("data-ad-status") === "filled" ||
-          (slot && slot.clientHeight > 40 && slot.innerHTML.trim().length > 20),
-      );
-      if (!filled) setFailed(true);
-    }, 3500);
+    // Wait a tick so <ins> is in the DOM, then request the ad.
+    const pushTimer = window.setTimeout(push, 50);
+
+    // Watch AdSense mutate data-ad-status / inject iframe.
+    const observer = new MutationObserver(() => {
+      const el = slot();
+      if (!el) return;
+      const status = el.getAttribute("data-ad-status");
+      if (status === "filled" || isAdFilled(el)) markFilled();
+      if (status === "unfilled") markEmpty();
+    });
+
+    const observeTimer = window.setTimeout(() => {
+      const el = slot();
+      if (el) {
+        observer.observe(el, {
+          attributes: true,
+          attributeFilter: ["data-ad-status", "style", "class"],
+          childList: true,
+          subtree: true,
+        });
+        if (isAdFilled(el)) markFilled();
+      }
+    }, 80);
+
+    // New sites often get zero fill — don't leave a blank black slide.
+    const fallbackTimer = window.setTimeout(() => {
+      const el = slot();
+      if (isAdFilled(el)) markFilled();
+      else markEmpty();
+    }, 2000);
 
     return () => {
-      window.clearTimeout(timer);
-      window.clearTimeout(fallback);
+      cancelled = true;
+      window.clearTimeout(pushTimer);
+      window.clearTimeout(observeTimer);
+      window.clearTimeout(fallbackTimer);
+      observer.disconnect();
     };
-  }, [index, reactId]);
+  }, [ads.clientId, ads.feedSlotId, index, slotDomId]);
 
-  if (failed || !ads.clientId || !ads.feedSlotId) {
-    return <HouseAd index={index} />;
+  if (phase === "empty") {
+    return (
+      <HouseAd
+        index={index}
+        note="AdSense has no fill yet — house ad shown so the feed never goes blank."
+      />
+    );
   }
 
   return (
-    <div className="relative flex h-full w-full flex-col items-center justify-center bg-[#0c0c10] px-3 py-8">
+    <div className="relative flex h-full w-full flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top,_#1c1630_0%,_#111116_55%)] px-3 py-8">
       <div className="absolute left-4 top-4 rounded-md border border-white/20 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/70">
         Advertisement
       </div>
-      <div className="flex w-full max-w-sm flex-col items-center gap-4">
+
+      {/* Keep house CTA visible under the unit until AdSense fills */}
+      {phase === "loading" ? (
+        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center px-6 text-center opacity-70">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--slop-violet)]/15 text-[var(--slop-violet)]">
+            <Megaphone className="h-6 w-6" />
+          </div>
+          <p className="font-display text-xl text-white">Loading ad…</p>
+        </div>
+      ) : null}
+
+      <div
+        className={`relative z-10 flex w-full max-w-sm flex-col items-center gap-4 ${
+          phase === "loading" ? "min-h-[1px] opacity-0" : ""
+        }`}
+      >
         <ins
-          id={`slop-ad-${reactId}`}
-          className="adsbygoogle block w-full overflow-hidden rounded-xl bg-black/40"
+          id={slotDomId}
+          className="adsbygoogle block w-full overflow-hidden rounded-xl"
           style={{ display: "block", minHeight: 280, width: "100%" }}
-          data-ad-client={ads.clientId}
-          data-ad-slot={ads.feedSlotId}
+          data-ad-client={ads.clientId!}
+          data-ad-slot={ads.feedSlotId!}
           data-ad-format="auto"
           data-full-width-responsive="true"
           {...(ads.testMode ? { "data-adtest": "on" } : {})}
@@ -141,7 +226,7 @@ export function AdSlot({ index }: { index: number }) {
     );
   }
 
-  if (ads.provider === "adsense") {
+  if (ads.provider === "adsense" && ads.clientId && ads.feedSlotId) {
     return <AdSenseSlot index={index} />;
   }
 
