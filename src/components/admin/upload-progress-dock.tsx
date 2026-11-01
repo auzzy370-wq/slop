@@ -78,7 +78,7 @@ export function UploadProgressDock() {
               {batch.drama.title} · {done}/{total}
               {failed > 0 ? ` · ${failed} failed` : ""}
               {batch.running
-                ? " · you can leave this page"
+                ? " · keep this tab open on phone"
                 : ""}
             </p>
           </div>
@@ -115,7 +115,9 @@ export function UploadProgressDock() {
             Open Episodes
           </Link>
           {batch.running ? (
-            <span className="text-white/35">Keep this tab open</span>
+            <span className="text-white/35">
+              Saved as each EP finishes — reopen + re-drop to resume
+            </span>
           ) : (
             <button
               type="button"

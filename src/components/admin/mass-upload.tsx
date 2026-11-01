@@ -14,7 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { rankUploadFiles } from "@/lib/episodes/filename";
 import {
+  clearUploadCheckpoint,
+  loadUploadCheckpoint,
+  type UploadCheckpoint,
+} from "@/lib/admin-upload-checkpoint";
+import {
   enqueueMassUpload,
+  episodeAlreadyDurable,
   isUploadRunning,
   subscribeUploadQueue,
   type CloudTarget,
@@ -62,6 +68,8 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
     "none",
   );
   const [batch, setBatch] = useState<UploadBatch | null>(null);
+  const [checkpoint, setCheckpoint] = useState<UploadCheckpoint | null>(null);
+  const [forceReplace, setForceReplace] = useState(false);
 
   const [newTitle, setNewTitle] = useState("");
   const [newSynopsis, setNewSynopsis] = useState("");
@@ -73,7 +81,13 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
   useEffect(() => {
     const saved = window.localStorage.getItem(ADMIN_KEY_STORAGE) ?? "";
     setAdminKey(saved);
+    setCheckpoint(loadUploadCheckpoint());
   }, []);
+
+  useEffect(() => {
+    if (batch?.running) return;
+    setCheckpoint(loadUploadCheckpoint());
+  }, [batch?.running, batch?.finishedAt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -293,17 +307,24 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       adminKey,
       cloudTarget: target,
       files: picked,
+      forceReplace,
     });
 
     if (!result.ok) {
       toast.error(result.error);
+      setCheckpoint(loadUploadCheckpoint());
       return;
     }
 
+    const queued = result.queued;
+    const skipped = result.skippedDurable;
     toast.message(
-      `Uploading ${picked.length} episodes in the background — you can leave this page`,
+      skipped > 0
+        ? `Resuming — uploading ${queued} remaining (skipped ${skipped} already on cloud). Keep this tab open on your phone.`
+        : `Uploading ${queued} episode${queued === 1 ? "" : "s"}. Keep this browser tab open until it finishes — progress is saved if you get disconnected.`,
     );
     setPicked([]);
+    setCheckpoint(loadUploadCheckpoint());
   };
 
   const canUpload =
@@ -319,8 +340,9 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           <p className="mt-1 max-w-2xl text-sm text-white/55">
             Drop MP4s named like{" "}
             <code className="text-[var(--slop-lavender)]">EP49</code> — SLOP
-            auto-sorts them and keeps uploading in the background if you leave
-            this page. Each episode is saved as soon as it finishes.
+            auto-sorts and saves each episode as soon as it finishes. On a
+            phone, keep this tab open (screen can lock). If the browser closes,
+            reopen and drop the same files — finished episodes are skipped.
           </p>
         </div>
         <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
@@ -355,6 +377,48 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
             "Cloud uploads need this key on the public deploy."}
         </p>
       </label>
+
+      {checkpoint && checkpoint.completedEpisodeNumbers.length > 0 && (
+        <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-3 py-3 text-sm text-emerald-50">
+          <p className="font-semibold">
+            Resume ready — {checkpoint.completedEpisodeNumbers.length}
+            {checkpoint.totalPlanned
+              ? ` / ${checkpoint.totalPlanned}`
+              : ""}{" "}
+            saved for “{checkpoint.dramaTitle}”
+          </p>
+          <p className="mt-1 text-xs text-emerald-100/80">
+            Pick the same drama, drop the same EP## folder again, and only the
+            missing episodes upload. Phones can’t keep uploading after you swipe
+            the browser away — this resume path is how you finish.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              type="button"
+              onClick={() => {
+                const match = dramas.find((d) => d.id === checkpoint.dramaId);
+                if (match) setDramaId(match.id);
+                toast.message("Drama selected — drop your EP## files to resume");
+              }}
+            >
+              Select that drama
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              type="button"
+              onClick={() => {
+                clearUploadCheckpoint();
+                setCheckpoint(null);
+              }}
+            >
+              Clear resume
+            </Button>
+          </div>
+        </div>
+      )}
 
       {(uploadReady === "suspended" || uploadReady === "no-cloud") && (
         <div className="flex gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-sm text-amber-100">
@@ -498,14 +562,34 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           onChange={(e) => setCloudTarget(e.target.value as CloudTarget)}
           disabled={queueBusy || uploadReady !== "ready"}
         >
-          <option value="r2">Cloudflare R2 (free, recommended)</option>
-          <option value="blob">Vercel Blob</option>
+          <option value="r2">Cloudflare R2 (free — reuploads go here)</option>
+          <option value="blob" disabled={preferredCloud !== "blob"}>
+            Vercel Blob
+            {preferredCloud !== "blob" ? " (suspended)" : ""}
+          </option>
           <option value="local">Local public/uploads (dev only)</option>
         </select>
         <p className="text-xs text-white/40">
-          Large MP4s upload directly to cloud via signed URLs. R2 is preferred
-          while Blob remains suspended.
+          Re-drop the same EP## files into the same drama — they upload to
+          Cloudflare R2 and replace old Blob URLs. Episodes already on R2 are
+          skipped automatically so you can resume after closing the browser.
         </p>
+      </label>
+
+      <label className="flex items-start gap-2 text-sm text-white/70">
+        <input
+          type="checkbox"
+          className="mt-1"
+          checked={forceReplace}
+          onChange={(e) => setForceReplace(e.target.checked)}
+          disabled={queueBusy}
+        />
+        <span>
+          Force re-upload episodes that are already on cloud storage
+          <span className="block text-xs text-white/40">
+            Leave off for resume. Turn on only if you want to replace R2 files.
+          </span>
+        </span>
       </label>
 
       <input

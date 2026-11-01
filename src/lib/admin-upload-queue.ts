@@ -2,14 +2,64 @@
 
 import { upload } from "@vercel/blob/client";
 import {
+  clearUploadCheckpoint,
+  markCheckpointEpisodeDone,
+} from "@/lib/admin-upload-checkpoint";
+import {
   formatEpisodeTitle,
   type RankedUploadFile,
 } from "@/lib/episodes/filename";
+import { isVercelBlobUrl } from "@/lib/media-url";
 import type { Drama, PublicationStatus, Video } from "@/lib/types";
 import { slugify, uid } from "@/lib/utils";
 import { useSlopStore } from "@/store/slop-store";
 
 const ADMIN_KEY_STORAGE = "slop_admin_key";
+
+/** Episode already on durable cloud (R2/local) — safe to skip on resume. */
+export function episodeAlreadyDurable(
+  dramaId: string,
+  episodeNumber: number,
+): boolean {
+  const hit = useSlopStore
+    .getState()
+    .videos.find(
+      (v) => v.dramaId === dramaId && v.episodeNumber === episodeNumber,
+    );
+  if (!hit?.videoUrl) return false;
+  // Blob URLs are broken while suspended — do not skip those (allow R2 replace).
+  if (isVercelBlobUrl(hit.videoUrl)) return false;
+  return Boolean(hit.videoUrl.trim());
+}
+
+let wakeLock: WakeLockSentinel | null = null;
+
+async function requestWakeLock() {
+  try {
+    if (typeof navigator === "undefined" || !("wakeLock" in navigator)) return;
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => {
+      wakeLock = null;
+    });
+  } catch {
+    wakeLock = null;
+  }
+}
+
+async function releaseWakeLock() {
+  try {
+    await wakeLock?.release();
+  } catch {
+    /* ignore */
+  }
+  wakeLock = null;
+}
+
+function reacquireWakeLockOnVisible() {
+  if (document.visibilityState === "visible" && activeBatch?.running) {
+    void requestWakeLock();
+  }
+}
 
 export type QueueJob = {
   id: string;
@@ -33,10 +83,13 @@ export type UploadBatch = {
   /** @deprecated use cloudTarget */
   preferBlob: boolean;
   cloudTarget: CloudTarget;
+  /** When true, re-upload even if episode already has a durable (non-Blob) URL. */
+  forceReplace: boolean;
   jobs: QueueJob[];
   running: boolean;
   startedAt: number;
   finishedAt?: number;
+  skippedDurable?: number;
 };
 
 type Listener = (batch: UploadBatch | null) => void;
@@ -262,12 +315,40 @@ async function processQueue() {
   const batch = activeBatch;
   batch.running = true;
   emit();
+  await requestWakeLock();
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", reacquireWakeLockOnVisible);
+  }
 
-  const store = useSlopStore.getState();
   let drama = batch.drama;
+  const totalPlanned = batch.jobs.length;
 
   for (const job of batch.jobs) {
     if (job.status === "done") continue;
+
+    // Resume safety: if this EP was already saved to R2 before the tab died,
+    // skip re-uploading the bytes.
+    if (
+      !batch.forceReplace &&
+      episodeAlreadyDurable(drama.id, job.episodeNumber)
+    ) {
+      patchJob(job.id, {
+        status: "done",
+        progress: 100,
+        error: undefined,
+      });
+      markCheckpointEpisodeDone({
+        dramaId: drama.id,
+        dramaTitle: drama.title,
+        cloudTarget: batch.cloudTarget,
+        publishStatus: batch.publishStatus,
+        episodeNumber: job.episodeNumber,
+        fileName: job.file.name,
+        totalPlanned,
+      });
+      continue;
+    }
+
     patchJob(job.id, {
       status: "uploading",
       progress: 8,
@@ -323,10 +404,12 @@ async function processQueue() {
       patchJob(job.id, { progress: 55 });
       const durationSeconds = await readDuration(job.file);
       const title = formatEpisodeTitle(job.episodeNumber, job.file.name);
-      const existing = store.videos.find(
-        (v) =>
-          v.dramaId === drama.id && v.episodeNumber === job.episodeNumber,
-      );
+      const existing = useSlopStore
+        .getState()
+        .videos.find(
+          (v) =>
+            v.dramaId === drama.id && v.episodeNumber === job.episodeNumber,
+        );
       const now = new Date().toISOString();
 
       const video: Video = {
@@ -398,6 +481,16 @@ async function processQueue() {
         url,
         error: undefined,
       });
+
+      markCheckpointEpisodeDone({
+        dramaId: drama.id,
+        dramaTitle: drama.title,
+        cloudTarget: batch.cloudTarget,
+        publishStatus: batch.publishStatus,
+        episodeNumber: job.episodeNumber,
+        fileName: job.file.name,
+        totalPlanned,
+      });
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Upload failed";
@@ -429,9 +522,18 @@ async function processQueue() {
   if (activeBatch) {
     activeBatch.running = false;
     activeBatch.finishedAt = Date.now();
+    const allDone = activeBatch.jobs.every((j) => j.status === "done");
+    if (allDone) clearUploadCheckpoint();
     emit();
   }
   processing = false;
+  if (typeof document !== "undefined") {
+    document.removeEventListener(
+      "visibilitychange",
+      reacquireWakeLockOnVisible,
+    );
+  }
+  await releaseWakeLock();
 }
 
 export function enqueueMassUpload(opts: {
@@ -441,7 +543,11 @@ export function enqueueMassUpload(opts: {
   preferBlob?: boolean;
   cloudTarget?: CloudTarget;
   files: RankedUploadFile[];
-}): { ok: true } | { ok: false; error: string } {
+  /** Re-upload episodes that already have durable cloud URLs. */
+  forceReplace?: boolean;
+}):
+  | { ok: true; queued: number; skippedDurable: number }
+  | { ok: false; error: string } {
   if (activeBatch?.running) {
     return {
       ok: false,
@@ -457,6 +563,27 @@ export function enqueueMassUpload(opts: {
 
   const cloudTarget: CloudTarget =
     opts.cloudTarget || (opts.preferBlob === false ? "local" : "r2");
+  const forceReplace = Boolean(opts.forceReplace);
+
+  let skippedDurable = 0;
+  const files = forceReplace
+    ? opts.files
+    : opts.files.filter((f) => {
+        const skip = episodeAlreadyDurable(opts.drama.id, f.episodeNumber);
+        if (skip) skippedDurable += 1;
+        return !skip;
+      });
+
+  if (files.length === 0) {
+    clearUploadCheckpoint();
+    return {
+      ok: false,
+      error:
+        skippedDurable > 0
+          ? `All ${skippedDurable} selected episode${skippedDurable === 1 ? "" : "s"} are already on cloud storage. Nothing left to upload.`
+          : "No files to upload.",
+    };
+  }
 
   activeBatch = {
     id: uid("batch"),
@@ -465,9 +592,11 @@ export function enqueueMassUpload(opts: {
     adminKey: opts.adminKey,
     preferBlob: cloudTarget === "blob",
     cloudTarget,
+    forceReplace,
+    skippedDurable,
     startedAt: Date.now(),
     running: true,
-    jobs: opts.files.map((f) => ({
+    jobs: files.map((f) => ({
       id: uid("job"),
       file: f.file,
       episodeNumber: f.episodeNumber,
@@ -479,7 +608,7 @@ export function enqueueMassUpload(opts: {
   };
   emit();
   void processQueue();
-  return { ok: true };
+  return { ok: true, queued: files.length, skippedDurable };
 }
 
 export function clearFinishedUploadBatch() {
