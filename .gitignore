@@ -44,5 +44,9 @@ next-env.d.ts
 /data/
 *.tmp
 
+# admin mass-uploaded episode files (keep folder)
+/public/uploads/**
+!/public/uploads/.gitkeep
+
 # netlify local build output
 .netlify/

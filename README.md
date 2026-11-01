@@ -65,7 +65,15 @@ Publishing **episode 1 or 2** of a show triggers posts to Discord / Telegram / X
 - **Watch** — vertical short-form episode feed with ads for free users
 - **Explore / genres / search** — discovery
 - **Premium** — Stripe-ready ad-free subscription
-- **Admin** — episodes, social auto-post, analytics, moderation, settings
+- **Admin** — episodes (including **mass MP4 upload** with `EP##` auto-sort), social auto-post, analytics, moderation, settings
+
+### Admin mass upload
+
+1. Sign in as demo admin → `/admin/videos`
+2. Under **Mass upload**, pick a drama and drop many MP4s named `EP01`, `EP49`, etc.
+3. Files auto-sort by episode number (ascending) and publish into that series
+
+Locally, files save under `public/uploads/`. On Vercel, set `BLOB_READ_WRITE_TOKEN` (Vercel Blob) so large MP4s upload directly to cloud storage.
 
 ## Analytics & Rewards
 

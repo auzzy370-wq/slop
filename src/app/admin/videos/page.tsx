@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { MassUpload } from "@/components/admin/mass-upload";
 import { useSlopStore } from "@/store/slop-store";
 import type { PublicationStatus, Video } from "@/lib/types";
 import { triggerEpisodeAutoPost } from "@/lib/social/client";
@@ -34,6 +35,15 @@ export default function AdminVideosPage() {
   const deleteVideo = useSlopStore((s) => s.deleteVideo);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  const sortedVideos = useMemo(
+    () =>
+      [...videos].sort((a, b) => {
+        if (a.dramaId !== b.dramaId) return a.dramaId.localeCompare(b.dramaId);
+        return a.episodeNumber - b.episodeNumber;
+      }),
+    [videos],
+  );
 
   const save = async () => {
     if (!form.title.trim() || !form.videoUrl.trim() || !form.dramaId) {
@@ -150,8 +160,12 @@ export default function AdminVideosPage() {
         <h1 className="font-display text-3xl font-bold">Episode management</h1>
         <p className="mt-1 text-sm text-white/50">
           Only admins publish episodes. Users cannot upload or generate videos.
+          Mass-upload MP4s named <span className="text-white/70">EP01</span>,{" "}
+          <span className="text-white/70">EP02</span>, … and they auto-sort.
         </p>
       </div>
+
+      <MassUpload dramas={dramas} />
 
       <section className="space-y-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="font-semibold">
@@ -312,14 +326,14 @@ export default function AdminVideosPage() {
       </section>
 
       <section className="space-y-2">
-        {videos.map((video) => (
+        {sortedVideos.map((video) => (
           <div
             key={video.id}
             className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/30 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
             <div className="min-w-0">
               <p className="truncate font-semibold">
-                EP {video.episodeNumber} · {video.title}
+                EP {String(video.episodeNumber).padStart(2, "0")} · {video.title}
               </p>
               <p className="text-xs text-white/45">
                 {video.sourceAttribution} · {video.status} · {video.viewCount}{" "}
