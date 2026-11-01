@@ -26,6 +26,10 @@ const body = Inter({
   weight: ["400", "500", "600", "700"],
 });
 
+const ADSENSE_CLIENT =
+  process.env.NEXT_PUBLIC_ADS_CLIENT_ID?.trim() ||
+  "ca-pub-5591745880216042";
+
 export const metadata: Metadata = {
   title: {
     default: "SLOP — Stories That Keep You Watching",
@@ -43,6 +47,11 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "SLOP",
+  },
+  other: {
+    "google-adsense-account": ADSENSE_CLIENT.startsWith("ca-pub-")
+      ? ADSENSE_CLIENT
+      : `ca-pub-${ADSENSE_CLIENT}`,
   },
   openGraph: {
     title: "SLOP — Stories That Keep You Watching",
