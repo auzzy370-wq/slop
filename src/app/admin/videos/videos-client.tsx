@@ -796,7 +796,8 @@ export default function VideosClient() {
                       <li>
                         Briefly reactivate/unsuspend the Vercel Blob store so
                         files can be copied (billing shows Inactive/Suspended).
-                        Auto-move resumes on its own every 5 minutes.
+                        Keep Admin → Videos open (polls every 30s) or wait for
+                        the daily cron — copying starts automatically.
                       </li>
                     )}
                   </ul>

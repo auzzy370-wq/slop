@@ -113,7 +113,7 @@ You can **use both** stores at once:
 
 - **New uploads** → Cloudflare R2 (preferred)
 - **Existing Blob episodes** → stay in the catalog; For You hides them while Blob is blocked so seed series still play
-- **Auto-migrate** → once `R2_*` is set **and** Blob content reads work again, episodes copy Blob → R2 automatically (Admin page + Vercel Cron every 5 minutes). Catalog URLs rewrite themselves — no manual reupload
+- **Auto-migrate** → once `R2_*` is set **and** Blob content reads work again, episodes copy Blob → R2 automatically (Admin → Videos polls + daily Cron). Catalog URLs rewrite themselves — no manual reupload
 
 **Right now the Blob store is Suspended / Billing Inactive**, so Vercel returns `403` even to the token — nothing can read the MP4 bytes until you briefly reactivate that store. After auto-migrate finishes you can leave Blob suspended.
 
