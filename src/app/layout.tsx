@@ -7,6 +7,7 @@ import { DesktopNav } from "@/components/layout/desktop-nav";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { PwaRegister } from "@/components/pwa-register";
 import { StoreHygiene } from "@/components/store-hygiene";
+import { UploadsHydrator } from "@/components/uploads-hydrator";
 import "./globals.css";
 
 export const instant = false;
@@ -72,6 +73,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full bg-[var(--slop-black)] text-white">
         <Suspense fallback={null}>
           <StoreHygiene />
+          <UploadsHydrator />
           <AnalyticsProvider>
             <DesktopNav />
             <main className="min-h-full flex-1">{children}</main>

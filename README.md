@@ -75,6 +75,8 @@ Publishing **episode 1 or 2** of a show triggers posts to Discord / Telegram / X
 
 Locally, files save under `public/uploads/`. On Vercel, set `BLOB_READ_WRITE_TOKEN` (Vercel Blob) so large MP4s upload directly to cloud storage.
 
+Episode **metadata** (titles, drama, episode numbers, Blob URLs) is saved to a server catalog (`/api/catalog/uploads`) so uploads survive refresh and show for everyone — not just the browser that uploaded them. Paste `SLOP_ADMIN_KEY` in the Mass upload key field on the public deploy.
+
 ## Analytics & Rewards
 
 Production-ready event analytics, attribution, campaigns, content/revenue dashboards, and SLOP Rewards referrals. Metrics come from **recorded events only** (never fabricated).

@@ -5,15 +5,20 @@ import {
   applyEngagementCounts,
   catalogFromSeed,
 } from "@/lib/engagement";
+import {
+  mergeSeedWithUploads,
+  type UploadsCatalog,
+} from "@/lib/uploads-catalog-shared";
 import { useSlopStore } from "@/store/slop-store";
 
 /**
- * One-shot: wipe legacy localStorage catalogs that baked in fake
- * 842K views / 32K likes, then re-derive counters from real rows only.
+ * Wipe legacy poisoned catalogs, reset to seed, then re-apply any
+ * admin mass-upload overlay from the server so uploads stick.
  */
 export function StoreHygiene() {
   useEffect(() => {
     if (typeof window === "undefined") return;
+
     for (const key of Object.keys(localStorage)) {
       if (key.startsWith("slop-local-v") && key !== "slop-local-v8") {
         localStorage.removeItem(key);
@@ -39,6 +44,38 @@ export function StoreHygiene() {
       ...derived,
       comments: state.comments.filter((c) => !String(c.id).startsWith("cmt_")),
     });
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const res = await fetch("/api/catalog/uploads", { cache: "no-store" });
+        if (!res.ok || cancelled) return;
+        const uploads = (await res.json()) as UploadsCatalog;
+        if (!uploads?.videos?.length && !uploads?.dramas?.length) return;
+
+        const live = useSlopStore.getState();
+        const merged = mergeSeedWithUploads(
+          live.videos,
+          live.dramas,
+          uploads,
+        );
+        const withEngagement = applyEngagementCounts(
+          merged.videos,
+          merged.dramas,
+          live.likes,
+          live.saves,
+          live.comments,
+        );
+        if (cancelled) return;
+        useSlopStore.setState(withEngagement);
+      } catch {
+        /* seed-only is fine */
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   return null;

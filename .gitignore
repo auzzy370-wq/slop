@@ -40,8 +40,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# local analytics / referral event store
-/data/
+# local analytics / referral event store / upload catalog overlay
+/data/*
+!/data/.gitkeep
 *.tmp
 
 # admin mass-uploaded episode files (keep folder)

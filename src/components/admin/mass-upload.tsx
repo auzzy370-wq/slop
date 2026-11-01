@@ -308,6 +308,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
     let ok = 0;
     let failed = 0;
     const now = new Date().toISOString();
+    const savedVideos: Video[] = [];
 
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
@@ -400,6 +401,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         };
 
         upsertVideo(video);
+        savedVideos.push(video);
         patchRow(i, { status: "done", progress: 100, url });
         ok += 1;
       } catch (err) {
@@ -415,16 +417,51 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       ...videos
         .filter((v) => v.dramaId === drama.id)
         .map((v) => v.episodeNumber),
+      ...savedVideos.map((v) => v.episodeNumber),
     );
-    upsertDrama({ ...drama, episodeCount: maxEp });
+    const dramaSaved = { ...drama, episodeCount: maxEp };
+    upsertDrama(dramaSaved);
+
+    // Persist metadata server-side so episodes survive refresh / other devices.
+    if (savedVideos.length > 0) {
+      try {
+        const res = await fetch("/api/admin/catalog/uploads", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...adminHeaders(adminKey),
+          },
+          body: JSON.stringify({
+            dramas: [dramaSaved],
+            videos: savedVideos,
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error(
+            data.message ||
+              data.error ||
+              "Files uploaded, but catalog save failed — episodes may not stick after refresh.",
+          );
+        } else {
+          toast.success(
+            `Saved ${ok} episode${ok === 1 ? "" : "s"} to “${drama.title}” (persistent)`,
+          );
+        }
+      } catch {
+        toast.error(
+          "Files uploaded, but catalog save failed — episodes may not stick after refresh.",
+        );
+      }
+    } else if (failed > 0) {
+      toast.error(`Imported ${ok}, failed ${failed}`);
+    }
 
     setBusy(false);
-    if (failed === 0) {
-      toast.success(
-        `Imported ${ok} episode${ok === 1 ? "" : "s"} into “${drama.title}”`,
-      );
-    } else {
-      toast.error(`Imported ${ok}, failed ${failed}`);
+    if (savedVideos.length === 0 && failed > 0) {
+      /* already toasted */
+    } else if (failed > 0 && savedVideos.length > 0) {
+      toast.message(`Imported ${ok}, failed ${failed}`);
     }
   };
 
