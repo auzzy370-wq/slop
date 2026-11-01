@@ -122,7 +122,9 @@ export function VideoFeed({
       ) || 1,
     );
     pageHRef.current = h;
-    setPageH(h);
+    // Avoid redundant setState — ResizeObserver + height writes can otherwise
+    // thrash into "Maximum update depth exceeded" on share landings.
+    setPageH((prev) => (prev === h ? prev : h));
     if (el) {
       el.style.setProperty("--slop-feed-page", `${h}px`);
       el.style.height = `${h}px`;
