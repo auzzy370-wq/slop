@@ -1,3 +1,4 @@
+import { isPlayableVideoUrl } from "./media-url";
 import type { FeedSection, Video } from "./types";
 
 function scoreForYou(video: Video): number {
@@ -15,7 +16,14 @@ function scoreForYou(video: Video): number {
     video.saveCount * 10;
   const featuredBoost = video.featured ? 50_000 : 0;
   const pinnedBoost = video.pinned ? 100_000 : 0;
-  return pinnedBoost + featuredBoost + engagement / Math.pow(ageHours, 0.35);
+  // Keep broken Blob uploads out of the top of For You when the store is blocked.
+  const unplayablePenalty = isPlayableVideoUrl(video.videoUrl) ? 0 : -1_000_000;
+  return (
+    pinnedBoost +
+    featuredBoost +
+    unplayablePenalty +
+    engagement / Math.pow(ageHours, 0.35)
+  );
 }
 
 export function publishedVideos(videos: Video[]): Video[] {
@@ -29,9 +37,21 @@ export function getFeed(
     categoryId?: string;
     query?: string;
     savedIds?: string[];
+    /** Drop known-unplayable Blob URLs from browse feeds (not drama deep-links). */
+    hideUnplayableBlob?: boolean;
   },
 ): Video[] {
   let list = publishedVideos(videos);
+
+  if (
+    opts?.hideUnplayableBlob &&
+    section !== "drama" &&
+    section !== "saved"
+  ) {
+    const playable = list.filter((v) => isPlayableVideoUrl(v.videoUrl));
+    // Only hide when some other content remains — don't empty the feed.
+    if (playable.length > 0) list = playable;
+  }
 
   if (
     (section === "category" || section === "drama") &&

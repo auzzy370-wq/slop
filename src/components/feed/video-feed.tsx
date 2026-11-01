@@ -39,6 +39,7 @@ export function VideoFeed({
   const user = useSlopStore((s) => s.currentUser);
   const settings = useSlopStore((s) => s.settings);
   const hydrated = useSlopStore((s) => s.hydrated);
+  const blobPlaybackBlocked = useSlopStore((s) => s.blobPlaybackBlocked);
 
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -81,8 +82,17 @@ export function VideoFeed({
       categoryId,
       query,
       savedIds,
+      hideUnplayableBlob: blobPlaybackBlocked,
     });
-  }, [videos, section, feedParam, categoryId, query, savedIds]);
+  }, [
+    videos,
+    section,
+    feedParam,
+    categoryId,
+    query,
+    savedIds,
+    blobPlaybackBlocked,
+  ]);
 
   const showAds =
     settings.adsEnabled && !(user?.isPremium && user.status === "active");
@@ -420,6 +430,13 @@ export function VideoFeed({
     }
   }, [items, videos, goTo]);
 
+  const onPlaybackFailed = useCallback(() => {
+    const current = indexRef.current;
+    if (current < itemsLenRef.current - 1) {
+      window.setTimeout(() => goTo(current + 1, true), 350);
+    }
+  }, [goTo]);
+
   if (!hydrated) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[var(--slop-ink)]">
@@ -502,6 +519,7 @@ export function VideoFeed({
                     .filter(Boolean)}
                   onJumpToVideo={onJumpToVideo}
                   onEpisodeEnded={onEpisodeEnded}
+                  onPlaybackFailed={onPlaybackFailed}
                 />
               ) : (
                 <div

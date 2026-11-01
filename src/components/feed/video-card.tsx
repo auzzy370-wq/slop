@@ -45,7 +45,7 @@ import {
 } from "@/lib/social/engagement-client";
 import { requestEngagementRefresh } from "@/components/social-hydrator";
 import { getOriginalScript } from "@/lib/series/originals/catalog";
-import { resolvePlaybackUrl } from "@/lib/media-url";
+import { isVercelBlobUrl, resolvePlaybackUrl } from "@/lib/media-url";
 
 interface VideoCardProps {
   video: Video;
@@ -55,6 +55,7 @@ interface VideoCardProps {
   categoryNames: string[];
   onJumpToVideo?: (videoId: string) => void;
   onEpisodeEnded?: () => void;
+  onPlaybackFailed?: () => void;
 }
 
 export function VideoCard({
@@ -65,6 +66,7 @@ export function VideoCard({
   categoryNames,
   onJumpToVideo,
   onEpisodeEnded,
+  onPlaybackFailed,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isScripted = video.playback === "scripted";
@@ -75,11 +77,15 @@ export function VideoCard({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(false);
+  const blobPlaybackBlocked = useSlopStore((s) => s.blobPlaybackBlocked);
+  const storageBlocked =
+    isVercelBlobUrl(video.videoUrl) && blobPlaybackBlocked;
   const [failed, setFailed] = useState(false);
   const [loading, setLoading] = useState(!isScripted);
   /** Bumps to force a clean <video> remount after abort / retry. */
   const [mediaKey, setMediaKey] = useState(0);
   const retryCount = useRef(0);
+  const notifiedFail = useRef(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -134,6 +140,21 @@ export function VideoCard({
   const videoComments = comments.filter(
     (c) => c.videoId === video.id && c.moderationStatus === "visible",
   );
+
+  useEffect(() => {
+    if (!active) {
+      notifiedFail.current = false;
+      return;
+    }
+    if (storageBlocked) {
+      setFailed(true);
+      setLoading(false);
+      if (!notifiedFail.current) {
+        notifiedFail.current = true;
+        onPlaybackFailed?.();
+      }
+    }
+  }, [active, storageBlocked, onPlaybackFailed, video.id]);
 
   useEffect(() => {
     if (isScripted) {
@@ -644,7 +665,7 @@ export function VideoCard({
           onTap={onVideoSurfaceTap}
           onEnded={handleEpisodeEnded}
         />
-      ) : active && !failed ? (
+      ) : active && !failed && !storageBlocked ? (
         <video
           key={`${video.id}-${mediaKey}`}
           ref={videoRef}
@@ -675,7 +696,7 @@ export function VideoCard({
           onEnded={handleEpisodeEnded}
           onError={() => {
             // Auto-recover on Safari transient decode / network errors.
-            if (retryCount.current < 3) {
+            if (!storageBlocked && retryCount.current < 3) {
               retryCount.current += 1;
               setLoading(true);
               window.setTimeout(() => setMediaKey((k) => k + 1), 160);
@@ -683,6 +704,10 @@ export function VideoCard({
             }
             setFailed(true);
             setLoading(false);
+            if (!notifiedFail.current) {
+              notifiedFail.current = true;
+              onPlaybackFailed?.();
+            }
           }}
           onClick={onVideoSurfaceTap}
         />
@@ -695,23 +720,30 @@ export function VideoCard({
             className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-40"
           />
           <p className="relative font-display text-xl text-white">
-            Video failed to load
+            {storageBlocked || isVercelBlobUrl(video.videoUrl)
+              ? "Cloud storage blocked"
+              : "Video failed to load"}
           </p>
-          <p className="relative text-sm text-white/60">
-            Safari sometimes drops the stream — tap retry.
+          <p className="relative max-w-sm text-sm text-white/60">
+            {storageBlocked || isVercelBlobUrl(video.videoUrl)
+              ? "This episode is on a suspended Vercel Blob store. Unsuspend Blob in Vercel, or re-upload the originals to Cloudflare R2 — no need to rebuild the catalog."
+              : "Safari sometimes drops the stream — tap retry."}
           </p>
-          <Button
-            variant="secondary"
-            className="relative"
-            onClick={() => {
-              retryCount.current = 0;
-              setFailed(false);
-              setLoading(true);
-              setMediaKey((k) => k + 1);
-            }}
-          >
-            Retry
-          </Button>
+          {!storageBlocked && (
+            <Button
+              variant="secondary"
+              className="relative"
+              onClick={() => {
+                retryCount.current = 0;
+                notifiedFail.current = false;
+                setFailed(false);
+                setLoading(true);
+                setMediaKey((k) => k + 1);
+              }}
+            >
+              Retry
+            </Button>
+          )}
         </div>
       ) : (
         // Inactive neighbor — poster only. Keeps Safari from fighting over decoders.

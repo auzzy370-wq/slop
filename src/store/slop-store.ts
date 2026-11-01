@@ -25,6 +25,7 @@ import type {
   Video,
   Category,
 } from "@/lib/types";
+import { setBlobPlaybackBlocked as setMediaBlobBlocked } from "@/lib/media-url";
 import { uid } from "@/lib/utils";
 
 const FRESH_CATALOG = catalogFromSeed();
@@ -32,6 +33,9 @@ const FRESH_CATALOG = catalogFromSeed();
 interface SlopState {
   hydrated: boolean;
   setHydrated: (v: boolean) => void;
+  /** True when Vercel Blob content reads are blocked/suspended. */
+  blobPlaybackBlocked: boolean;
+  setBlobPlaybackBlocked: (v: boolean) => void;
 
   currentUser: Profile | null;
   signInDemo: (asAdmin?: boolean) => void;
@@ -104,6 +108,11 @@ export const useSlopStore = create<SlopState>()(
     (set, get) => ({
       hydrated: false,
       setHydrated: (v) => set({ hydrated: v }),
+      blobPlaybackBlocked: false,
+      setBlobPlaybackBlocked: (v) => {
+        setMediaBlobBlocked(v);
+        set({ blobPlaybackBlocked: v });
+      },
 
       currentUser: null,
       signInDemo: (asAdmin = false) => {

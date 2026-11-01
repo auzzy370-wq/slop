@@ -11,6 +11,14 @@ import {
 } from "@/lib/uploads-catalog-shared";
 import { useSlopStore } from "@/store/slop-store";
 
+type CatalogPayload = UploadsCatalog & {
+  storage?: {
+    blobSuspended?: boolean;
+    blobReadable?: boolean;
+    message?: string;
+  };
+};
+
 /**
  * Wipe legacy poisoned catalogs, reset to seed, then re-apply any
  * admin mass-upload overlay from the server so uploads stick.
@@ -50,7 +58,15 @@ export function StoreHygiene() {
       try {
         const res = await fetch("/api/catalog/uploads", { cache: "no-store" });
         if (!res.ok || cancelled) return;
-        const uploads = (await res.json()) as UploadsCatalog;
+        const uploads = (await res.json()) as CatalogPayload;
+        if (uploads.storage) {
+          useSlopStore.getState().setBlobPlaybackBlocked(
+            Boolean(
+              uploads.storage.blobSuspended ||
+                uploads.storage.blobReadable === false,
+            ),
+          );
+        }
         if (!uploads?.videos?.length && !uploads?.dramas?.length) return;
 
         const live = useSlopStore.getState();
