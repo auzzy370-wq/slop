@@ -48,6 +48,7 @@ interface VideoCardProps {
   onToggleMute: () => void;
   categoryNames: string[];
   onJumpToVideo?: (videoId: string) => void;
+  onEpisodeEnded?: () => void;
 }
 
 export function VideoCard({
@@ -57,6 +58,7 @@ export function VideoCard({
   onToggleMute,
   categoryNames,
   onJumpToVideo,
+  onEpisodeEnded,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isScripted = video.playback === "scripted";
@@ -115,6 +117,7 @@ export function VideoCard({
   const playbackId = useRef(uid("pb"));
   const lastProgressSent = useRef(0);
   const started = useRef(false);
+  const endedOnce = useRef(false);
 
   const liked = !!user && likes.some((l) => l.userId === user.id && l.videoId === video.id);
   const saved = !!user && saves.some((s) => s.userId === user.id && s.videoId === video.id);
@@ -262,13 +265,23 @@ export function VideoCard({
       setFailed(false);
       setLoading(false);
       retryCount.current = 0;
+      endedOnce.current = false;
       return;
     }
+    // Episode picks / feed advances should always start playing.
+    setPaused(false);
     setFailed(false);
     setLoading(!isScripted);
     retryCount.current = 0;
+    endedOnce.current = false;
     setSpeed(loadPlaybackSpeed());
   }, [active, isScripted, video.id]);
+
+  const handleEpisodeEnded = useCallback(() => {
+    if (!active || endedOnce.current) return;
+    endedOnce.current = true;
+    onEpisodeEnded?.();
+  }, [active, onEpisodeEnded]);
 
   useEffect(() => {
     const el = videoRef.current;
@@ -568,6 +581,7 @@ export function VideoCard({
           }}
           onDuration={(sec) => setDuration(sec)}
           onTap={onVideoSurfaceTap}
+          onEnded={handleEpisodeEnded}
         />
       ) : active && !failed ? (
         <video
@@ -577,7 +591,6 @@ export function VideoCard({
           src={video.videoUrl}
           poster={video.thumbnailUrl}
           playsInline
-          loop
           muted={muted}
           preload="auto"
           onTimeUpdate={onTimeUpdate}
@@ -598,6 +611,7 @@ export function VideoCard({
           onCanPlay={() => {
             if (!paused) void videoRef.current?.play().catch(() => {});
           }}
+          onEnded={handleEpisodeEnded}
           onError={() => {
             // Auto-recover on Safari transient decode / network errors.
             if (retryCount.current < 3) {

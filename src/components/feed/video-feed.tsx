@@ -359,6 +359,33 @@ export function VideoFeed({
     [items, goTo, videos, dramas, router],
   );
 
+  const onEpisodeEnded = useCallback(() => {
+    const current = indexRef.current;
+    // Prefer the next episode of the same series when present in this feed.
+    const currentItem = items[current];
+    if (currentItem?.kind === "video") {
+      const currentVideo = videos.find((v) => v.id === currentItem.videoId);
+      if (currentVideo) {
+        const nextSameSeries = items.findIndex((item, i) => {
+          if (i <= current || item.kind !== "video") return false;
+          const v = videos.find((x) => x.id === item.videoId);
+          return (
+            !!v &&
+            v.dramaId === currentVideo.dramaId &&
+            v.episodeNumber > currentVideo.episodeNumber
+          );
+        });
+        if (nextSameSeries >= 0) {
+          goTo(nextSameSeries, true);
+          return;
+        }
+      }
+    }
+    if (current < itemsLenRef.current - 1) {
+      goTo(current + 1, true);
+    }
+  }, [items, videos, goTo]);
+
   if (!hydrated) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[var(--slop-ink)]">
@@ -434,6 +461,7 @@ export function VideoFeed({
                     .map((id) => categoryNameMap[id])
                     .filter(Boolean)}
                   onJumpToVideo={onJumpToVideo}
+                  onEpisodeEnded={onEpisodeEnded}
                 />
               ) : (
                 <div
