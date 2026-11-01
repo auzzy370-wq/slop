@@ -1,6 +1,6 @@
-import { del } from "@vercel/blob";
 import { NextResponse } from "next/server";
 import { requireAdminKey } from "@/lib/admin-guard";
+import { deleteEpisodeMedia } from "@/lib/episodes/delete-media";
 import {
   loadUploadsCatalog,
   removeVideoFromUploadsCatalog,
@@ -8,9 +8,8 @@ import {
 } from "@/lib/uploads-catalog";
 
 /**
- * Permanently remove an episode from the shared uploads catalog.
- * Also tombstones the drama:episode key so Blob rescans don't resurrect it,
- * and best-effort deletes the MP4 from Vercel Blob when the URL is ours.
+ * Permanently remove an episode from the shared uploads catalog AND delete
+ * its MP4 from Vercel Blob / local public/uploads so it stops using storage.
  */
 export async function POST(request: Request) {
   const denied = requireAdminKey(request);
@@ -49,10 +48,10 @@ export async function POST(request: Request) {
       videoId,
     );
 
-    // Tombstone seed/demo episodes too so refresh doesn't resurrect them.
     const deletedIds = new Set(catalog.deletedVideoIds ?? []);
     deletedIds.add(videoId);
     catalog.deletedVideoIds = [...deletedIds];
+
     const dramaId = removed?.dramaId || body.dramaId?.trim() || null;
     const episodeNumber =
       removed?.episodeNumber ??
@@ -66,28 +65,34 @@ export async function POST(request: Request) {
 
     await saveUploadsCatalog(catalog);
 
-    let blobDeleted = false;
-    const url = removed?.videoUrl || body.videoUrl || null;
-    if (
-      url &&
-      process.env.BLOB_READ_WRITE_TOKEN &&
-      /vercel-storage\.com|blob\.vercel-storage\.com/i.test(url)
-    ) {
-      try {
-        await del(url);
-        blobDeleted = true;
-      } catch (err) {
-        console.error("blob delete failed", err);
-      }
-    }
+    const media = await deleteEpisodeMedia({
+      videoUrl: removed?.videoUrl || body.videoUrl || null,
+      dramaId,
+      episodeNumber,
+    });
+
+    const filesRemoved =
+      media.deletedUrls.length + media.deletedPaths.length;
+    const storageFreed = filesRemoved > 0;
 
     return NextResponse.json({
       ok: true,
       videoId,
       removedFromCatalog: inCatalog || Boolean(removed),
-      blobDeleted,
+      storageFreed,
+      filesRemoved,
+      deletedUrls: media.deletedUrls,
+      deletedPaths: media.deletedPaths.map((p) =>
+        p.replace(process.cwd(), ""),
+      ),
+      mediaErrors: media.errors,
       videoCount: catalog.videos.length,
       updatedAt: catalog.updatedAt,
+      message: storageFreed
+        ? `Episode deleted and ${filesRemoved} video file${filesRemoved === 1 ? "" : "s"} removed from storage.`
+        : media.errors.length
+          ? "Episode removed from catalog, but the video file could not be deleted."
+          : "Episode deleted from catalog.",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Delete failed";

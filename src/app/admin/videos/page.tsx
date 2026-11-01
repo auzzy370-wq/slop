@@ -434,6 +434,9 @@ export default function AdminVideosPage() {
                         ok?: boolean;
                         message?: string;
                         error?: string;
+                        storageFreed?: boolean;
+                        filesRemoved?: number;
+                        mediaErrors?: string[];
                       };
                       if (!res.ok || !data.ok) {
                         toast.error(
@@ -445,7 +448,25 @@ export default function AdminVideosPage() {
                         return;
                       }
                       deleteVideo(video.id);
-                      toast.success("Episode deleted", { id: toastId });
+                      if (data.storageFreed) {
+                        toast.success(
+                          data.message ||
+                            `Episode and video file deleted (${data.filesRemoved ?? 1})`,
+                          { id: toastId },
+                        );
+                      } else if (data.mediaErrors?.length) {
+                        toast.message("Episode removed from catalog", {
+                          id: toastId,
+                          description:
+                            data.mediaErrors[0] ||
+                            "Video file may still be using storage.",
+                        });
+                      } else {
+                        toast.success(
+                          data.message || "Episode deleted",
+                          { id: toastId },
+                        );
+                      }
                     } catch {
                       toast.error("Delete request failed", { id: toastId });
                     }
