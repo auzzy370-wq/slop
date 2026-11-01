@@ -25,20 +25,43 @@ export function defaultSiteSettings(): SiteSettings {
   };
 }
 
-const LOCAL_PATH = path.join(process.cwd(), "data", "site-settings.json");
+function isServerless() {
+  return Boolean(
+    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
+  );
+}
+
+/** Local/dev path, or /tmp on Vercel (repo `data/` is read-only there). */
+function localPath() {
+  if (isServerless()) {
+    return path.join("/tmp", "slop-data", "site-settings.json");
+  }
+  return path.join(process.cwd(), "data", "site-settings.json");
+}
 
 async function readLocal(): Promise<SiteSettings | null> {
   try {
-    const raw = await readFile(LOCAL_PATH, "utf8");
+    const raw = await readFile(localPath(), "utf8");
     return normalize(JSON.parse(raw));
   } catch {
     return null;
   }
 }
 
-async function writeLocal(settings: SiteSettings) {
-  await mkdir(path.dirname(LOCAL_PATH), { recursive: true });
-  await writeFile(LOCAL_PATH, JSON.stringify(settings, null, 2), "utf8");
+async function writeLocal(settings: SiteSettings): Promise<boolean> {
+  try {
+    const file = localPath();
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify(settings, null, 2), "utf8");
+    return true;
+  } catch (err) {
+    // Never fail the request on ephemeral/local disk — cloud is source of truth.
+    console.warn(
+      "site-settings local write skipped",
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  }
 }
 
 async function readBlob(): Promise<SiteSettings | null> {
@@ -50,7 +73,9 @@ async function readBlob(): Promise<SiteSettings | null> {
       blobs.find((b) => b.pathname === SITE_SETTINGS_PATH) ?? blobs[0];
     if (!hit?.url) return null;
     const res = await fetch(
-      hit.url.includes("?") ? `${hit.url}&t=${Date.now()}` : `${hit.url}?t=${Date.now()}`,
+      hit.url.includes("?")
+        ? `${hit.url}&t=${Date.now()}`
+        : `${hit.url}?t=${Date.now()}`,
       { cache: "no-store" },
     );
     if (!res.ok) return null;
@@ -60,8 +85,8 @@ async function readBlob(): Promise<SiteSettings | null> {
   }
 }
 
-async function writeBlob(settings: SiteSettings) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return;
+async function writeBlob(settings: SiteSettings): Promise<boolean> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return false;
   try {
     const { put } = await import("@vercel/blob");
     await put(SITE_SETTINGS_PATH, JSON.stringify(settings), {
@@ -71,8 +96,10 @@ async function writeBlob(settings: SiteSettings) {
       contentType: "application/json",
       cacheControlMaxAge: 0,
     });
+    return true;
   } catch (err) {
     console.error("site-settings blob write failed", err);
+    return false;
   }
 }
 
@@ -87,8 +114,8 @@ async function readR2(): Promise<SiteSettings | null> {
   }
 }
 
-async function writeR2(settings: SiteSettings) {
-  if (!isR2Configured()) return;
+async function writeR2(settings: SiteSettings): Promise<boolean> {
+  if (!isR2Configured()) return false;
   try {
     await r2PutObject({
       key: SITE_SETTINGS_PATH,
@@ -96,8 +123,10 @@ async function writeR2(settings: SiteSettings) {
       contentType: "application/json",
       cacheControl: "no-cache",
     });
+    return true;
   } catch (err) {
     console.error("site-settings r2 write failed", err);
+    return false;
   }
 }
 
@@ -146,6 +175,28 @@ export async function saveSiteSettings(
         : current.maintenanceMessage,
     updatedAt: new Date().toISOString(),
   };
-  await Promise.all([writeR2(next), writeBlob(next), writeLocal(next)]);
+
+  const [r2Ok, blobOk] = await Promise.all([
+    writeR2(next),
+    writeBlob(next),
+  ]);
+  // Best-effort local cache (never required on Vercel).
+  await writeLocal(next);
+
+  if (!r2Ok && !blobOk) {
+    if (isServerless()) {
+      throw new Error(
+        "Could not save site settings to cloud storage. Ensure Cloudflare R2 (R2_*) is configured — the Vercel filesystem is read-only.",
+      );
+    }
+    // Local-only dev without cloud is fine if /data wrote.
+    const local = await readLocal();
+    if (!local || local.updatedAt !== next.updatedAt) {
+      throw new Error(
+        "Could not save site settings. Configure R2_* or ensure data/ is writable.",
+      );
+    }
+  }
+
   return next;
 }
