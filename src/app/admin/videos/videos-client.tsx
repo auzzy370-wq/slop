@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,17 @@ type StorageReportPayload = {
     totalBlobEpisodes: number;
     message: string;
     formattedPendingBytes?: string;
+  } | null;
+  autoMigrate?: {
+    armed: boolean;
+    canRun: boolean;
+    waitingOn: Array<"r2" | "blob_reads">;
+    pending: number;
+    pendingBytes: number;
+    message: string;
+    r2Ok: boolean;
+    blobReadable: boolean;
+    blobSuspended: boolean;
   } | null;
   health?: {
     configured: boolean;
@@ -143,6 +154,7 @@ export default function VideosClient() {
   const [purgeBusy, setPurgeBusy] = useState(false);
   const [migrateBusy, setMigrateBusy] = useState(false);
   const [migrateLog, setMigrateLog] = useState("");
+  const autoMigrateStarted = useRef(false);
 
   const sortedVideos = useMemo(
     () =>
@@ -294,94 +306,137 @@ export default function VideosClient() {
     }
   };
 
-  const migrateBlobToR2 = async () => {
-    const pending = storage?.migrate?.pending ?? 0;
-    if (!storage?.r2Health?.ok) {
-      toast.error(
-        "Configure Cloudflare R2 (R2_* env vars) and redeploy before migrating.",
-      );
-      return;
-    }
-    const confirmed = window.confirm(
-      pending > 0
-        ? `Copy ${pending} existing Blob episode${pending === 1 ? "" : "s"} to Cloudflare R2 without reuploading? Catalog URLs update automatically. Original Blob files are kept (dual storage).`
-        : "Run Blob → R2 migration check? Existing catalog episodes on Blob will be copied if any remain.",
-    );
-    if (!confirmed) return;
-
-    setMigrateBusy(true);
-    setMigrateLog("");
-    const toastId = toast.loading("Migrating Blob → R2 (no reupload)…");
-    let totalMigrated = 0;
-    let totalBytes = 0;
-    let rounds = 0;
-
-    try {
-      for (;;) {
-        rounds += 1;
-        const res = await fetch("/api/admin/storage/migrate", {
-          method: "POST",
-          headers: adminHeaders(),
-          body: JSON.stringify({ limit: 2, deleteFromBlob: false }),
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean;
-          migrated?: number;
-          remaining?: number;
-          bytesCopied?: number;
-          failed?: number;
-          readBlocked?: boolean;
-          message?: string;
-          error?: string;
-          formattedBytesCopied?: string;
-        };
-
-        totalMigrated += data.migrated || 0;
-        totalBytes += data.bytesCopied || 0;
-        setMigrateLog(
-          `Round ${rounds}: +${data.migrated || 0} · total ${totalMigrated} · remaining ${data.remaining ?? "?"}`,
+  const migrateBlobToR2 = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      const silent = Boolean(opts?.silent);
+      if (migrateBusy) return;
+      if (!storage?.r2Health?.ok && !silent) {
+        toast.error(
+          "Configure Cloudflare R2 (R2_* env vars) and redeploy before migrating.",
         );
-
-        if (data.readBlocked) {
-          toast.error(data.message || "Blob reads blocked", {
-            id: toastId,
-            description:
-              totalMigrated > 0
-                ? `${totalMigrated} already copied — unsuspend Blob briefly to finish`
-                : "Unsuspend Vercel Blob temporarily so files can be copied to R2",
-          });
-          break;
-        }
-
-        if (!res.ok && !(data.migrated && data.migrated > 0)) {
-          toast.error(data.message || data.error || "Migration failed", {
-            id: toastId,
-          });
-          break;
-        }
-
-        if (!data.remaining || data.remaining <= 0 || !(data.migrated || 0)) {
-          toast.success(
-            totalMigrated > 0
-              ? `Migrated ${totalMigrated} episode${totalMigrated === 1 ? "" : "s"} to R2 (${formatBytes(totalBytes)}). No reupload needed.`
-              : data.message || "Nothing left to migrate.",
-            { id: toastId },
-          );
-          break;
-        }
-
-        toast.loading(
-          `Migrating… ${totalMigrated} done, ${data.remaining} left`,
-          { id: toastId },
-        );
+        return;
       }
-      await loadStorage();
-    } catch {
-      toast.error("Migration request failed", { id: toastId });
-    } finally {
-      setMigrateBusy(false);
-    }
-  };
+      if (!silent) {
+        const pending = storage?.migrate?.pending ?? 0;
+        const confirmed = window.confirm(
+          pending > 0
+            ? `Copy ${pending} existing Blob episode${pending === 1 ? "" : "s"} to Cloudflare R2 without reuploading? Catalog URLs update automatically. Original Blob files are kept (dual storage).`
+            : "Run Blob → R2 migration check? Existing catalog episodes on Blob will be copied if any remain.",
+        );
+        if (!confirmed) return;
+      }
+
+      setMigrateBusy(true);
+      if (!silent) setMigrateLog("");
+      const toastId = silent
+        ? null
+        : toast.loading("Migrating Blob → R2 (no reupload)…");
+      let totalMigrated = 0;
+      let totalBytes = 0;
+      let rounds = 0;
+
+      try {
+        for (;;) {
+          rounds += 1;
+          const res = await fetch("/api/admin/storage/migrate", {
+            method: "POST",
+            headers: adminHeaders(),
+            body: JSON.stringify({ mode: "auto" }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            migrated?: number;
+            remaining?: number;
+            bytesCopied?: number;
+            failed?: number;
+            readBlocked?: boolean;
+            canRun?: boolean;
+            message?: string;
+            error?: string;
+            status?: { canRun?: boolean; waitingOn?: string[] };
+          };
+
+          const migrated = data.migrated || 0;
+          totalMigrated += migrated;
+          totalBytes += data.bytesCopied || 0;
+          setMigrateLog(
+            `Auto round ${rounds}: +${migrated} · total ${totalMigrated} · remaining ${data.remaining ?? "?"}`,
+          );
+
+          if (data.readBlocked || data.status?.waitingOn?.includes("blob_reads")) {
+            if (toastId) {
+              toast.message(data.message || "Waiting for Blob reads…", {
+                id: toastId,
+                description:
+                  "Auto-migrate will resume when the Blob store is unsuspended.",
+              });
+            }
+            break;
+          }
+
+          if (!res.ok && migrated === 0 && !silent) {
+            toast.error(data.message || data.error || "Migration failed", {
+              id: toastId ?? undefined,
+            });
+            break;
+          }
+
+          if (!data.remaining || data.remaining <= 0 || migrated === 0) {
+            if (toastId) {
+              toast.success(
+                totalMigrated > 0
+                  ? `Migrated ${totalMigrated} episode${totalMigrated === 1 ? "" : "s"} to R2 (${formatBytes(totalBytes)}).`
+                  : data.message || "Nothing left to migrate.",
+                { id: toastId },
+              );
+            } else if (totalMigrated > 0) {
+              toast.success(
+                `Auto-moved ${totalMigrated} episode${totalMigrated === 1 ? "" : "s"} to R2`,
+              );
+            }
+            break;
+          }
+
+          if (toastId) {
+            toast.loading(
+              `Migrating… ${totalMigrated} done, ${data.remaining} left`,
+              { id: toastId },
+            );
+          }
+        }
+        await loadStorage();
+      } catch {
+        if (toastId) toast.error("Migration request failed", { id: toastId });
+      } finally {
+        setMigrateBusy(false);
+      }
+    },
+    [migrateBusy, storage?.r2Health?.ok, storage?.migrate?.pending, loadStorage],
+  );
+
+  // Auto-move whenever R2 is ready and Blob becomes readable — no button click.
+  useEffect(() => {
+    const auto = storage?.autoMigrate;
+    if (!auto?.canRun || migrateBusy) return;
+    if (autoMigrateStarted.current) return;
+    autoMigrateStarted.current = true;
+    void migrateBlobToR2({ silent: true }).finally(() => {
+      // Allow another pass later if more files appear / Blob unblocks again.
+      window.setTimeout(() => {
+        autoMigrateStarted.current = false;
+      }, 60_000);
+    });
+  }, [storage?.autoMigrate, migrateBusy, migrateBlobToR2]);
+
+  // Keep polling while armed but waiting (R2 missing or Blob blocked).
+  useEffect(() => {
+    const auto = storage?.autoMigrate;
+    if (!auto?.armed || auto.canRun) return;
+    const id = window.setInterval(() => {
+      void loadStorage();
+    }, 30_000);
+    return () => window.clearInterval(id);
+  }, [storage?.autoMigrate, loadStorage]);
 
   const purgeOrphans = async () => {
     const preview = storage?.purgePreview;
@@ -717,15 +772,36 @@ export default function VideosClient() {
                 Vercel, then redeploy.
               </p>
             )}
-            {storage.migrate && storage.migrate.pending > 0 && (
-              <p className="mt-2 text-xs opacity-90">
-                {storage.migrate.pending} existing episode
-                {storage.migrate.pending === 1 ? "" : "s"} still on Blob (
-                {storage.migrate.formattedPendingBytes ||
-                  formatBytes(storage.migrate.pendingBytes)}
-                ). Migrate copies them to R2 and rewrites catalog URLs — no
-                reupload.
-              </p>
+            {storage.autoMigrate && (
+              <div className="mt-3 rounded-lg border border-white/10 bg-black/20 px-3 py-2 text-xs opacity-95">
+                <p className="font-semibold">
+                  {storage.autoMigrate.canRun
+                    ? migrateBusy
+                      ? "Auto-moving videos now…"
+                      : "Auto-migrate ready"
+                    : storage.autoMigrate.armed
+                      ? "Auto-migrate armed — waiting"
+                      : "Auto-migrate idle"}
+                </p>
+                <p className="mt-1 opacity-80">{storage.autoMigrate.message}</p>
+                {storage.autoMigrate.waitingOn.length > 0 && (
+                  <ul className="mt-2 list-disc space-y-1 pl-4 opacity-80">
+                    {storage.autoMigrate.waitingOn.includes("r2") && (
+                      <li>
+                        Add free Cloudflare R2 credentials (`R2_*`) in Vercel →
+                        Redeploy
+                      </li>
+                    )}
+                    {storage.autoMigrate.waitingOn.includes("blob_reads") && (
+                      <li>
+                        Briefly reactivate/unsuspend the Vercel Blob store so
+                        files can be copied (billing shows Inactive/Suspended).
+                        Auto-move resumes on its own every 5 minutes.
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
             )}
             {migrateLog && (
               <p className="mt-1 text-[11px] opacity-70">{migrateLog}</p>
@@ -737,9 +813,9 @@ export default function VideosClient() {
           <div className="rounded-xl border border-white/10 bg-white/[0.04] px-3 py-3 text-sm text-white/75">
             <p className="font-semibold text-white/90">Dual storage on</p>
             <p className="mt-1 text-xs text-white/55">
-              New mass uploads prefer R2. Existing Blob episodes keep playing
-              (via authenticated proxy if the public CDN is suspended). After
-              migrate, catalog points at R2; Blob copies stay until you purge.
+              New mass uploads prefer R2. Existing Blob episodes auto-move to R2
+              when Blob reads work again. Catalog URLs update automatically —
+              no reupload.
             </p>
           </div>
         )}
@@ -748,11 +824,11 @@ export default function VideosClient() {
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-sm text-amber-50">
             <p className="font-semibold">Vercel Blob store suspended</p>
             <p className="mt-1 text-xs text-amber-100/80">
-              {storage.health.message} Playback tries an authenticated proxy so
-              you do not lose episodes. For a permanent fix: set R2_*, redeploy,
-              then <span className="text-amber-50">Migrate to R2</span>. If
-              migrate cannot read files, unsuspend Blob briefly, run migrate,
-              then leave Blob suspended.
+              Files are still listed ({storage.autoMigrate?.pending ?? "?"} on
+              Blob) but content reads return 403, so they cannot be copied yet.
+              Set R2_*, then briefly unsuspend/reactivate Blob — auto-migrate
+              copies everything and rewrites the catalog. After that you can
+              leave Blob suspended.
             </p>
           </div>
         )}

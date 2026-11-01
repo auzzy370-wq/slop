@@ -1,6 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireAdminKey } from "@/lib/admin-guard";
 import {
+  getAutoMigrateStatus,
+  runAutoMigrate,
+} from "@/lib/admin/auto-migrate";
+import {
   migrateBlobToR2Batch,
   previewBlobToR2Migration,
 } from "@/lib/admin/migrate-blob-to-r2";
@@ -18,9 +22,13 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   try {
-    const preview = await previewBlobToR2Migration();
+    const [preview, auto] = await Promise.all([
+      previewBlobToR2Migration(),
+      getAutoMigrateStatus(),
+    ]);
     return NextResponse.json({
       ...preview,
+      auto,
       formattedPendingBytes: formatBytes(preview.pendingBytes),
       candidates: preview.candidates.slice(0, 100),
     });
@@ -37,15 +45,20 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST — copy a batch of Blob episodes → Cloudflare R2 and rewrite catalog URLs.
- * Body: `{ limit?: number, deleteFromBlob?: boolean }`
- * Call repeatedly until `remaining === 0`.
+ * POST — copy Blob episodes → Cloudflare R2 and rewrite catalog URLs.
+ * Body:
+ * - `{ mode: "auto" }` — run until budget / blocked / done (no click needed)
+ * - `{ limit?, deleteFromBlob? }` — single batch
  */
 export async function POST(request: Request) {
   const denied = requireAdminKey(request);
   if (denied) return denied;
 
-  let body: { limit?: number; deleteFromBlob?: boolean } = {};
+  let body: {
+    mode?: string;
+    limit?: number;
+    deleteFromBlob?: boolean;
+  } = {};
   try {
     body = (await request.json()) as typeof body;
   } catch {
@@ -53,6 +66,20 @@ export async function POST(request: Request) {
   }
 
   try {
+    if (body.mode === "auto") {
+      const result = await runAutoMigrate({
+        maxBatches: 8,
+        limitPerBatch: 1,
+        timeBudgetMs: 50_000,
+      });
+      return NextResponse.json({
+        ok: true,
+        mode: "auto",
+        ...result,
+        formattedBytesCopied: formatBytes(result.bytesCopied),
+      });
+    }
+
     const result = await migrateBlobToR2Batch({
       limit: body.limit,
       deleteFromBlob: body.deleteFromBlob,

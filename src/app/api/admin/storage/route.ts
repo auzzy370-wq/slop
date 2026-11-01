@@ -6,6 +6,7 @@ import {
   planOrphanPurge,
   purgeOrphanBlobs,
 } from "@/lib/admin/blob-storage";
+import { getAutoMigrateStatus } from "@/lib/admin/auto-migrate";
 import { previewBlobToR2Migration } from "@/lib/admin/migrate-blob-to-r2";
 import { getR2Health, isR2Configured, r2ListObjects } from "@/lib/r2";
 
@@ -22,12 +23,14 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   try {
-    const [report, health, r2Health, migratePreview] = await Promise.all([
-      getStorageReport(),
-      getBlobHealth({ probeWrite: false }),
-      getR2Health(),
-      previewBlobToR2Migration().catch(() => null),
-    ]);
+    const [report, health, r2Health, migratePreview, autoMigrate] =
+      await Promise.all([
+        getStorageReport(),
+        getBlobHealth({ probeWrite: false }),
+        getR2Health(),
+        previewBlobToR2Migration().catch(() => null),
+        getAutoMigrateStatus().catch(() => null),
+      ]);
 
     let r2 = {
       configured: isR2Configured(),
@@ -101,6 +104,7 @@ export async function GET(request: Request) {
             formattedPendingBytes: formatBytes(migratePreview.pendingBytes),
           }
         : null,
+      autoMigrate,
       report,
       purgePreview: {
         files: plan.length,

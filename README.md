@@ -112,10 +112,12 @@ Mass upload prefers R2 automatically when healthy. Resume unfinished series from
 You can **use both** stores at once:
 
 - **New uploads** → Cloudflare R2 (preferred)
-- **Existing Blob episodes** → keep playing (authenticated `/api/media/blob` proxy if the public CDN is suspended)
-- **Migrate** → Admin → Videos → **Migrate N to R2 (no reupload)** copies Blob bytes to R2 and rewrites catalog URLs in batches. Original Blob files stay until you purge (dual storage)
+- **Existing Blob episodes** → stay in the catalog; For You hides them while Blob is blocked so seed series still play
+- **Auto-migrate** → once `R2_*` is set **and** Blob content reads work again, episodes copy Blob → R2 automatically (Admin page + Vercel Cron every 5 minutes). Catalog URLs rewrite themselves — no manual reupload
 
-If migrate says reads are blocked, temporarily unsuspend/restore the Vercel Blob store, run migrate, then you can leave Blob suspended again.
+**Right now the Blob store is Suspended / Billing Inactive**, so Vercel returns `403` even to the token — nothing can read the MP4 bytes until you briefly reactivate that store. After auto-migrate finishes you can leave Blob suspended.
+
+Optional: set `CRON_SECRET` in Vercel so `/api/cron/migrate-blob` is locked to Vercel Cron.
 
 `BLOB_READ_WRITE_TOKEN` remains available as a fallback; Hobby Blob can suspend when limits are exceeded.
 
