@@ -6,6 +6,7 @@ import {
   planOrphanPurge,
   purgeOrphanBlobs,
 } from "@/lib/admin/blob-storage";
+import { previewBlobToR2Migration } from "@/lib/admin/migrate-blob-to-r2";
 import { getR2Health, isR2Configured, r2ListObjects } from "@/lib/r2";
 
 function formatBytes(n: number) {
@@ -21,10 +22,11 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   try {
-    const [report, health, r2Health] = await Promise.all([
+    const [report, health, r2Health, migratePreview] = await Promise.all([
       getStorageReport(),
       getBlobHealth({ probeWrite: false }),
       getR2Health(),
+      previewBlobToR2Migration().catch(() => null),
     ]);
 
     let r2 = {
@@ -88,6 +90,17 @@ export async function GET(request: Request) {
       r2Health,
       r2,
       preferred: r2Health.ok ? "r2" : health.writeOk ? "blob" : "none",
+      dualMode: Boolean(r2Health.ok && health.configured),
+      migrate: migratePreview
+        ? {
+            pending: migratePreview.pending,
+            pendingBytes: migratePreview.pendingBytes,
+            alreadyOnR2: migratePreview.alreadyOnR2,
+            totalBlobEpisodes: migratePreview.totalBlobEpisodes,
+            message: migratePreview.message,
+            formattedPendingBytes: formatBytes(migratePreview.pendingBytes),
+          }
+        : null,
       report,
       purgePreview: {
         files: plan.length,

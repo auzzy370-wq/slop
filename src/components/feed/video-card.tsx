@@ -45,6 +45,7 @@ import {
 } from "@/lib/social/engagement-client";
 import { requestEngagementRefresh } from "@/components/social-hydrator";
 import { getOriginalScript } from "@/lib/series/originals/catalog";
+import { resolvePlaybackUrl } from "@/lib/media-url";
 
 interface VideoCardProps {
   video: Video;
@@ -648,7 +649,7 @@ export function VideoCard({
           key={`${video.id}-${mediaKey}`}
           ref={videoRef}
           className="slop-feed-video"
-          src={video.videoUrl}
+          src={resolvePlaybackUrl(video.videoUrl)}
           poster={video.thumbnailUrl}
           playsInline
           muted={muted}

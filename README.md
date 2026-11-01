@@ -107,7 +107,17 @@ Locally, files save under `public/uploads/`. On Vercel, use **Cloudflare R2** (f
 
 Mass upload prefers R2 automatically when healthy. Resume unfinished series from the next episode number (e.g. EP57+).
 
-`BLOB_READ_WRITE_TOKEN` (Vercel Blob) remains an optional fallback; Hobby Blob can suspend when limits are exceeded.
+### Keep existing Blob videos (no reupload)
+
+You can **use both** stores at once:
+
+- **New uploads** → Cloudflare R2 (preferred)
+- **Existing Blob episodes** → keep playing (authenticated `/api/media/blob` proxy if the public CDN is suspended)
+- **Migrate** → Admin → Videos → **Migrate N to R2 (no reupload)** copies Blob bytes to R2 and rewrites catalog URLs in batches. Original Blob files stay until you purge (dual storage)
+
+If migrate says reads are blocked, temporarily unsuspend/restore the Vercel Blob store, run migrate, then you can leave Blob suspended again.
+
+`BLOB_READ_WRITE_TOKEN` remains available as a fallback; Hobby Blob can suspend when limits are exceeded.
 
 Episode **metadata** (titles, drama, episode numbers, cloud URLs) is saved to a server catalog (`/api/catalog/uploads`) so uploads survive refresh and show for everyone — not just the browser that uploaded them. Paste `SLOP_ADMIN_KEY` in the Mass upload key field on the public deploy.
 
