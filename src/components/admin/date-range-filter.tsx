@@ -90,22 +90,38 @@ export function MetricCard({
 
 export function SimpleBars({
   data,
+  formatValue,
+  labelWidth = 88,
 }: {
-  data: { label: string; value: number }[];
+  data: { label: string; value: number; color?: string }[];
+  formatValue?: (value: number) => string;
+  labelWidth?: number;
 }) {
   const max = Math.max(1, ...data.map((d) => d.value));
+  const valueCol = formatValue ? 64 : 40;
   return (
     <div className="space-y-2">
       {data.map((d) => (
-        <div key={d.label} className="grid grid-cols-[88px_1fr_40px] items-center gap-2 text-xs">
+        <div
+          key={d.label}
+          className="grid items-center gap-2 text-xs"
+          style={{
+            gridTemplateColumns: `${labelWidth}px 1fr ${valueCol}px`,
+          }}
+        >
           <span className="truncate text-white/60">{d.label}</span>
           <div className="h-2 overflow-hidden rounded-full bg-white/10">
             <div
-              className="h-full rounded-full bg-[var(--slop-violet)]"
-              style={{ width: `${(d.value / max) * 100}%` }}
+              className="h-full rounded-full"
+              style={{
+                width: `${(d.value / max) * 100}%`,
+                backgroundColor: d.color || "var(--slop-violet)",
+              }}
             />
           </div>
-          <span className="text-right text-white/70">{d.value}</span>
+          <span className="text-right tabular-nums text-white/70">
+            {formatValue ? formatValue(d.value) : d.value}
+          </span>
         </div>
       ))}
       {data.length === 0 && (
@@ -113,6 +129,54 @@ export function SimpleBars({
           No recorded data in this range yet.
         </p>
       )}
+    </div>
+  );
+}
+
+/** Horizontal stacked bar for share-of-total breakdowns (e.g. storage). */
+export function StackedShareBar({
+  segments,
+  formatValue,
+}: {
+  segments: { label: string; value: number; color: string }[];
+  formatValue?: (value: number) => string;
+}) {
+  const total = segments.reduce((s, seg) => s + seg.value, 0);
+  if (total <= 0) {
+    return (
+      <p className="text-sm text-[var(--slop-slate)]">No storage data yet.</p>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex h-3 overflow-hidden rounded-full bg-white/10">
+        {segments.map((seg) =>
+          seg.value <= 0 ? null : (
+            <div
+              key={seg.label}
+              title={`${seg.label}: ${formatValue ? formatValue(seg.value) : seg.value}`}
+              style={{
+                width: `${(seg.value / total) * 100}%`,
+                backgroundColor: seg.color,
+              }}
+            />
+          ),
+        )}
+      </div>
+      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-white/60">
+        {segments.map((seg) => (
+          <span key={seg.label} className="inline-flex items-center gap-1.5">
+            <span
+              className="inline-block h-2 w-2 rounded-full"
+              style={{ backgroundColor: seg.color }}
+            />
+            {seg.label}{" "}
+            <span className="tabular-nums text-white/80">
+              {formatValue ? formatValue(seg.value) : seg.value}
+            </span>
+          </span>
+        ))}
+      </div>
     </div>
   );
 }

@@ -1,14 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MassUpload } from "@/components/admin/mass-upload";
+import {
+  SimpleBars,
+  StackedShareBar,
+} from "@/components/admin/date-range-filter";
 import { useSlopStore } from "@/store/slop-store";
 import type { PublicationStatus, Video } from "@/lib/types";
 import { triggerEpisodeAutoPost } from "@/lib/social/client";
-import { slugify, uid } from "@/lib/utils";
+import { formatBytes, slugify, uid } from "@/lib/utils";
 import { toast } from "sonner";
 
 const emptyForm = {
@@ -27,6 +31,62 @@ const emptyForm = {
   autoPostSocial: true,
 };
 
+type StorageReportPayload = {
+  ok?: boolean;
+  report?: {
+    configured: boolean;
+    totals: {
+      objects: number;
+      videos: number;
+      bytes: number;
+      videoBytes: number;
+    };
+    catalog: { dramas: number; videos: number };
+    dramas: Array<{
+      dramaId: string;
+      title: string;
+      files: number;
+      uniqueEpisodes: number;
+      bytes: number;
+      inCatalogEpisodes: number;
+    }>;
+    orphans: { files: number; bytes: number };
+    duplicates: { files: number; bytes: number };
+    reclaimableBytes: number;
+    activeBytes: number;
+  };
+  purgePreview?: {
+    files: number;
+    bytes: number;
+    byReason: {
+      orphan_drama: number;
+      duplicate: number;
+      tombstoned: number;
+    };
+  };
+  formatted?: {
+    total: string;
+    videos: string;
+    active: string;
+    reclaimable: string;
+    orphans: string;
+    duplicates: string;
+  };
+  error?: string;
+  message?: string;
+};
+
+function adminHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    "content-type": "application/json",
+  };
+  if (typeof window !== "undefined") {
+    const adminKey = window.localStorage.getItem("slop_admin_key");
+    if (adminKey) headers["x-slop-admin-key"] = adminKey;
+  }
+  return headers;
+}
+
 export default function AdminVideosPage() {
   const videos = useSlopStore((s) => s.videos);
   const dramas = useSlopStore((s) => s.dramas);
@@ -35,6 +95,11 @@ export default function AdminVideosPage() {
   const deleteVideo = useSlopStore((s) => s.deleteVideo);
   const [form, setForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [storage, setStorage] = useState<StorageReportPayload | null>(null);
+  const [storageLoading, setStorageLoading] = useState(false);
+  const [purgeBusy, setPurgeBusy] = useState(false);
 
   const sortedVideos = useMemo(
     () =>
@@ -44,6 +109,194 @@ export default function AdminVideosPage() {
       }),
     [videos],
   );
+
+  const allSelected =
+    sortedVideos.length > 0 && selected.size === sortedVideos.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const loadStorage = useCallback(async () => {
+    setStorageLoading(true);
+    try {
+      const res = await fetch("/api/admin/storage", {
+        headers: adminHeaders(),
+        cache: "no-store",
+      });
+      const data = (await res.json().catch(() => ({}))) as StorageReportPayload;
+      if (!res.ok) {
+        setStorage({
+          ok: false,
+          error: data.error,
+          message: data.message || "Could not load storage report",
+        });
+        return;
+      }
+      setStorage(data);
+    } catch {
+      setStorage({
+        ok: false,
+        message: "Storage request failed",
+      });
+    } finally {
+      setStorageLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadStorage();
+  }, [loadStorage]);
+
+  const toggleSelect = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (allSelected) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(sortedVideos.map((v) => v.id)));
+    }
+  };
+
+  const deleteEpisodes = async (targets: Video[]) => {
+    if (!targets.length) return;
+    const toastId = toast.loading(
+      targets.length === 1
+        ? "Deleting episode…"
+        : `Deleting ${targets.length} episodes…`,
+    );
+    try {
+      const res = await fetch("/api/admin/videos/delete", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify(
+          targets.length === 1
+            ? {
+                videoId: targets[0]!.id,
+                videoUrl: targets[0]!.videoUrl,
+                dramaId: targets[0]!.dramaId,
+                episodeNumber: targets[0]!.episodeNumber,
+              }
+            : {
+                videos: targets.map((v) => ({
+                  videoId: v.id,
+                  videoUrl: v.videoUrl,
+                  dramaId: v.dramaId,
+                  episodeNumber: v.episodeNumber,
+                })),
+              },
+        ),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        storageFreed?: boolean;
+        filesRemoved?: number;
+        mediaErrors?: string[];
+        deletedIds?: string[];
+      };
+      if (!res.ok || !data.ok) {
+        toast.error(
+          data.message || data.error || "Could not delete episode(s)",
+          { id: toastId },
+        );
+        return;
+      }
+      for (const v of targets) deleteVideo(v.id);
+      setSelected((prev) => {
+        const next = new Set(prev);
+        for (const v of targets) next.delete(v.id);
+        return next;
+      });
+      if (data.storageFreed) {
+        toast.success(
+          data.message ||
+            `Deleted and removed ${data.filesRemoved ?? 1} file(s) from storage`,
+          { id: toastId },
+        );
+      } else if (data.mediaErrors?.length) {
+        toast.message(
+          data.message || "Removed from catalog; some files may remain",
+          {
+            id: toastId,
+            description: data.mediaErrors[0],
+          },
+        );
+      } else {
+        toast.success(data.message || "Episode(s) deleted", { id: toastId });
+      }
+      void loadStorage();
+    } catch {
+      toast.error("Delete request failed", { id: toastId });
+    }
+  };
+
+  const bulkDelete = async () => {
+    const targets = sortedVideos.filter((v) => selected.has(v.id));
+    if (!targets.length) return;
+    const confirmed = window.confirm(
+      `Delete ${targets.length} episode${targets.length === 1 ? "" : "s"} and free their video storage? This cannot be undone.`,
+    );
+    if (!confirmed) return;
+    setBulkBusy(true);
+    try {
+      await deleteEpisodes(targets);
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const purgeOrphans = async () => {
+    const preview = storage?.purgePreview;
+    const reclaimable =
+      storage?.formatted?.reclaimable ||
+      formatBytes(storage?.report?.reclaimableBytes ?? 0);
+    const confirmed = window.confirm(
+      preview && preview.files > 0
+        ? `Purge ${preview.files} orphan/duplicate file${preview.files === 1 ? "" : "s"} (${reclaimable})? Active catalog episodes are kept.`
+        : "Purge orphan and duplicate Blob files? Active catalog episodes are kept.",
+    );
+    if (!confirmed) return;
+    setPurgeBusy(true);
+    const toastId = toast.loading("Purging orphan Blob files…");
+    try {
+      const res = await fetch("/api/admin/storage", {
+        method: "POST",
+        headers: adminHeaders(),
+        body: JSON.stringify({ action: "purge" }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+        deleted?: number;
+        formattedDeleted?: string;
+        errors?: string[];
+      };
+      if (!res.ok || !data.ok) {
+        toast.error(data.message || data.error || "Purge failed", {
+          id: toastId,
+        });
+        return;
+      }
+      toast.success(data.message || "Purge complete", {
+        id: toastId,
+        description: data.errors?.length
+          ? `${data.errors.length} file(s) failed`
+          : undefined,
+      });
+      await loadStorage();
+    } catch {
+      toast.error("Purge request failed", { id: toastId });
+    } finally {
+      setPurgeBusy(false);
+    }
+  };
 
   const save = async () => {
     if (!form.title.trim() || !form.videoUrl.trim() || !form.dramaId) {
@@ -154,6 +407,9 @@ export default function AdminVideosPage() {
     });
   };
 
+  const report = storage?.report;
+  const reclaimable = report?.reclaimableBytes ?? 0;
+
   return (
     <div className="space-y-8">
       <div>
@@ -164,6 +420,203 @@ export default function AdminVideosPage() {
           <span className="text-white/70">EP02</span>, … and they auto-sort.
         </p>
       </div>
+
+      <section className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="font-semibold">Blob storage</h2>
+            <p className="mt-0.5 text-xs text-white/45">
+              Live usage across Vercel Blob. Orphans and duplicates can be purged
+              without touching catalog episodes.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              size="sm"
+              variant="secondary"
+              disabled={storageLoading}
+              onClick={() => void loadStorage()}
+            >
+              {storageLoading ? "Refreshing…" : "Refresh"}
+            </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              disabled={
+                purgeBusy ||
+                storageLoading ||
+                !report?.configured ||
+                reclaimable <= 0
+              }
+              onClick={() => void purgeOrphans()}
+            >
+              {purgeBusy
+                ? "Purging…"
+                : reclaimable > 0
+                  ? `Purge orphans (${storage?.formatted?.reclaimable ?? formatBytes(reclaimable)})`
+                  : "Nothing to purge"}
+            </Button>
+          </div>
+        </div>
+
+        {storageLoading && !report ? (
+          <p className="text-sm text-white/45">Loading storage report…</p>
+        ) : storage && !storage.ok && !report ? (
+          <p className="text-sm text-red-300/90">
+            {storage.message || storage.error || "Storage unavailable"}
+          </p>
+        ) : report && !report.configured ? (
+          <p className="text-sm text-white/45">
+            Blob not configured — set{" "}
+            <span className="text-white/70">BLOB_READ_WRITE_TOKEN</span> to track
+            cloud storage.
+          </p>
+        ) : report ? (
+          <>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-white/40">
+                  Total
+                </p>
+                <p className="mt-1 font-display text-xl font-bold">
+                  {storage?.formatted?.total ?? formatBytes(report.totals.bytes)}
+                </p>
+                <p className="text-xs text-white/40">
+                  {report.totals.objects} objects
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-white/40">
+                  Active videos
+                </p>
+                <p className="mt-1 font-display text-xl font-bold">
+                  {storage?.formatted?.active ?? formatBytes(report.activeBytes)}
+                </p>
+                <p className="text-xs text-white/40">
+                  {report.catalog.videos} catalog episodes
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-white/40">
+                  Orphans
+                </p>
+                <p className="mt-1 font-display text-xl font-bold">
+                  {storage?.formatted?.orphans ??
+                    formatBytes(report.orphans.bytes)}
+                </p>
+                <p className="text-xs text-white/40">
+                  {report.orphans.files} file
+                  {report.orphans.files === 1 ? "" : "s"}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] uppercase tracking-wide text-white/40">
+                  Reclaimable
+                </p>
+                <p className="mt-1 font-display text-xl font-bold text-[var(--slop-violet)]">
+                  {storage?.formatted?.reclaimable ??
+                    formatBytes(report.reclaimableBytes)}
+                </p>
+                <p className="text-xs text-white/40">
+                  {report.duplicates.files} duplicate
+                  {report.duplicates.files === 1 ? "" : "s"}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-white/80">
+                  Storage breakdown
+                </h3>
+                <StackedShareBar
+                  formatValue={formatBytes}
+                  segments={[
+                    {
+                      label: "Active",
+                      value: report.activeBytes,
+                      color: "var(--slop-violet)",
+                    },
+                    {
+                      label: "Orphans",
+                      value: report.orphans.bytes,
+                      color: "#f59e0b",
+                    },
+                    {
+                      label: "Duplicates",
+                      value: report.duplicates.bytes,
+                      color: "#f87171",
+                    },
+                  ]}
+                />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-white/80">
+                  Size by series
+                </h3>
+                <SimpleBars
+                  labelWidth={120}
+                  formatValue={formatBytes}
+                  data={report.dramas.slice(0, 10).map((d, i) => ({
+                    label: d.title,
+                    value: d.bytes,
+                    color:
+                      d.inCatalogEpisodes === 0
+                        ? "#f59e0b"
+                        : i === 0
+                          ? "var(--slop-violet)"
+                          : "rgba(185, 154, 255, 0.55)",
+                  }))}
+                />
+              </div>
+            </div>
+
+            {report.dramas.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-white/10 text-xs text-white/40">
+                      <th className="py-2 pr-3 font-medium">Series</th>
+                      <th className="py-2 pr-3 font-medium">Files</th>
+                      <th className="py-2 pr-3 font-medium">Eps</th>
+                      <th className="py-2 font-medium">Size</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {report.dramas.slice(0, 12).map((d) => (
+                      <tr
+                        key={d.dramaId}
+                        className="border-b border-white/5 text-white/80"
+                      >
+                        <td className="py-2 pr-3">
+                          <span className="font-medium text-white">
+                            {d.title}
+                          </span>
+                          {d.inCatalogEpisodes === 0 && (
+                            <span className="ml-2 text-xs text-amber-300/80">
+                              not in catalog
+                            </span>
+                          )}
+                        </td>
+                        <td className="py-2 pr-3 tabular-nums">{d.files}</td>
+                        <td className="py-2 pr-3 tabular-nums">
+                          {d.uniqueEpisodes}
+                          {d.inCatalogEpisodes > 0
+                            ? ` / ${d.inCatalogEpisodes}`
+                            : ""}
+                        </td>
+                        <td className="py-2 tabular-nums">
+                          {formatBytes(d.bytes)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : null}
+      </section>
 
       <MassUpload dramas={dramas} />
 
@@ -325,22 +778,66 @@ export default function AdminVideosPage() {
         </div>
       </section>
 
-      <section className="space-y-2">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-2 text-sm text-white/70">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                ref={(el) => {
+                  if (el) el.indeterminate = someSelected;
+                }}
+                onChange={toggleSelectAll}
+                disabled={sortedVideos.length === 0}
+              />
+              Select all
+            </label>
+            {selected.size > 0 && (
+              <span className="text-xs text-white/45">
+                {selected.size} selected
+              </span>
+            )}
+          </div>
+          <Button
+            size="sm"
+            variant="danger"
+            disabled={selected.size === 0 || bulkBusy}
+            onClick={() => void bulkDelete()}
+          >
+            {bulkBusy
+              ? "Deleting…"
+              : selected.size > 0
+                ? `Delete selected (${selected.size})`
+                : "Delete selected"}
+          </Button>
+        </div>
+
         {sortedVideos.map((video) => (
           <div
             key={video.id}
             className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-black/30 p-4 sm:flex-row sm:items-center sm:justify-between"
           >
-            <div className="min-w-0">
-              <p className="truncate font-semibold">
-                EP {String(video.episodeNumber).padStart(2, "0")} · {video.title}
-              </p>
-              <p className="text-xs text-white/45">
-                {video.sourceAttribution} · {video.status} · {video.viewCount}{" "}
-                views
-              </p>
+            <div className="flex min-w-0 items-start gap-3">
+              <input
+                type="checkbox"
+                className="mt-1"
+                checked={selected.has(video.id)}
+                onChange={() => toggleSelect(video.id)}
+                aria-label={`Select ${video.title}`}
+              />
+              <div className="min-w-0">
+                <p className="truncate font-semibold">
+                  EP {String(video.episodeNumber).padStart(2, "0")} ·{" "}
+                  {video.title}
+                </p>
+                <p className="text-xs text-white/45">
+                  {video.sourceAttribution} · {video.status} · {video.viewCount}{" "}
+                  views
+                </p>
+              </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 pl-7 sm:pl-0">
               <Button size="sm" variant="secondary" onClick={() => edit(video)}>
                 Edit
               </Button>
@@ -408,69 +905,11 @@ export default function AdminVideosPage() {
                 size="sm"
                 variant="danger"
                 onClick={() => {
-                  void (async () => {
-                    const toastId = toast.loading("Deleting episode…");
-                    try {
-                      const headers: Record<string, string> = {
-                        "content-type": "application/json",
-                      };
-                      const adminKey =
-                        typeof window !== "undefined"
-                          ? window.localStorage.getItem("slop_admin_key")
-                          : null;
-                      if (adminKey) headers["x-slop-admin-key"] = adminKey;
-
-                      const res = await fetch("/api/admin/videos/delete", {
-                        method: "POST",
-                        headers,
-                        body: JSON.stringify({
-                          videoId: video.id,
-                          videoUrl: video.videoUrl,
-                          dramaId: video.dramaId,
-                          episodeNumber: video.episodeNumber,
-                        }),
-                      });
-                      const data = (await res.json().catch(() => ({}))) as {
-                        ok?: boolean;
-                        message?: string;
-                        error?: string;
-                        storageFreed?: boolean;
-                        filesRemoved?: number;
-                        mediaErrors?: string[];
-                      };
-                      if (!res.ok || !data.ok) {
-                        toast.error(
-                          data.message ||
-                            data.error ||
-                            "Could not delete episode from catalog",
-                          { id: toastId },
-                        );
-                        return;
-                      }
-                      deleteVideo(video.id);
-                      if (data.storageFreed) {
-                        toast.success(
-                          data.message ||
-                            `Episode and video file deleted (${data.filesRemoved ?? 1})`,
-                          { id: toastId },
-                        );
-                      } else if (data.mediaErrors?.length) {
-                        toast.message("Episode removed from catalog", {
-                          id: toastId,
-                          description:
-                            data.mediaErrors[0] ||
-                            "Video file may still be using storage.",
-                        });
-                      } else {
-                        toast.success(
-                          data.message || "Episode deleted",
-                          { id: toastId },
-                        );
-                      }
-                    } catch {
-                      toast.error("Delete request failed", { id: toastId });
-                    }
-                  })();
+                  const confirmed = window.confirm(
+                    `Delete “${video.title}” and free its video storage?`,
+                  );
+                  if (!confirmed) return;
+                  void deleteEpisodes([video]);
                 }}
               >
                 Delete
