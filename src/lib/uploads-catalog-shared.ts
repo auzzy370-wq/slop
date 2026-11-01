@@ -7,7 +7,14 @@ export type UploadsCatalog = {
   updatedAt: string;
   dramas: Drama[];
   videos: Video[];
+  /** Tombstones so Blob rescans / seed merges can't resurrect deleted episodes. */
+  deletedEpisodeKeys?: string[];
+  deletedVideoIds?: string[];
 };
+
+export function episodeKey(dramaId: string, episodeNumber: number) {
+  return `${dramaId}:${episodeNumber}`;
+}
 
 export function emptyUploadsCatalog(): UploadsCatalog {
   return {
@@ -15,6 +22,8 @@ export function emptyUploadsCatalog(): UploadsCatalog {
     updatedAt: new Date().toISOString(),
     dramas: [],
     videos: [],
+    deletedEpisodeKeys: [],
+    deletedVideoIds: [],
   };
 }
 
@@ -24,12 +33,25 @@ export function mergeSeedWithUploads(
   seedDramas: Drama[],
   uploads: UploadsCatalog | null | undefined,
 ): { videos: Video[]; dramas: Drama[] } {
+  const deletedKeys = new Set(uploads?.deletedEpisodeKeys ?? []);
+  const deletedIds = new Set(uploads?.deletedVideoIds ?? []);
+
   if (!uploads || (uploads.videos.length === 0 && uploads.dramas.length === 0)) {
-    return { videos: seedVideos, dramas: seedDramas };
+    if (deletedKeys.size === 0 && deletedIds.size === 0) {
+      return { videos: seedVideos, dramas: seedDramas };
+    }
+    return {
+      videos: seedVideos.filter(
+        (v) =>
+          !deletedIds.has(v.id) &&
+          !deletedKeys.has(episodeKey(v.dramaId, v.episodeNumber)),
+      ),
+      dramas: seedDramas,
+    };
   }
 
   const uploadEpKeys = new Set(
-    uploads.videos.map((v) => `${v.dramaId}:${v.episodeNumber}`),
+    uploads.videos.map((v) => episodeKey(v.dramaId, v.episodeNumber)),
   );
   const uploadVideoIds = new Set(uploads.videos.map((v) => v.id));
 
@@ -37,9 +59,15 @@ export function mergeSeedWithUploads(
     ...seedVideos.filter(
       (v) =>
         !uploadVideoIds.has(v.id) &&
-        !uploadEpKeys.has(`${v.dramaId}:${v.episodeNumber}`),
+        !uploadEpKeys.has(episodeKey(v.dramaId, v.episodeNumber)) &&
+        !deletedIds.has(v.id) &&
+        !deletedKeys.has(episodeKey(v.dramaId, v.episodeNumber)),
     ),
-    ...uploads.videos,
+    ...uploads.videos.filter(
+      (v) =>
+        !deletedIds.has(v.id) &&
+        !deletedKeys.has(episodeKey(v.dramaId, v.episodeNumber)),
+    ),
   ];
 
   const dramaMap = new Map<string, Drama>();
@@ -65,8 +93,13 @@ export function upsertUploadsCatalog(
   const dramaMap = new Map(current.dramas.map((d) => [d.id, d]));
   for (const d of patch.dramas ?? []) dramaMap.set(d.id, d);
 
+  const deletedKeys = new Set(current.deletedEpisodeKeys ?? []);
+  const deletedIds = new Set(current.deletedVideoIds ?? []);
   const videoMap = new Map(current.videos.map((v) => [v.id, v]));
   for (const v of patch.videos ?? []) {
+    // Re-uploading an episode clears its tombstone.
+    deletedKeys.delete(episodeKey(v.dramaId, v.episodeNumber));
+    deletedIds.delete(v.id);
     for (const [id, existing] of [...videoMap.entries()]) {
       if (
         existing.dramaId === v.dramaId &&
@@ -88,5 +121,47 @@ export function upsertUploadsCatalog(
         a.dramaId.localeCompare(b.dramaId) ||
         a.episodeNumber - b.episodeNumber,
     ),
+    deletedEpisodeKeys: [...deletedKeys],
+    deletedVideoIds: [...deletedIds],
+  };
+}
+
+/** Remove an episode from the uploads overlay and tombstone it. */
+export function removeVideoFromUploadsCatalog(
+  current: UploadsCatalog,
+  videoId: string,
+): { catalog: UploadsCatalog; removed: Video | null } {
+  const removed =
+    current.videos.find((v) => v.id === videoId) ?? null;
+  const videos = current.videos.filter((v) => v.id !== videoId);
+  const deletedKeys = new Set(current.deletedEpisodeKeys ?? []);
+  const deletedIds = new Set(current.deletedVideoIds ?? []);
+  deletedIds.add(videoId);
+  if (removed) {
+    deletedKeys.add(episodeKey(removed.dramaId, removed.episodeNumber));
+  }
+
+  const dramas = current.dramas.map((d) => {
+    if (!removed || d.id !== removed.dramaId) return d;
+    const maxEp = videos
+      .filter((v) => v.dramaId === d.id)
+      .reduce((m, v) => Math.max(m, v.episodeNumber), 0);
+    return { ...d, episodeCount: maxEp };
+  });
+
+  return {
+    removed,
+    catalog: {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      dramas,
+      videos: videos.sort(
+        (a, b) =>
+          a.dramaId.localeCompare(b.dramaId) ||
+          a.episodeNumber - b.episodeNumber,
+      ),
+      deletedEpisodeKeys: [...deletedKeys],
+      deletedVideoIds: [...deletedIds],
+    },
   };
 }

@@ -408,8 +408,48 @@ export default function AdminVideosPage() {
                 size="sm"
                 variant="danger"
                 onClick={() => {
-                  deleteVideo(video.id);
-                  toast.success("Episode deleted");
+                  void (async () => {
+                    const toastId = toast.loading("Deleting episode…");
+                    try {
+                      const headers: Record<string, string> = {
+                        "content-type": "application/json",
+                      };
+                      const adminKey =
+                        typeof window !== "undefined"
+                          ? window.localStorage.getItem("slop_admin_key")
+                          : null;
+                      if (adminKey) headers["x-slop-admin-key"] = adminKey;
+
+                      const res = await fetch("/api/admin/videos/delete", {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                          videoId: video.id,
+                          videoUrl: video.videoUrl,
+                          dramaId: video.dramaId,
+                          episodeNumber: video.episodeNumber,
+                        }),
+                      });
+                      const data = (await res.json().catch(() => ({}))) as {
+                        ok?: boolean;
+                        message?: string;
+                        error?: string;
+                      };
+                      if (!res.ok || !data.ok) {
+                        toast.error(
+                          data.message ||
+                            data.error ||
+                            "Could not delete episode from catalog",
+                          { id: toastId },
+                        );
+                        return;
+                      }
+                      deleteVideo(video.id);
+                      toast.success("Episode deleted", { id: toastId });
+                    } catch {
+                      toast.error("Delete request failed", { id: toastId });
+                    }
+                  })();
                 }}
               >
                 Delete

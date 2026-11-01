@@ -3,6 +3,8 @@ import path from "path";
 import type { Drama, Video } from "@/lib/types";
 import {
   emptyUploadsCatalog,
+  episodeKey,
+  removeVideoFromUploadsCatalog,
   UPLOADS_BLOB_PATH,
   upsertUploadsCatalog,
   type UploadsCatalog,
@@ -11,7 +13,9 @@ import { slugify, uid } from "@/lib/utils";
 
 export {
   emptyUploadsCatalog,
+  episodeKey,
   mergeSeedWithUploads,
+  removeVideoFromUploadsCatalog,
   upsertUploadsCatalog,
   UPLOADS_BLOB_PATH,
   type UploadsCatalog,
@@ -160,18 +164,23 @@ export async function rebuildUploadsCatalogFromBlobs(): Promise<{
   // folders from abandoned upload attempts so we don't invent "Uploaded series".
   const knownDramaIds = new Set(current.dramas.map((d) => d.id));
   for (const v of current.videos) knownDramaIds.add(v.dramaId);
+  const deletedKeys = new Set(current.deletedEpisodeKeys ?? []);
+  const deletedIds = new Set(current.deletedVideoIds ?? []);
 
   const synthesized: Video[] = [];
   const now = new Date().toISOString();
 
   for (const hit of latest.values()) {
     if (!knownDramaIds.has(hit.dramaId)) continue;
+    const key = episodeKey(hit.dramaId, hit.episodeNumber);
+    if (deletedKeys.has(key)) continue;
 
     const existing = current.videos.find(
       (v) =>
         v.dramaId === hit.dramaId && v.episodeNumber === hit.episodeNumber,
     );
     if (existing) {
+      if (deletedIds.has(existing.id)) continue;
       if (existing.videoUrl !== hit.url) {
         synthesized.push({ ...existing, videoUrl: hit.url });
       }
@@ -217,15 +226,28 @@ export async function rebuildUploadsCatalogFromBlobs(): Promise<{
 
   const dramas = current.dramas.map((d) => {
     const maxEp = Math.max(
+      0,
       d.episodeCount || 0,
       ...[...latest.values()]
-        .filter((h) => h.dramaId === d.id)
+        .filter(
+          (h) =>
+            h.dramaId === d.id &&
+            !deletedKeys.has(episodeKey(h.dramaId, h.episodeNumber)),
+        )
         .map((h) => h.episodeNumber),
       ...synthesized
         .filter((v) => v.dramaId === d.id)
         .map((v) => v.episodeNumber),
+      ...current.videos
+        .filter(
+          (v) =>
+            v.dramaId === d.id &&
+            !deletedIds.has(v.id) &&
+            !deletedKeys.has(episodeKey(v.dramaId, v.episodeNumber)),
+        )
+        .map((v) => v.episodeNumber),
     );
-    return { ...d, episodeCount: Math.max(d.episodeCount || 0, maxEp) };
+    return { ...d, episodeCount: maxEp };
   });
 
   const catalog = upsertUploadsCatalog(current, {
