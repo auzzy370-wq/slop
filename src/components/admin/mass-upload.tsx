@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { upload } from "@vercel/blob/client";
 import {
   CheckCircle2,
@@ -31,11 +31,28 @@ type UploadRow = RankedUploadFile & {
 };
 
 const NEW_DRAMA = "__new__";
+const ADMIN_KEY_STORAGE = "slop_admin_key";
 
-function adminHeaders(): HeadersInit {
+function adminHeaders(keyOverride?: string): HeadersInit {
   if (typeof window === "undefined") return {};
-  const key = window.localStorage.getItem("slop_admin_key");
+  const key =
+    keyOverride?.trim() ||
+    window.localStorage.getItem(ADMIN_KEY_STORAGE) ||
+    "";
   return key ? { "x-slop-admin-key": key } : {};
+}
+
+function friendlyUploadError(raw: string) {
+  if (/client token|unauthorized|admin key|admin_writes_locked/i.test(raw)) {
+    return "Admin key missing or wrong — paste SLOP_ADMIN_KEY below, then retry.";
+  }
+  if (/blob_not_configured|BLOB_READ_WRITE_TOKEN/i.test(raw)) {
+    return "Cloud storage not configured (BLOB_READ_WRITE_TOKEN).";
+  }
+  if (/use_blob/i.test(raw)) {
+    return "This host needs Vercel Blob for MP4 uploads.";
+  }
+  return raw;
 }
 
 async function readDuration(file: File): Promise<number> {
@@ -60,6 +77,7 @@ async function uploadLocal(
   file: File,
   dramaId: string,
   episodeNumber: number,
+  adminKey?: string,
 ): Promise<string> {
   const body = new FormData();
   body.set("dramaId", dramaId);
@@ -68,12 +86,16 @@ async function uploadLocal(
 
   const res = await fetch("/api/admin/videos/upload", {
     method: "POST",
-    headers: adminHeaders(),
+    headers: adminHeaders(adminKey),
     body,
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    throw new Error(data.message || data.error || "Local upload failed");
+    throw new Error(
+      friendlyUploadError(
+        data.message || data.error || "Local upload failed",
+      ),
+    );
   }
   return data.url as string;
 }
@@ -82,15 +104,21 @@ async function uploadBlob(
   file: File,
   dramaId: string,
   episodeNumber: number,
+  adminKey?: string,
 ): Promise<string> {
   const ep = String(episodeNumber).padStart(2, "0");
   const pathname = `slop/${dramaId}/ep-${ep}-${file.name.replace(/[^\w.\-]+/g, "_")}`;
-  const blob = await upload(pathname, file, {
-    access: "public",
-    handleUploadUrl: "/api/admin/videos/blob",
-    headers: adminHeaders() as Record<string, string>,
-  });
-  return blob.url;
+  try {
+    const blob = await upload(pathname, file, {
+      access: "public",
+      handleUploadUrl: "/api/admin/videos/blob",
+      headers: adminHeaders(adminKey) as Record<string, string>,
+    });
+    return blob.url;
+  } catch (err) {
+    const raw = err instanceof Error ? err.message : String(err);
+    throw new Error(friendlyUploadError(raw));
+  }
 }
 
 export function MassUpload({ dramas }: { dramas: Drama[] }) {
@@ -105,11 +133,67 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
   const [rows, setRows] = useState<UploadRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [preferBlob, setPreferBlob] = useState(true);
+  const [adminKey, setAdminKey] = useState("");
+  const [uploadReady, setUploadReady] = useState<
+    "unknown" | "ready" | "needs-key" | "no-blob"
+  >("unknown");
+  const [readyMessage, setReadyMessage] = useState("");
 
   const [newTitle, setNewTitle] = useState("");
   const [newSynopsis, setNewSynopsis] = useState("");
   const [newGenreIds, setNewGenreIds] = useState<string[]>([]);
   const [newPosterUrl, setNewPosterUrl] = useState("");
+
+  useEffect(() => {
+    const saved = window.localStorage.getItem(ADMIN_KEY_STORAGE) ?? "";
+    setAdminKey(saved);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const probe = async () => {
+      try {
+        const res = await fetch("/api/admin/videos/upload-status", {
+          headers: adminHeaders(adminKey),
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        if (!res.ok) {
+          setUploadReady("needs-key");
+          setReadyMessage(
+            data.message ||
+              "Paste SLOP_ADMIN_KEY to unlock cloud uploads on this deploy.",
+          );
+          return;
+        }
+        if (!data.blobConfigured) {
+          setUploadReady("no-blob");
+          setReadyMessage(data.message || "Blob storage is not configured.");
+          return;
+        }
+        setUploadReady("ready");
+        setReadyMessage(data.message || "Ready for cloud mass upload");
+      } catch {
+        if (!cancelled) {
+          setUploadReady("unknown");
+          setReadyMessage("Could not check upload status.");
+        }
+      }
+    };
+    void probe();
+    return () => {
+      cancelled = true;
+    };
+  }, [adminKey]);
+
+  const persistAdminKey = (value: string) => {
+    setAdminKey(value);
+    if (value.trim()) {
+      window.localStorage.setItem(ADMIN_KEY_STORAGE, value.trim());
+    } else {
+      window.localStorage.removeItem(ADMIN_KEY_STORAGE);
+    }
+  };
 
   const creatingNew = dramaId === NEW_DRAMA;
   const existingDrama = creatingNew
@@ -230,28 +314,36 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       patchRow(i, { status: "uploading", progress: 8, error: undefined });
       try {
         let url: string;
-        if (preferBlob) {
+        if (preferBlob && uploadReady !== "no-blob") {
           try {
-            url = await uploadBlob(row.file, drama.id, row.episodeNumber);
+            url = await uploadBlob(
+              row.file,
+              drama.id,
+              row.episodeNumber,
+              adminKey,
+            );
           } catch (blobErr) {
             const msg =
               blobErr instanceof Error ? blobErr.message : String(blobErr);
-            if (
-              /blob_not_configured|BLOB_READ_WRITE_TOKEN|not configured/i.test(
-                msg,
-              )
-            ) {
-              url = await uploadLocal(row.file, drama.id, row.episodeNumber);
+            // Only fall back to local disk when Blob truly isn't configured.
+            if (/Blob storage not configured|BLOB_READ_WRITE_TOKEN|not configured/i.test(msg)) {
+              url = await uploadLocal(
+                row.file,
+                drama.id,
+                row.episodeNumber,
+                adminKey,
+              );
             } else {
-              try {
-                url = await uploadLocal(row.file, drama.id, row.episodeNumber);
-              } catch {
-                throw blobErr;
-              }
+              throw blobErr;
             }
           }
         } else {
-          url = await uploadLocal(row.file, drama.id, row.episodeNumber);
+          url = await uploadLocal(
+            row.file,
+            drama.id,
+            row.episodeNumber,
+            adminKey,
+          );
         }
 
         patchRow(i, { progress: 70 });
@@ -357,6 +449,32 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           Admin only
         </span>
       </div>
+
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/45">
+          Admin upload key
+        </span>
+        <Input
+          type="password"
+          autoComplete="off"
+          placeholder="Paste SLOP_ADMIN_KEY (required on Vercel)"
+          value={adminKey}
+          onChange={(e) => persistAdminKey(e.target.value)}
+          disabled={busy}
+        />
+        <p
+          className={`text-xs ${
+            uploadReady === "ready"
+              ? "text-emerald-400/90"
+              : uploadReady === "needs-key" || uploadReady === "no-blob"
+                ? "text-amber-300/90"
+                : "text-white/40"
+          }`}
+        >
+          {readyMessage ||
+            "Cloud uploads need this key on the public deploy."}
+        </p>
+      </label>
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm">

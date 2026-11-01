@@ -8,7 +8,18 @@ import { requireAdminKey } from "@/lib/admin-guard";
  */
 export async function POST(request: Request) {
   const denied = requireAdminKey(request);
-  if (denied) return denied;
+  if (denied) {
+    // Blob client surfaces a generic "Failed to retrieve the client token"
+    // when this route rejects — make the body explicit for debugging.
+    return NextResponse.json(
+      {
+        error: "unauthorized",
+        message:
+          "Admin key missing or wrong. Paste SLOP_ADMIN_KEY into Mass upload, then retry.",
+      },
+      { status: 401 },
+    );
+  }
 
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
     return NextResponse.json(
