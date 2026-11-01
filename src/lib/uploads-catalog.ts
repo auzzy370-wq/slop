@@ -22,6 +22,7 @@ export {
   emptyUploadsCatalog,
   episodeKey,
   mergeSeedWithUploads,
+  removeDramaFromUploadsCatalog,
   removeVideoFromUploadsCatalog,
   upsertUploadsCatalog,
   UPLOADS_BLOB_PATH,

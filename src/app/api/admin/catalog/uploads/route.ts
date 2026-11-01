@@ -4,34 +4,77 @@ import type { Drama, Video } from "@/lib/types";
 import {
   loadUploadsCatalog,
   rebuildUploadsCatalogFromBlobs,
+  removeDramaFromUploadsCatalog,
   saveUploadsCatalog,
   upsertUploadsCatalog,
 } from "@/lib/uploads-catalog";
 
 /**
  * Persist admin mass-upload metadata so episodes survive refresh / new devices.
- * MP4 bytes live in Blob (or /public/uploads); this stores the catalog overlay.
+ * MP4 bytes live in Blob/R2 (or /public/uploads); this stores the catalog overlay.
  *
- * Body `{ rebuildFromBlobs: true }` rescans Blob MP4s and fills catalog gaps
- * (used when a mass upload lost episodes to stale catalog overwrites).
+ * Body `{ rebuildFromBlobs: true }` rescans Blob MP4s and fills catalog gaps.
+ * Body `{ action: "removeSeries", dramaId }` unpublishes by deleting the series
+ * from the catalog (tombstones episodes; storage files are kept).
  */
 export async function POST(request: Request) {
   const denied = requireAdminKey(request);
   if (denied) return denied;
 
   let body: {
+    action?: string;
+    dramaId?: string;
     dramas?: Drama[];
     videos?: Video[];
     rebuildFromBlobs?: boolean;
   };
   try {
     body = (await request.json()) as {
+      action?: string;
+      dramaId?: string;
       dramas?: Drama[];
       videos?: Video[];
       rebuildFromBlobs?: boolean;
     };
   } catch {
     return NextResponse.json({ error: "invalid_json" }, { status: 400 });
+  }
+
+  if (body.action === "removeSeries") {
+    const dramaId = body.dramaId?.trim();
+    if (!dramaId) {
+      return NextResponse.json(
+        { error: "missing_drama", message: "dramaId is required" },
+        { status: 400 },
+      );
+    }
+    try {
+      const current = await loadUploadsCatalog();
+      const result = removeDramaFromUploadsCatalog(current, dramaId);
+      await saveUploadsCatalog(result.catalog);
+      return NextResponse.json({
+        ok: true,
+        removed: true,
+        dramaId,
+        removedDramaTitle: result.removedDrama?.title ?? null,
+        removedEpisodes: result.removedVideos.length,
+        dramaCount: result.catalog.dramas.length,
+        videoCount: result.catalog.videos.length,
+        updatedAt: result.catalog.updatedAt,
+        message:
+          result.removedVideos.length > 0 || result.removedDrama
+            ? `Removed “${result.removedDrama?.title || dramaId}” and ${result.removedVideos.length} episode${result.removedVideos.length === 1 ? "" : "s"} from the catalog.`
+            : "Series was not in the uploads catalog.",
+      });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error: "remove_series_failed",
+          message: err instanceof Error ? err.message : "Remove failed",
+        },
+        { status: 500 },
+      );
+    }
   }
 
   if (body.rebuildFromBlobs) {

@@ -165,3 +165,46 @@ export function removeVideoFromUploadsCatalog(
     },
   };
 }
+
+/**
+ * Remove an entire series from the uploads catalog and tombstone every episode
+ * so Blob/R2 rescans can't resurrect it. MP4 files are left in storage.
+ */
+export function removeDramaFromUploadsCatalog(
+  current: UploadsCatalog,
+  dramaId: string,
+): {
+  catalog: UploadsCatalog;
+  removedDrama: Drama | null;
+  removedVideos: Video[];
+} {
+  const removedDrama =
+    current.dramas.find((d) => d.id === dramaId) ?? null;
+  const removedVideos = current.videos.filter((v) => v.dramaId === dramaId);
+  const deletedKeys = new Set(current.deletedEpisodeKeys ?? []);
+  const deletedIds = new Set(current.deletedVideoIds ?? []);
+
+  for (const v of removedVideos) {
+    deletedIds.add(v.id);
+    deletedKeys.add(episodeKey(v.dramaId, v.episodeNumber));
+  }
+
+  return {
+    removedDrama,
+    removedVideos,
+    catalog: {
+      version: 1,
+      updatedAt: new Date().toISOString(),
+      dramas: current.dramas.filter((d) => d.id !== dramaId),
+      videos: current.videos
+        .filter((v) => v.dramaId !== dramaId)
+        .sort(
+          (a, b) =>
+            a.dramaId.localeCompare(b.dramaId) ||
+            a.episodeNumber - b.episodeNumber,
+        ),
+      deletedEpisodeKeys: [...deletedKeys],
+      deletedVideoIds: [...deletedIds],
+    },
+  };
+}

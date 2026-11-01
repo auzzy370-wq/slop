@@ -221,14 +221,14 @@ export default function VideosClient() {
       const publishing = nextStatus === "published";
       const confirmed = window.confirm(
         publishing
-          ? `Publish “${drama.title}” and all ${eps.length} episode${eps.length === 1 ? "" : "s"}?`
-          : `Unpublish “${drama.title}” and all ${eps.length} episode${eps.length === 1 ? "" : "s"}? It will disappear from the public site and the server catalog will be updated.`,
+          ? `Publish “${drama.title}” and all ${eps.length} episode${eps.length === 1 ? "" : "s"}? This restores them in the server catalog.`
+          : `Unpublish “${drama.title}” and remove it from the server catalog (${eps.length} episode${eps.length === 1 ? "" : "s"})? It will leave Home / Explore / Watch. Video files stay in storage; Publish series can restore the catalog entries.`,
       );
       if (!confirmed) return;
 
       setSeriesBusyId(dramaId);
       const toastId = toast.loading(
-        publishing ? "Publishing series…" : "Unpublishing series…",
+        publishing ? "Publishing series…" : "Removing series from catalog…",
       );
       const now = new Date().toISOString();
       const nextDrama = {
@@ -245,16 +245,42 @@ export default function VideosClient() {
       try {
         upsertDrama(nextDrama);
         for (const v of nextVideos) upsertVideo(v);
-        await persistCatalogOverlay({
-          dramas: [nextDrama],
-          videos: nextVideos,
-        });
-        toast.success(
-          publishing
-            ? `Published “${drama.title}” (${eps.length} episodes) — catalog updated`
-            : `Unpublished “${drama.title}” (${eps.length} episodes) — removed from public catalog`,
-          { id: toastId },
-        );
+
+        if (publishing) {
+          await persistCatalogOverlay({
+            dramas: [nextDrama],
+            videos: nextVideos,
+          });
+          toast.success(
+            `Published “${drama.title}” (${eps.length} episodes) — catalog restored`,
+            { id: toastId },
+          );
+        } else {
+          const res = await fetch("/api/admin/catalog/uploads", {
+            method: "POST",
+            headers: adminHeaders(),
+            body: JSON.stringify({
+              action: "removeSeries",
+              dramaId,
+            }),
+          });
+          const data = (await res.json().catch(() => ({}))) as {
+            ok?: boolean;
+            message?: string;
+            error?: string;
+            removedEpisodes?: number;
+          };
+          if (!res.ok || data.ok === false) {
+            throw new Error(
+              data.message || data.error || "Failed to remove series from catalog",
+            );
+          }
+          toast.success(
+            data.message ||
+              `Unpublished “${drama.title}” and removed ${data.removedEpisodes ?? eps.length} episodes from the catalog`,
+            { id: toastId },
+          );
+        }
       } catch (err) {
         toast.error(
           err instanceof Error ? err.message : "Series update failed",
@@ -1139,8 +1165,10 @@ export default function VideosClient() {
         <div>
           <h2 className="font-semibold">Series publish controls</h2>
           <p className="mt-0.5 text-xs text-white/45">
-            Publish or unpublish an entire show at once. Unpublish updates the
-            server catalog so the series leaves Home, Explore, and Watch.
+            Publish or unpublish an entire show at once. Unpublish removes the
+            series from the server catalog (public site) and tombstones
+            episodes so they don’t come back from storage scans. Files stay in
+            R2/Blob; Publish series writes the catalog back.
           </p>
         </div>
         {seriesRows.length === 0 ? (
