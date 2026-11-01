@@ -63,6 +63,7 @@ export function VideoFeed({
   const rafDragRef = useRef(0);
   const pendingYRef = useRef<number | null>(null);
   const startedRef = useRef(false);
+  const lastVideoIdRef = useRef<string | null>(null);
   const animTimerRef = useRef<number | null>(null);
 
   const savedIds = useMemo(
@@ -110,16 +111,15 @@ export function VideoFeed({
     const parent = el?.parentElement;
     const fromParent = parent?.clientHeight ?? 0;
     const fromSelf = el?.clientHeight ?? 0;
-    const fromVv = window.visualViewport?.height ?? 0;
-    // Take the largest candidate so a short svh parent can't leave a
-    // black band under the slide when the browser chrome collapses.
+    // Prefer the stage/parent height so every reel (and ad break) matches the
+    // visible frame. Max-ing with window.innerHeight made slides shorter than
+    // the viewport and showed two reels at once around ads.
     const h = Math.round(
-      Math.max(
-        fromParent > 40 ? fromParent : 0,
-        fromSelf > 40 ? fromSelf : 0,
-        fromVv,
-        window.innerHeight || 0,
-      ) || 1,
+      (fromParent > 40 ? fromParent : 0) ||
+        (fromSelf > 40 ? fromSelf : 0) ||
+        window.visualViewport?.height ||
+        window.innerHeight ||
+        1,
     );
     pageHRef.current = h;
     // Avoid redundant setState — ResizeObserver + height writes can otherwise
@@ -167,12 +167,21 @@ export function VideoFeed({
     [applyTransform, measure],
   );
 
-  // Initial measure + start episode (once hydrated / when start id changes)
+  // Remember the episode under the active index so ad inserts can't desync paging.
+  useEffect(() => {
+    const item = items[activeIndex];
+    if (item?.kind === "video") lastVideoIdRef.current = item.videoId;
+  }, [items, activeIndex]);
+
+  // Initial measure + start episode (once hydrated / when start id changes).
+  // When ads inject and items.length changes, re-anchor on the last video —
+  // never jump back to startVideoId mid-session (that broke reels after ads).
   useEffect(() => {
     if (!hydrated || items.length === 0) return;
     measure();
     let start = indexRef.current;
-    if (!startedRef.current || startVideoId) {
+
+    if (!startedRef.current) {
       start = 0;
       if (startVideoId) {
         const idx = items.findIndex(
@@ -181,9 +190,17 @@ export function VideoFeed({
         if (idx >= 0) start = idx;
       }
       startedRef.current = true;
+    } else {
+      const prefer = lastVideoIdRef.current;
+      if (prefer) {
+        const idx = items.findIndex(
+          (item) => item.kind === "video" && item.videoId === prefer,
+        );
+        if (idx >= 0) start = idx;
+      }
+      start = Math.max(0, Math.min(items.length - 1, start));
     }
-    // Clamp if feed shrank
-    start = Math.max(0, Math.min(items.length - 1, start));
+
     indexRef.current = start;
     setActiveIndex(start);
     requestAnimationFrame(() => goTo(start, false));
@@ -444,8 +461,13 @@ export function VideoFeed({
                 key={item.key}
                 className="slop-feed-slide"
                 data-index={index}
+                data-kind="ad"
               >
-                <AdSlot index={index} />
+                {near ? (
+                  <AdSlot index={index} />
+                ) : (
+                  <div className="absolute inset-0 bg-[#111116]" aria-hidden />
+                )}
               </section>
             );
           }
@@ -455,6 +477,7 @@ export function VideoFeed({
               key={video.id}
               className="slop-feed-slide"
               data-index={index}
+              data-kind="video"
             >
               {near ? (
                 <VideoCard

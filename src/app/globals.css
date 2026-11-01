@@ -149,7 +149,10 @@ a {
   max-height: var(--slop-feed-page, 100%);
   overflow: hidden;
   background: #000;
-  contain: layout style paint;
+  /* Avoid "paint" containment so video layers stay correct, but keep size
+     locked so AdSense iframes can't stretch a slide and desync the pager. */
+  contain: layout style;
+  flex: none;
 }
 
 .slop-feed-video {
