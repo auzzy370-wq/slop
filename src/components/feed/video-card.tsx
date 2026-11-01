@@ -211,8 +211,17 @@ export function VideoCard({
         const node = videoRef.current;
         if (!node) return;
         void node.play().catch(() => {
+          // Some browsers block unmuted autoplay — retry briefly, then
+          // start muted only as a last resort so playback still begins.
           window.setTimeout(() => {
-            void videoRef.current?.play().catch(() => {});
+            const retry = videoRef.current;
+            if (!retry) return;
+            void retry.play().catch(() => {
+              if (!retry.muted) {
+                retry.muted = true;
+                void retry.play().catch(() => {});
+              }
+            });
           }, 200);
         });
       };

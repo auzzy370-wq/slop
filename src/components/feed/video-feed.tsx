@@ -41,7 +41,7 @@ export function VideoFeed({
   const hydrated = useSlopStore((s) => s.hydrated);
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [muted, setMuted] = useState(true);
+  const [muted, setMuted] = useState(false);
   const [pageH, setPageH] = useState(0);
 
   const viewportRef = useRef<HTMLDivElement>(null);

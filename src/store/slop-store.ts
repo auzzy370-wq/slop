@@ -139,7 +139,7 @@ export const useSlopStore = create<SlopState>()(
           isPremium: false,
           premiumBadge: false,
           createdAt: new Date().toISOString(),
-          preferences: { autoplay: true, defaultMuted: true },
+          preferences: { autoplay: true, defaultMuted: false },
         };
         set({ currentUser: profile, subscription: null });
       },

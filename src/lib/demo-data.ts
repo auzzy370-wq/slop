@@ -132,7 +132,7 @@ export const DEMO_USER_PROFILE: Profile = {
   isPremium: false,
   premiumBadge: false,
   createdAt: "2026-10-01T00:00:00.000Z",
-  preferences: { autoplay: true, defaultMuted: true },
+  preferences: { autoplay: true, defaultMuted: false },
 };
 
 export const DEFAULT_SETTINGS: PlatformSettings = {
