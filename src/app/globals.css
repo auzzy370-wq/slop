@@ -28,6 +28,8 @@
 html,
 body {
   height: 100%;
+  min-height: 100svh;
+  min-height: 100dvh;
 }
 
 body {
@@ -78,11 +80,14 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Full-bleed mobile shell; desktop stages the player as a phone frame */
+/* Full-bleed mobile shell; desktop stages the player as a phone frame.
+   Prefer 100dvh so collapsing mobile browser chrome doesn't leave a
+   black dead band under the player (100svh alone stays short). */
 .slop-watch-shell {
   position: relative;
-  min-height: 100dvh;
+  height: 100%;
   min-height: 100svh;
+  min-height: 100dvh;
   background: #000;
   overflow: hidden;
 }
@@ -230,16 +235,15 @@ a {
 /* Watch player — TikTok rail + cinematic drama accents */
 .slop-player-vignette {
   background:
-    linear-gradient(180deg, rgba(17, 17, 22, 0.62) 0%, transparent 16%),
-    /* Heavy bottom curtain — masks burned-in episode captions behind chrome */
+    linear-gradient(180deg, rgba(17, 17, 22, 0.5) 0%, transparent 12%),
+    /* Short bottom wash for scrubber readability — not a black curtain */
     linear-gradient(
       0deg,
-      rgba(17, 17, 22, 0.97) 0%,
-      rgba(17, 17, 22, 0.88) 14%,
-      rgba(17, 17, 22, 0.55) 28%,
-      transparent 46%
+      rgba(17, 17, 22, 0.7) 0%,
+      rgba(17, 17, 22, 0.28) 7%,
+      transparent 16%
     ),
-    radial-gradient(100% 50% at 50% 100%, rgba(185, 154, 255, 0.1), transparent 55%);
+    radial-gradient(100% 28% at 50% 100%, rgba(185, 154, 255, 0.06), transparent 55%);
 }
 
 .slop-player-grain {
@@ -281,20 +285,28 @@ a {
 .slop-caption {
   transform-origin: bottom left;
   transition:
-    opacity 320ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+    opacity 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    max-height 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .slop-caption.is-visible {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+  max-height: 12rem;
 }
 
 .slop-caption.is-hidden {
   opacity: 0;
-  transform: translateY(12px);
+  transform: translateY(6px);
   pointer-events: none;
+  /* Collapse so hidden titles don't leave a dead zone above the scrubber */
+  max-height: 0;
+  margin: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  overflow: hidden;
 }
 
 .slop-player-ep-ghost {

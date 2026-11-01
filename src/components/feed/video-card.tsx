@@ -706,8 +706,8 @@ export function VideoCard({
 
       {/* Instagram Reels–style right action rail */}
       <div
-        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-4.5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-5 ${
-          chromeVisible ? "bottom-[8.5rem]" : "bottom-[3.25rem]"
+        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-3.5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-4 ${
+          chromeVisible ? "bottom-[5.75rem]" : "bottom-[3.75rem]"
         }`}
       >
         <RailButton
@@ -782,8 +782,8 @@ export function VideoCard({
         </RailButton>
       </div>
 
-      {/* Bottom caption + film scrub — leaves room for the rail */}
-      <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.35rem,env(safe-area-inset-bottom))]">
+      {/* Bottom caption + film scrub — flush to the home indicator */}
+      <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))]">
         <div
           key={active ? video.id : "idle"}
           className={`slop-caption relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
@@ -793,7 +793,7 @@ export function VideoCard({
         >
           <div
             aria-hidden
-            className="slop-player-ep-ghost pointer-events-none absolute -top-10 left-0 text-[5.5rem] opacity-80 sm:text-[7rem]"
+            className="slop-player-ep-ghost pointer-events-none absolute -top-8 left-0 text-[4.5rem] opacity-80 sm:text-[6rem]"
           >
             {epLabel}
           </div>
@@ -810,16 +810,16 @@ export function VideoCard({
               </span>
             ) : null}
           </div>
-          <h2 className="relative mt-1.5 max-w-[100%] font-display text-[1.45rem] font-bold leading-[1.05] tracking-tight text-white sm:text-[1.75rem]">
+          <h2 className="relative mt-1 max-w-[100%] font-display text-[1.25rem] font-bold leading-[1.05] tracking-tight text-white sm:text-[1.5rem]">
             {video.title}
           </h2>
-          <p className="relative mt-1.5 line-clamp-2 text-[13px] leading-snug text-white/70">
+          <p className="relative mt-1 line-clamp-2 text-[12px] leading-snug text-white/70">
             {video.description}
           </p>
         </div>
 
-        <div className={`mt-3 px-3 sm:px-4 ${scrubbing ? "slop-scrubbing" : ""}`}>
-          <div className="mb-1 flex items-center justify-between font-display text-[10px] font-semibold tabular-nums tracking-wide text-white/45">
+        <div className={`mt-1 px-3 sm:px-4 ${scrubbing ? "slop-scrubbing" : ""}`}>
+          <div className="mb-0.5 flex items-center justify-between font-display text-[10px] font-semibold tabular-nums tracking-wide text-white/45">
             <span className="text-[var(--slop-lavender)]">
               {formatTime(progress * (duration || 0))}
             </span>
@@ -833,7 +833,7 @@ export function VideoCard({
             aria-valuemax={100}
             aria-valuenow={Math.round(progress * 100)}
             tabIndex={0}
-            className="relative flex h-9 cursor-pointer touch-none items-center"
+            className="relative flex h-5 cursor-pointer touch-none items-center"
             data-no-swipe
             onPointerDown={onScrubPointerDown}
             onPointerMove={onScrubPointerMove}
@@ -866,9 +866,9 @@ export function VideoCard({
             </div>
           </div>
 
-          {/* Episode picker + speed — mirrors short-drama player chrome */}
+          {/* Episode picker + speed — flush to bottom */}
           <div
-            className="mt-2 flex items-center gap-2 pb-1"
+            className="mt-1 flex items-center gap-2"
             data-no-swipe
           >
             <button
@@ -877,7 +877,7 @@ export function VideoCard({
                 revealChrome();
                 setEpisodesOpen(true);
               }}
-              className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60"
+              className="inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60"
               aria-label="Choose episode"
             >
               <Clapperboard className="h-3.5 w-3.5 shrink-0 text-[var(--slop-violet)]" />
@@ -901,7 +901,7 @@ export function VideoCard({
                     duration: 1200,
                   });
                 }}
-                className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-3.5 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
+                className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-3 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
                 aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
               >
                 {formatSpeed(speed)}

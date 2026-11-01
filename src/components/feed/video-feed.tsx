@@ -111,12 +111,15 @@ export function VideoFeed({
     const fromParent = parent?.clientHeight ?? 0;
     const fromSelf = el?.clientHeight ?? 0;
     const fromVv = window.visualViewport?.height ?? 0;
+    // Take the largest candidate so a short svh parent can't leave a
+    // black band under the slide when the browser chrome collapses.
     const h = Math.round(
-      (fromParent > 40 ? fromParent : 0) ||
-        (fromSelf > 40 ? fromSelf : 0) ||
-        fromVv ||
-        window.innerHeight ||
-        1,
+      Math.max(
+        fromParent > 40 ? fromParent : 0,
+        fromSelf > 40 ? fromSelf : 0,
+        fromVv,
+        window.innerHeight || 0,
+      ) || 1,
     );
     pageHRef.current = h;
     setPageH(h);
