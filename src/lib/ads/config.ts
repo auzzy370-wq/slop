@@ -25,8 +25,10 @@ function normalizeProvider(raw: string | undefined): AdsProvider {
 export function getAdsPublicConfig(): AdsPublicConfig {
   const provider = normalizeProvider(process.env.NEXT_PUBLIC_ADS_PROVIDER);
   const clientId =
-    process.env.NEXT_PUBLIC_ADS_CLIENT_ID?.trim().replace(/^ca-pub-/i, "") ||
-      null;
+    (
+      process.env.NEXT_PUBLIC_ADS_CLIENT_ID?.trim() ||
+      "ca-pub-5591745880216042"
+    ).replace(/^ca-pub-/i, "") || null;
   const feedSlotId =
     process.env.NEXT_PUBLIC_ADS_SLOT_FEED?.trim() ||
     process.env.NEXT_PUBLIC_ADS_SLOT_ID?.trim() ||
