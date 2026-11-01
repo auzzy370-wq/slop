@@ -1,9 +1,6 @@
 import { NextResponse } from "next/server";
 import { isVercelBlobUrl } from "@/lib/media-url";
 
-export const runtime = "nodejs";
-export const maxDuration = 60;
-
 /**
  * Authenticated Vercel Blob proxy.
  * Keeps existing episode playback working when the public Blob CDN is
