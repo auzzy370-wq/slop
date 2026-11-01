@@ -1,6 +1,47 @@
 import type { Comment, Drama, Like, SavedVideo, Video } from "@/lib/types";
 import { DEMO_DRAMAS, DEMO_VIDEOS } from "@/lib/demo-data";
 
+/**
+ * Live chart score from real watches/socials — not hardcoded trendingRank.
+ * Seed originals with a vanity rank but zero traffic lose to uploaded hits.
+ */
+export function scoreDramaChart(drama: Drama, videos: Video[]): number {
+  const eps = videos.filter(
+    (v) => v.dramaId === drama.id && v.status === "published",
+  );
+  const views =
+    drama.viewCount ||
+    eps.reduce((sum, v) => sum + (v.viewCount ?? 0), 0);
+  const likes =
+    drama.likeCount ||
+    eps.reduce((sum, v) => sum + (v.likeCount ?? 0), 0);
+  const comments = eps.reduce((sum, v) => sum + (v.commentCount ?? 0), 0);
+  const saves = eps.reduce((sum, v) => sum + (v.saveCount ?? 0), 0);
+  return (
+    views * 1 +
+    likes * 25 +
+    comments * 40 +
+    saves * 20 +
+    // Tiny volume signal so a watched long series edges an idle short one.
+    eps.length * 0.05
+  );
+}
+
+export function sortDramasByChart(
+  dramas: Drama[],
+  videos: Video[],
+): Drama[] {
+  return [...dramas].sort((a, b) => {
+    const scoreDiff = scoreDramaChart(b, videos) - scoreDramaChart(a, videos);
+    if (scoreDiff !== 0) return scoreDiff;
+    // Tie-break only when both have no real engagement.
+    const rankA = a.trendingRank ?? 999;
+    const rankB = b.trendingRank ?? 999;
+    if (rankA !== rankB) return rankA - rankB;
+    return (b.viewCount ?? 0) - (a.viewCount ?? 0);
+  });
+}
+
 /** Derive public counters only from real interaction rows — never seed fakes. */
 export function applyEngagementCounts(
   videos: Video[],

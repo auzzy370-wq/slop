@@ -9,6 +9,7 @@ import {
   genreCount,
   genreCover,
 } from "@/components/browse/genre-tile";
+import { sortDramasByChart } from "@/lib/engagement";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
 import type { Drama } from "@/lib/types";
@@ -30,13 +31,15 @@ export function HomeBrowse() {
   }
 
   const published = dramas.filter((d) => d.status === "published");
+  // Hero: prefer the live chart leader so a watched upload can take the top slot
+  // over a hardcoded featured seed with no traffic.
+  const chart = sortDramasByChart(published, videos);
   const featured =
+    chart[0] ??
     published.filter((d) => settings.featuredDramaIds.includes(d.id))[0] ??
     published.find((d) => d.featured) ??
     published[0];
-  const trending = [...published]
-    .sort((a, b) => (a.trendingRank ?? 99) - (b.trendingRank ?? 99))
-    .slice(0, 8);
+  const trending = chart.slice(0, 8);
   const newest = [...published].sort(
     (a, b) =>
       new Date(b.publishedAt ?? b.createdAt).getTime() -

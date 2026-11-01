@@ -10,6 +10,7 @@ import {
   genreCount,
   genreCover,
 } from "@/components/browse/genre-tile";
+import { sortDramasByChart } from "@/lib/engagement";
 import { useSlopStore } from "@/store/slop-store";
 
 function ExploreInner() {
@@ -17,6 +18,7 @@ function ExploreInner() {
   const sort = params.get("sort") ?? "trending";
   const categories = useSlopStore((s) => s.categories);
   const dramas = useSlopStore((s) => s.dramas);
+  const videos = useSlopStore((s) => s.videos);
 
   const published = useMemo(() => {
     const list = dramas.filter((d) => d.status === "published");
@@ -27,10 +29,8 @@ function ExploreInner() {
           new Date(a.publishedAt ?? a.createdAt).getTime(),
       );
     }
-    return [...list].sort(
-      (a, b) => (a.trendingRank ?? 99) - (b.trendingRank ?? 99),
-    );
-  }, [dramas, sort]);
+    return sortDramasByChart(list, videos);
+  }, [dramas, videos, sort]);
 
   const activeCats = categories
     .filter((c) => c.active)
