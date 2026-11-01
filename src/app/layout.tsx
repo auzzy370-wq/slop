@@ -8,6 +8,7 @@ import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { PwaRegister } from "@/components/pwa-register";
 import { StoreHygiene } from "@/components/store-hygiene";
 import { UploadsHydrator } from "@/components/uploads-hydrator";
+import { UploadProgressDock } from "@/components/admin/upload-progress-dock";
 import "./globals.css";
 
 export const instant = false;
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
             <DesktopNav />
             <main className="min-h-full flex-1">{children}</main>
             <BottomNav />
+            <UploadProgressDock />
           </AnalyticsProvider>
         </Suspense>
         <Toaster
