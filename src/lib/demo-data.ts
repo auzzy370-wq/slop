@@ -8,10 +8,6 @@ import type {
   Video,
 } from "./types";
 import {
-  FORGOTTEN_WIFE_DRAMA,
-  FORGOTTEN_WIFE_VIDEOS,
-} from "./series/forgotten-wife/catalog";
-import {
   ORIGINAL_DRAMAS,
   ORIGINAL_VIDEOS,
 } from "./series/originals/catalog";
@@ -105,13 +101,9 @@ function ep(
 }
 
 /** All SLOP Original generated dramas — see docs/CONTENT_SOURCES.md */
-export const DEMO_DRAMAS: Drama[] = [
-  FORGOTTEN_WIFE_DRAMA,
-  ...ORIGINAL_DRAMAS,
-];
+export const DEMO_DRAMAS: Drama[] = [...ORIGINAL_DRAMAS];
 
 export const DEMO_VIDEOS: Video[] = [
-  ...FORGOTTEN_WIFE_VIDEOS.map((v) => ep(v)),
   ...ORIGINAL_VIDEOS.map((v) => ep(v)),
 ];
 
@@ -154,13 +146,11 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   premiumPriceLabel: "$7.99/mo",
   premiumMonthlyPriceCents: 799,
   featuredVideoIds: [
-    "ep_bfw_01",
     "ep_blood_contract_01",
     "ep_crown_of_ash_01",
     "ep_apartment_7_01",
   ],
   featuredDramaIds: [
-    "drm_forgotten_wife",
     "drm_blood_contract",
     "drm_crown_of_ash",
     "drm_apartment_7",

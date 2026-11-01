@@ -44,7 +44,6 @@ import {
   syncToggleLike,
 } from "@/lib/social/engagement-client";
 import { requestEngagementRefresh } from "@/components/social-hydrator";
-import { getForgottenWifeScript } from "@/lib/series/forgotten-wife/scripts";
 import { getOriginalScript } from "@/lib/series/originals/catalog";
 
 interface VideoCardProps {
@@ -70,9 +69,6 @@ export function VideoCard({
   const isScripted = video.playback === "scripted";
   const script = (() => {
     if (!isScripted || !video.scriptSeriesId) return undefined;
-    if (video.scriptSeriesId === "forgotten-wife") {
-      return getForgottenWifeScript(video.episodeNumber);
-    }
     return getOriginalScript(video.scriptSeriesId, video.episodeNumber);
   })();
   const [progress, setProgress] = useState(0);

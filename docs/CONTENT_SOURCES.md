@@ -2,13 +2,12 @@
 
 All catalog titles are **SLOP Originals** — generated vertical episodes with AI scene stills, neural TTS dialogue, and burned-in subtitles.
 
-**30 series / 190 episodes** in the live catalog.
+**29 series / 130 episodes** in the live catalog (plus uploaded series).
 
-## Flagship + Batch 1
+## Batch 1
 
 | Drama | Theme | Episodes | Notes |
 | --- | --- | --- | --- |
-| **The Billionaire's Forgotten Wife** | Romance / Revenge / Suspense | 60 | Flagship. Sophia vs Alexander Sterling. |
 | **Blood Contract** | Revenge / Drama | 8 | Ava's secret marriage clause. |
 | **Crown of Ash** | Fantasy / Romance | 8 | Cursed princess + immune prince. |
 | **Apartment 7** | Thriller / Suspense | 6 | Smart apartment that predicts murder. |
