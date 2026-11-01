@@ -300,22 +300,13 @@ async function processQueue() {
               msg,
             )
           ) {
-            // Prefer R2 when Blob is dead, else local (dev only).
-            try {
-              url = await uploadR2(
-                job.file,
-                drama.id,
-                job.episodeNumber,
-                batch.adminKey,
-              );
-            } catch {
-              url = await uploadLocal(
-                job.file,
-                drama.id,
-                job.episodeNumber,
-                batch.adminKey,
-              );
-            }
+            // Never fall back to local on Vercel — force R2 so reuploads land on Cloudflare.
+            url = await uploadR2(
+              job.file,
+              drama.id,
+              job.episodeNumber,
+              batch.adminKey,
+            );
           } else {
             throw blobErr;
           }

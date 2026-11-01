@@ -277,16 +277,21 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
     const drama = resolveDrama();
     if (!drama) return;
 
+    // Always prefer R2 for production reuploads — Blob is suspended on Hobby.
+    const target: CloudTarget =
+      preferredCloud === "r2" || cloudTarget === "r2"
+        ? "r2"
+        : preferredCloud === "blob" && cloudTarget === "blob"
+          ? "blob"
+          : cloudTarget === "local"
+            ? "local"
+            : "r2";
+
     const result = enqueueMassUpload({
       drama,
       publishStatus: status,
       adminKey,
-      cloudTarget:
-        uploadReady === "ready"
-          ? cloudTarget
-          : preferredCloud === "blob"
-            ? "blob"
-            : "r2",
+      cloudTarget: target,
       files: picked,
     });
 
