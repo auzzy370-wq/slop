@@ -10,6 +10,7 @@ import { StoreHygiene } from "@/components/store-hygiene";
 import { SocialHydrator } from "@/components/social-hydrator";
 import { UploadsHydrator } from "@/components/uploads-hydrator";
 import { UploadProgressDock } from "@/components/admin/upload-progress-dock";
+import { MaintenanceGate } from "@/components/maintenance-gate";
 import { AdsenseScript } from "@/components/ads/adsense-script";
 import "./globals.css";
 
@@ -87,12 +88,14 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <StoreHygiene />
           <UploadsHydrator />
           <SocialHydrator />
-          <AnalyticsProvider>
-            <DesktopNav />
-            <main className="min-h-full flex-1">{children}</main>
-            <BottomNav />
-            <UploadProgressDock />
-          </AnalyticsProvider>
+          <MaintenanceGate>
+            <AnalyticsProvider>
+              <DesktopNav />
+              <main className="min-h-full flex-1">{children}</main>
+              <BottomNav />
+              <UploadProgressDock />
+            </AnalyticsProvider>
+          </MaintenanceGate>
         </Suspense>
         <Toaster
           theme="dark"
