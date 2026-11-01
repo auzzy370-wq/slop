@@ -9,6 +9,7 @@ import {
 } from "react";
 import {
   Bookmark,
+  Clapperboard,
   Heart,
   MessageCircle,
   MoreHorizontal,
@@ -27,6 +28,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { CommentsSheet } from "@/components/feed/comments-sheet";
+import {
+  EpisodeSheet,
+  formatSpeed,
+  loadPlaybackSpeed,
+  nextPlaybackSpeed,
+  savePlaybackSpeed,
+} from "@/components/feed/episode-sheet";
 import { ScriptedPlayer } from "@/components/feed/scripted-player";
 import Link from "next/link";
 import { track } from "@/lib/analytics/client";
@@ -39,6 +47,7 @@ interface VideoCardProps {
   muted: boolean;
   onToggleMute: () => void;
   categoryNames: string[];
+  onJumpToVideo?: (videoId: string) => void;
 }
 
 export function VideoCard({
@@ -47,6 +56,7 @@ export function VideoCard({
   muted,
   onToggleMute,
   categoryNames,
+  onJumpToVideo,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const isScripted = video.playback === "scripted";
@@ -70,6 +80,8 @@ export function VideoCard({
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [episodesOpen, setEpisodesOpen] = useState(false);
+  const [speed, setSpeed] = useState(1);
   const [commentText, setCommentText] = useState("");
   const [reportReason, setReportReason] = useState("spam");
   const [reportDetails, setReportDetails] = useState("");
@@ -82,6 +94,7 @@ export function VideoCard({
   const saves = useSlopStore((s) => s.saves);
   const comments = useSlopStore((s) => s.comments);
   const dramas = useSlopStore((s) => s.dramas);
+  const allVideos = useSlopStore((s) => s.videos);
   const toggleLike = useSlopStore((s) => s.toggleLike);
   const toggleSave = useSlopStore((s) => s.toggleSave);
   const addComment = useSlopStore((s) => s.addComment);
@@ -89,10 +102,15 @@ export function VideoCard({
   const addReport = useSlopStore((s) => s.addReport);
   const recordView = useSlopStore((s) => s.recordView);
   const drama = dramas.find((d) => d.id === video.dramaId);
+  const seriesEpisodes = allVideos
+    .filter((v) => v.dramaId === video.dramaId && v.status === "published")
+    .sort((a, b) => a.episodeNumber - b.episodeNumber);
   const epLabel = String(video.episodeNumber).padStart(2, "0");
-  const epTotal = drama?.episodeCount
-    ? String(drama.episodeCount).padStart(2, "0")
-    : null;
+  const epTotalCount =
+    drama?.episodeCount && drama.episodeCount > seriesEpisodes.length
+      ? drama.episodeCount
+      : seriesEpisodes.length || video.episodeNumber;
+  const epTotal = String(epTotalCount).padStart(2, "0");
   const viewed = useRef(false);
   const playbackId = useRef(uid("pb"));
   const lastProgressSent = useRef(0);
@@ -249,7 +267,14 @@ export function VideoCard({
     setFailed(false);
     setLoading(!isScripted);
     retryCount.current = 0;
+    setSpeed(loadPlaybackSpeed());
   }, [active, isScripted, video.id]);
+
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el) return;
+    el.playbackRate = speed;
+  }, [speed, active, mediaKey]);
 
   const clearChromeHideTimer = useCallback(() => {
     if (chromeHideTimer.current) {
@@ -284,7 +309,14 @@ export function VideoCard({
 
   useEffect(() => {
     if (!active) return;
-    if (paused || scrubbing || commentsOpen || shareOpen || reportOpen) {
+    if (
+      paused ||
+      scrubbing ||
+      commentsOpen ||
+      shareOpen ||
+      reportOpen ||
+      episodesOpen
+    ) {
       clearChromeHideTimer();
       setChromeVisible(true);
       return;
@@ -297,6 +329,7 @@ export function VideoCard({
     commentsOpen,
     shareOpen,
     reportOpen,
+    episodesOpen,
     clearChromeHideTimer,
     scheduleChromeHide,
   ]);
@@ -660,7 +693,7 @@ export function VideoCard({
       {/* Instagram Reels–style right action rail */}
       <div
         className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-4.5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-5 ${
-          chromeVisible ? "bottom-[5.75rem]" : "bottom-[3.25rem]"
+          chromeVisible ? "bottom-[8.5rem]" : "bottom-[3.25rem]"
         }`}
       >
         <RailButton
@@ -818,8 +851,63 @@ export function VideoCard({
               />
             </div>
           </div>
+
+          {/* Episode picker + speed — mirrors short-drama player chrome */}
+          <div
+            className="mt-2 flex items-center gap-2 pb-1"
+            data-no-swipe
+          >
+            <button
+              type="button"
+              onClick={() => {
+                revealChrome();
+                setEpisodesOpen(true);
+              }}
+              className="inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60"
+              aria-label="Choose episode"
+            >
+              <Clapperboard className="h-3.5 w-3.5 shrink-0 text-[var(--slop-violet)]" />
+              <span className="truncate">
+                Episode {video.episodeNumber}/{epTotalCount}
+              </span>
+              <span className="ml-auto text-white/45" aria-hidden>
+                ˄
+              </span>
+            </button>
+            {!isScripted ? (
+              <button
+                type="button"
+                onClick={() => {
+                  revealChrome();
+                  const next = nextPlaybackSpeed(speed);
+                  setSpeed(next);
+                  savePlaybackSpeed(next);
+                  if (videoRef.current) videoRef.current.playbackRate = next;
+                  toast.message(`Speed ${formatSpeed(next)}`, {
+                    duration: 1200,
+                  });
+                }}
+                className="inline-flex h-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-3.5 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
+                aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
+              >
+                {formatSpeed(speed)}
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
+
+      <EpisodeSheet
+        open={episodesOpen}
+        onClose={() => setEpisodesOpen(false)}
+        title={drama?.title ?? video.sourceAttribution}
+        episodes={seriesEpisodes}
+        currentId={video.id}
+        onSelect={(id) => {
+          if (id === video.id) return;
+          onJumpToVideo?.(id);
+        }}
+      />
 
       <CommentsSheet
         open={commentsOpen}

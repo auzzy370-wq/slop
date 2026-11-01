@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { getFeed } from "@/lib/feed";
 import type { FeedSection } from "@/lib/types";
 import { useSlopStore } from "@/store/slop-store";
@@ -12,9 +12,11 @@ type FeedItem =
   | { kind: "video"; videoId: string }
   | { kind: "ad"; key: string };
 
-const SWIPE_DISTANCE = 56;
-const SWIPE_VELOCITY = 0.45; // px/ms
-const MAX_RUBBER = 72;
+const SWIPE_DISTANCE = 42;
+const SWIPE_VELOCITY = 0.28; // px/ms
+const MAX_RUBBER = 56;
+const PAGE_MS = 220;
+const WHEEL_LOCK_MS = 260;
 
 export function VideoFeed({
   section = "for-you",
@@ -27,10 +29,12 @@ export function VideoFeed({
   query?: string;
   startVideoId?: string;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const feedParam = (searchParams.get("feed") as FeedSection | null) ?? section;
   const videos = useSlopStore((s) => s.videos);
   const categories = useSlopStore((s) => s.categories);
+  const dramas = useSlopStore((s) => s.dramas);
   const saves = useSlopStore((s) => s.saves);
   const user = useSlopStore((s) => s.currentUser);
   const settings = useSlopStore((s) => s.settings);
@@ -56,6 +60,10 @@ export function VideoFeed({
   } | null>(null);
   const animatingRef = useRef(false);
   const wheelLockRef = useRef(0);
+  const rafDragRef = useRef(0);
+  const pendingYRef = useRef<number | null>(null);
+  const startedRef = useRef(false);
+  const animTimerRef = useRef<number | null>(null);
 
   const savedIds = useMemo(
     () =>
@@ -100,7 +108,6 @@ export function VideoFeed({
   const measure = useCallback(() => {
     const el = viewportRef.current;
     const parent = el?.parentElement;
-    // Prefer the staging container (desktop phone frame) over the window.
     const fromParent = parent?.clientHeight ?? 0;
     const fromSelf = el?.clientHeight ?? 0;
     const fromVv = window.visualViewport?.height ?? 0;
@@ -123,9 +130,11 @@ export function VideoFeed({
   const applyTransform = useCallback((y: number, animate: boolean) => {
     const track = trackRef.current;
     if (!track) return;
-    track.style.transition = animate
-      ? "transform 280ms cubic-bezier(0.22, 1, 0.36, 1)"
-      : "none";
+    if (animate) {
+      track.style.transition = `transform ${PAGE_MS}ms cubic-bezier(0.2, 0.85, 0.25, 1)`;
+    } else {
+      track.style.transition = "none";
+    }
     track.style.transform = `translate3d(0, ${y}px, 0)`;
   }, []);
 
@@ -135,32 +144,46 @@ export function VideoFeed({
       const clamped = Math.max(0, Math.min(itemsLenRef.current - 1, idx));
       indexRef.current = clamped;
       setActiveIndex(clamped);
+      if (animTimerRef.current) {
+        window.clearTimeout(animTimerRef.current);
+        animTimerRef.current = null;
+      }
       animatingRef.current = animate;
       applyTransform(-clamped * h, animate);
       if (animate) {
-        window.setTimeout(() => {
+        animTimerRef.current = window.setTimeout(() => {
           animatingRef.current = false;
-        }, 300);
+          animTimerRef.current = null;
+        }, PAGE_MS + 20);
+      } else {
+        animatingRef.current = false;
       }
     },
     [applyTransform, measure],
   );
 
-  // Initial measure + start episode
+  // Initial measure + start episode (once hydrated / when start id changes)
   useEffect(() => {
-    if (!hydrated) return;
+    if (!hydrated || items.length === 0) return;
     measure();
-    let start = 0;
-    if (startVideoId) {
-      const idx = items.findIndex(
-        (item) => item.kind === "video" && item.videoId === startVideoId,
-      );
-      if (idx >= 0) start = idx;
+    let start = indexRef.current;
+    if (!startedRef.current || startVideoId) {
+      start = 0;
+      if (startVideoId) {
+        const idx = items.findIndex(
+          (item) => item.kind === "video" && item.videoId === startVideoId,
+        );
+        if (idx >= 0) start = idx;
+      }
+      startedRef.current = true;
     }
+    // Clamp if feed shrank
+    start = Math.max(0, Math.min(items.length - 1, start));
     indexRef.current = start;
     setActiveIndex(start);
     requestAnimationFrame(() => goTo(start, false));
-  }, [hydrated, items, startVideoId, goTo, measure]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: avoid re-paging on every items rebuild
+  }, [hydrated, startVideoId, items.length]);
 
   // Resize keeps the current page locked
   useEffect(() => {
@@ -184,7 +207,6 @@ export function VideoFeed({
     };
   }, [hydrated, goTo, measure]);
 
-  // Desktop keyboard paging
   useEffect(() => {
     if (!hydrated) return;
     const onKey = (e: KeyboardEvent) => {
@@ -202,12 +224,23 @@ export function VideoFeed({
     return () => window.removeEventListener("keydown", onKey);
   }, [hydrated, goTo]);
 
+  const flushDragFrame = useCallback(() => {
+    rafDragRef.current = 0;
+    const y = pendingYRef.current;
+    if (y == null) return;
+    pendingYRef.current = null;
+    applyTransform(y, false);
+  }, [applyTransform]);
+
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
     if (animatingRef.current) return;
-    // Don't hijack scrubber / buttons / links.
     const target = e.target as HTMLElement | null;
-    if (target?.closest("button, a, input, textarea, [role='slider'], [data-no-swipe]")) {
+    if (
+      target?.closest(
+        "button, a, input, textarea, [role='slider'], [data-no-swipe]",
+      )
+    ) {
       return;
     }
     dragRef.current = {
@@ -230,8 +263,7 @@ export function VideoFeed({
     const dx = e.clientX - drag.startX;
 
     if (drag.axis === "undecided") {
-      if (Math.abs(dy) < 8 && Math.abs(dx) < 8) return;
-      // Vertical wins ties — this is a vertical pager.
+      if (Math.abs(dy) < 6 && Math.abs(dx) < 6) return;
       drag.axis = Math.abs(dy) >= Math.abs(dx) ? "y" : "x";
       if (drag.axis === "x") {
         dragRef.current = null;
@@ -254,14 +286,16 @@ export function VideoFeed({
     const h = pageHRef.current || measure();
     const base = -indexRef.current * h;
     let offset = dy;
-    // Rubber-band at ends
     if (
       (indexRef.current === 0 && dy > 0) ||
       (indexRef.current >= itemsLenRef.current - 1 && dy < 0)
     ) {
-      offset = Math.sign(dy) * Math.min(Math.abs(dy) * 0.35, MAX_RUBBER);
+      offset = Math.sign(dy) * Math.min(Math.abs(dy) * 0.32, MAX_RUBBER);
     }
-    applyTransform(base + offset, false);
+    pendingYRef.current = base + offset;
+    if (!rafDragRef.current) {
+      rafDragRef.current = requestAnimationFrame(flushDragFrame);
+    }
   };
 
   const finishDrag = (e: React.PointerEvent) => {
@@ -269,19 +303,22 @@ export function VideoFeed({
     if (!drag || drag.pointerId !== e.pointerId) return;
     dragRef.current = null;
 
+    if (rafDragRef.current) {
+      cancelAnimationFrame(rafDragRef.current);
+      rafDragRef.current = 0;
+      flushDragFrame();
+    }
+
     if (!drag.dragging) return;
 
     const dy = e.clientY - drag.startY;
-    const dt = Math.max(16, e.timeStamp - drag.startT);
-    const instantDt = Math.max(16, e.timeStamp - drag.lastT);
+    const instantDt = Math.max(12, e.timeStamp - drag.lastT);
     const instantDy = e.clientY - drag.lastY;
-    const velocity = instantDy / instantDt; // px/ms, negative = swipe up = next
+    const velocity = instantDy / instantDt;
 
     let next = indexRef.current;
-    const goNext =
-      dy < -SWIPE_DISTANCE || velocity < -SWIPE_VELOCITY;
-    const goPrev =
-      dy > SWIPE_DISTANCE || velocity > SWIPE_VELOCITY;
+    const goNext = dy < -SWIPE_DISTANCE || velocity < -SWIPE_VELOCITY;
+    const goPrev = dy > SWIPE_DISTANCE || velocity > SWIPE_VELOCITY;
 
     if (goNext) next = indexRef.current + 1;
     else if (goPrev) next = indexRef.current - 1;
@@ -290,15 +327,37 @@ export function VideoFeed({
   };
 
   const onWheel = (e: React.WheelEvent) => {
-    // Desktop / trackpad paging
-    if (Math.abs(e.deltaY) < 8) return;
+    if (Math.abs(e.deltaY) < 6) return;
     e.preventDefault();
     const now = Date.now();
-    if (now - wheelLockRef.current < 420 || animatingRef.current) return;
+    if (now - wheelLockRef.current < WHEEL_LOCK_MS || animatingRef.current) {
+      return;
+    }
     wheelLockRef.current = now;
     if (e.deltaY > 0) goTo(indexRef.current + 1, true);
     else goTo(indexRef.current - 1, true);
   };
+
+  const onJumpToVideo = useCallback(
+    (videoId: string) => {
+      const idx = items.findIndex(
+        (item) => item.kind === "video" && item.videoId === videoId,
+      );
+      if (idx >= 0) {
+        goTo(idx, true);
+        return;
+      }
+      const target = videos.find((v) => v.id === videoId);
+      if (!target) return;
+      const drama = dramas.find((d) => d.id === target.dramaId);
+      const params = new URLSearchParams();
+      params.set("start", target.id);
+      params.set("drama", target.dramaId);
+      if (drama?.slug) params.set("dramaSlug", drama.slug);
+      router.push(`/watch?${params.toString()}`);
+    },
+    [items, goTo, videos, dramas, router],
+  );
 
   if (!hydrated) {
     return (
@@ -346,7 +405,6 @@ export function VideoFeed({
         }}
       >
         {items.map((item, index) => {
-          // ±1 is enough — Safari only reliably decodes one video at a time.
           const near = Math.abs(index - activeIndex) <= 1;
           if (item.kind === "ad") {
             return (
@@ -375,6 +433,7 @@ export function VideoFeed({
                   categoryNames={video.categoryIds
                     .map((id) => categoryNameMap[id])
                     .filter(Boolean)}
+                  onJumpToVideo={onJumpToVideo}
                 />
               ) : (
                 <div

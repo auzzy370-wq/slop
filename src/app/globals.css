@@ -72,9 +72,10 @@ a {
   overflow: hidden;
   overscroll-behavior: none;
   background: #000;
-  touch-action: pan-y;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* Full-bleed mobile shell; desktop stages the player as a phone frame */
@@ -130,6 +131,8 @@ a {
   width: 100%;
   will-change: transform;
   backface-visibility: hidden;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
 }
 
 .slop-feed-slide {
@@ -141,6 +144,7 @@ a {
   max-height: var(--slop-feed-page, 100%);
   overflow: hidden;
   background: #000;
+  contain: layout style paint;
 }
 
 .slop-feed-video {
