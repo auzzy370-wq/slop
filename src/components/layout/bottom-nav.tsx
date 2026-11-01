@@ -21,16 +21,14 @@ const items = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  // Hide on admin (has its own nav), auth, and immersive watch surfaces
   if (
     pathname.startsWith("/admin") ||
     pathname.startsWith("/auth") ||
     pathname.startsWith("/v/") ||
     pathname.startsWith("/watch")
   ) {
-    // Hide on immersive watch surfaces; watch page has its own chrome
-    if (pathname.startsWith("/watch") || pathname.startsWith("/v/")) {
-      return null;
-    }
+    return null;
   }
 
   return (
