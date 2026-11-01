@@ -9,7 +9,14 @@ import {
   upsertUploadsCatalog,
   type UploadsCatalog,
 } from "@/lib/uploads-catalog-shared";
+import {
+  isR2Configured,
+  r2GetObjectText,
+  r2PutObject,
+} from "@/lib/r2";
 import { slugify, uid } from "@/lib/utils";
+
+const UPLOADS_R2_KEY = UPLOADS_BLOB_PATH;
 
 export {
   emptyUploadsCatalog,
@@ -83,11 +90,56 @@ async function writeBlobCatalog(catalog: UploadsCatalog): Promise<string | null>
   return blob.url;
 }
 
+async function readR2Catalog(): Promise<UploadsCatalog | null> {
+  if (!isR2Configured()) return null;
+  try {
+    const raw = await r2GetObjectText(UPLOADS_R2_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as UploadsCatalog;
+    if (!parsed || !Array.isArray(parsed.videos) || !Array.isArray(parsed.dramas)) {
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+async function writeR2Catalog(catalog: UploadsCatalog): Promise<string | null> {
+  if (!isR2Configured()) return null;
+  const { url } = await r2PutObject({
+    key: UPLOADS_R2_KEY,
+    body: JSON.stringify(catalog),
+    contentType: "application/json",
+    cacheControl: "no-cache",
+  });
+  return url;
+}
+
+function pickNewerCatalog(
+  a: UploadsCatalog | null,
+  b: UploadsCatalog | null,
+): UploadsCatalog | null {
+  if (!a) return b;
+  if (!b) return a;
+  const at = Date.parse(a.updatedAt || "");
+  const bt = Date.parse(b.updatedAt || "");
+  if (Number.isFinite(at) && Number.isFinite(bt)) {
+    return bt >= at ? b : a;
+  }
+  return (b.videos?.length ?? 0) >= (a.videos?.length ?? 0) ? b : a;
+}
+
 export async function loadUploadsCatalog(): Promise<UploadsCatalog> {
-  const fromBlob = await readBlobCatalog();
-  if (fromBlob) return fromBlob;
-  const fromLocal = await readLocalCatalog();
-  if (fromLocal) return fromLocal;
+  // Prefer R2 when configured (Blob may be suspended); merge with Blob/local by updatedAt.
+  const [fromR2, fromBlob, fromLocal] = await Promise.all([
+    readR2Catalog(),
+    readBlobCatalog(),
+    readLocalCatalog(),
+  ]);
+  const cloud = pickNewerCatalog(fromR2, fromBlob);
+  const best = pickNewerCatalog(cloud, fromLocal);
+  if (best) return best;
   return emptyUploadsCatalog();
 }
 
@@ -96,7 +148,13 @@ export async function saveUploadsCatalog(
 ): Promise<{ ok: true; url?: string | null }> {
   let url: string | null = null;
   try {
-    url = await writeBlobCatalog(catalog);
+    url = await writeR2Catalog(catalog);
+  } catch (err) {
+    console.error("r2 catalog write failed", err);
+  }
+  try {
+    const blobUrl = await writeBlobCatalog(catalog);
+    url = url || blobUrl;
   } catch (err) {
     console.error("blob catalog write failed", err);
   }

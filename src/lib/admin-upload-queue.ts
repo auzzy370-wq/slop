@@ -23,12 +23,16 @@ export type QueueJob = {
   url?: string;
 };
 
+export type CloudTarget = "r2" | "blob" | "local";
+
 export type UploadBatch = {
   id: string;
   drama: Drama;
   publishStatus: PublicationStatus;
   adminKey: string;
+  /** @deprecated use cloudTarget */
   preferBlob: boolean;
+  cloudTarget: CloudTarget;
   jobs: QueueJob[];
   running: boolean;
   startedAt: number;
@@ -75,19 +79,22 @@ function friendlyUploadError(raw: string) {
     return "Admin key missing or wrong — paste SLOP_ADMIN_KEY, then retry.";
   }
   if (/store has been suspended|store is blocked|blob.*suspended/i.test(raw)) {
-    return "Vercel Blob store is suspended/blocked. Unsuspend or create a new Blob store in Vercel, update BLOB_READ_WRITE_TOKEN, then re-drop episodes from the first failed EP upward.";
+    return "Vercel Blob is suspended. Switch mass upload to Cloudflare R2 (free) or unsuspend Blob.";
+  }
+  if (/r2_not_configured|R2_/i.test(raw)) {
+    return "Cloudflare R2 is not configured — set R2_* env vars (see README).";
   }
   if (/blob_not_configured|BLOB_READ_WRITE_TOKEN/i.test(raw)) {
-    return "Cloud storage not configured (BLOB_READ_WRITE_TOKEN).";
+    return "Cloud storage not configured (set R2_* or BLOB_READ_WRITE_TOKEN).";
   }
   if (/use_blob/i.test(raw)) {
-    return "This host needs Vercel Blob for MP4 uploads.";
+    return "This host needs cloud storage (R2 or Blob) for MP4 uploads.";
   }
   return raw;
 }
 
-function isFatalBlobError(raw: string) {
-  return /store has been suspended|store is blocked|blob.*suspended|BLOB_READ_WRITE_TOKEN|not configured|use_blob|Admin key missing/i.test(
+function isFatalUploadError(raw: string) {
+  return /store has been suspended|store is blocked|blob.*suspended|r2_not_configured|BLOB_READ_WRITE_TOKEN|not configured|use_blob|Admin key missing/i.test(
     raw,
   );
 }
@@ -156,6 +163,60 @@ async function uploadBlob(
   }
 }
 
+async function uploadR2(
+  file: File,
+  dramaId: string,
+  episodeNumber: number,
+  adminKey?: string,
+): Promise<string> {
+  const contentType = file.type || "video/mp4";
+  const presignRes = await fetch("/api/admin/videos/r2", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      ...adminHeaders(adminKey),
+    },
+    body: JSON.stringify({
+      action: "presign",
+      dramaId,
+      episodeNumber,
+      filename: file.name,
+      contentType,
+    }),
+  });
+  const presign = (await presignRes.json().catch(() => ({}))) as {
+    ok?: boolean;
+    uploadUrl?: string;
+    publicUrl?: string;
+    message?: string;
+    error?: string;
+  };
+  if (!presignRes.ok || !presign.uploadUrl || !presign.publicUrl) {
+    throw new Error(
+      friendlyUploadError(
+        presign.message || presign.error || "R2 presign failed",
+      ),
+    );
+  }
+
+  const putRes = await fetch(presign.uploadUrl, {
+    method: "PUT",
+    headers: {
+      "content-type": contentType,
+    },
+    body: file,
+  });
+  if (!putRes.ok) {
+    const text = await putRes.text().catch(() => "");
+    throw new Error(
+      friendlyUploadError(
+        text || `R2 upload failed (HTTP ${putRes.status})`,
+      ),
+    );
+  }
+  return presign.publicUrl;
+}
+
 /**
  * Persist drama + every known episode for that series.
  * Sending the full set avoids lost updates when Blob catalog reads are stale
@@ -215,7 +276,15 @@ async function processQueue() {
 
     try {
       let url: string;
-      if (batch.preferBlob) {
+      const target = batch.cloudTarget || (batch.preferBlob ? "blob" : "local");
+      if (target === "r2") {
+        url = await uploadR2(
+          job.file,
+          drama.id,
+          job.episodeNumber,
+          batch.adminKey,
+        );
+      } else if (target === "blob") {
         try {
           url = await uploadBlob(
             job.file,
@@ -227,16 +296,26 @@ async function processQueue() {
           const msg =
             blobErr instanceof Error ? blobErr.message : String(blobErr);
           if (
-            /Blob storage not configured|BLOB_READ_WRITE_TOKEN|not configured/i.test(
+            /Blob storage not configured|BLOB_READ_WRITE_TOKEN|not configured|suspended|blocked/i.test(
               msg,
             )
           ) {
-            url = await uploadLocal(
-              job.file,
-              drama.id,
-              job.episodeNumber,
-              batch.adminKey,
-            );
+            // Prefer R2 when Blob is dead, else local (dev only).
+            try {
+              url = await uploadR2(
+                job.file,
+                drama.id,
+                job.episodeNumber,
+                batch.adminKey,
+              );
+            } catch {
+              url = await uploadLocal(
+                job.file,
+                drama.id,
+                job.episodeNumber,
+                batch.adminKey,
+              );
+            }
           } else {
             throw blobErr;
           }
@@ -337,11 +416,10 @@ async function processQueue() {
         error: message,
       });
 
-      // Suspended/blocked Blob (or missing key) will fail every remaining job —
-      // abort the rest so the UI stops at the first broken episode.
-      if (isFatalBlobError(message) && activeBatch) {
+      // Fatal cloud/config errors will fail every remaining job — abort the rest.
+      if (isFatalUploadError(message) && activeBatch) {
         const skipMsg = /suspended|blocked/i.test(message)
-          ? `Skipped — Blob store suspended (fix store, then re-upload from EP ${String(job.episodeNumber).padStart(2, "0")} onward)`
+          ? `Skipped — cloud storage unavailable (fix R2/Blob, then re-upload from EP ${String(job.episodeNumber).padStart(2, "0")} onward)`
           : `Skipped — ${message}`;
         activeBatch = {
           ...activeBatch,
@@ -369,7 +447,8 @@ export function enqueueMassUpload(opts: {
   drama: Drama;
   publishStatus: PublicationStatus;
   adminKey: string;
-  preferBlob: boolean;
+  preferBlob?: boolean;
+  cloudTarget?: CloudTarget;
   files: RankedUploadFile[];
 }): { ok: true } | { ok: false; error: string } {
   if (activeBatch?.running) {
@@ -385,12 +464,16 @@ export function enqueueMassUpload(opts: {
 
   useSlopStore.getState().upsertDrama(opts.drama);
 
+  const cloudTarget: CloudTarget =
+    opts.cloudTarget || (opts.preferBlob === false ? "local" : "r2");
+
   activeBatch = {
     id: uid("batch"),
     drama: opts.drama,
     publishStatus: opts.publishStatus,
     adminKey: opts.adminKey,
-    preferBlob: opts.preferBlob,
+    preferBlob: cloudTarget === "blob",
+    cloudTarget,
     startedAt: Date.now(),
     running: true,
     jobs: opts.files.map((f) => ({

@@ -17,6 +17,7 @@ import {
   enqueueMassUpload,
   isUploadRunning,
   subscribeUploadQueue,
+  type CloudTarget,
   type UploadBatch,
 } from "@/lib/admin-upload-queue";
 import type { Drama, PublicationStatus } from "@/lib/types";
@@ -51,12 +52,15 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
   const [dramaId, setDramaId] = useState(dramas[0]?.id ?? NEW_DRAMA);
   const [status, setStatus] = useState<PublicationStatus>("published");
   const [picked, setPicked] = useState<PickedRow[]>([]);
-  const [preferBlob, setPreferBlob] = useState(true);
+  const [cloudTarget, setCloudTarget] = useState<CloudTarget>("r2");
   const [adminKey, setAdminKey] = useState("");
   const [uploadReady, setUploadReady] = useState<
-    "unknown" | "ready" | "needs-key" | "no-blob" | "suspended"
+    "unknown" | "ready" | "needs-key" | "no-cloud" | "suspended"
   >("unknown");
   const [readyMessage, setReadyMessage] = useState("");
+  const [preferredCloud, setPreferredCloud] = useState<"r2" | "blob" | "none">(
+    "none",
+  );
   const [batch, setBatch] = useState<UploadBatch | null>(null);
 
   const [newTitle, setNewTitle] = useState("");
@@ -88,19 +92,32 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           );
           return;
         }
-        if (!data.blobConfigured) {
-          setUploadReady("no-blob");
-          setReadyMessage(data.message || "Blob storage is not configured.");
-          return;
+        const preferred =
+          data.preferred === "r2" || data.preferred === "blob"
+            ? data.preferred
+            : "none";
+        setPreferredCloud(preferred);
+        if (preferred !== "none") {
+          setCloudTarget(preferred);
         }
-        if (data.blobSuspended || data.writeOk === false) {
-          setUploadReady("suspended");
+
+        if (preferred === "none") {
+          if (data.blobSuspended && !data.r2Ok) {
+            setUploadReady("suspended");
+            setReadyMessage(
+              data.message ||
+                "Vercel Blob is suspended. Add free Cloudflare R2 credentials (R2_*) to keep uploading.",
+            );
+            return;
+          }
+          setUploadReady("no-cloud");
           setReadyMessage(
             data.message ||
-              "Vercel Blob store is suspended/blocked. Unsuspend or create a new store, then retry from the first failed episode.",
+              "No cloud storage ready. Configure Cloudflare R2 (free) or Vercel Blob.",
           );
           return;
         }
+
         setUploadReady("ready");
         setReadyMessage(data.message || "Ready for cloud mass upload");
       } catch {
@@ -249,9 +266,10 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       toast.error("Paste the admin upload key first");
       return;
     }
-    if (uploadReady === "suspended" && preferBlob) {
+    if (uploadReady === "suspended" || uploadReady === "no-cloud") {
       toast.error(
-        "Blob store is suspended — unsuspend it in Vercel (or turn off Prefer Blob) before uploading.",
+        readyMessage ||
+          "Cloud storage is not ready. Configure Cloudflare R2 (free) first.",
       );
       return;
     }
@@ -263,8 +281,12 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       drama,
       publishStatus: status,
       adminKey,
-      preferBlob:
-        preferBlob && uploadReady !== "no-blob" && uploadReady !== "suspended",
+      cloudTarget:
+        uploadReady === "ready"
+          ? cloudTarget
+          : preferredCloud === "blob"
+            ? "blob"
+            : "r2",
       files: picked,
     });
 
@@ -318,7 +340,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
             uploadReady === "ready"
               ? "text-emerald-400/90"
               : uploadReady === "needs-key" ||
-                  uploadReady === "no-blob" ||
+                  uploadReady === "no-cloud" ||
                   uploadReady === "suspended"
                 ? "text-amber-300/90"
                 : "text-white/40"
@@ -329,19 +351,22 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         </p>
       </label>
 
-      {uploadReady === "suspended" && (
+      {(uploadReady === "suspended" || uploadReady === "no-cloud") && (
         <div className="flex gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-sm text-amber-100">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           <div className="space-y-1">
             <p className="font-semibold text-amber-50">
-              Vercel Blob store suspended
+              Cloud storage needs Cloudflare R2
             </p>
             <p className="text-xs text-amber-100/80">
-              Uploads and Blob video playback are blocked until you unsuspend
-              the store (or create a new one) in the Vercel dashboard and update{" "}
-              <code className="text-amber-50">BLOB_READ_WRITE_TOKEN</code>. After
-              it&apos;s fixed, re-drop only the failed/remaining EP## files — done
-              episodes are kept.
+              Vercel Blob on Hobby is suspended. Use free Cloudflare R2 instead:
+              create a public bucket + API token, set{" "}
+              <code className="text-amber-50">R2_ACCOUNT_ID</code>,{" "}
+              <code className="text-amber-50">R2_ACCESS_KEY_ID</code>,{" "}
+              <code className="text-amber-50">R2_SECRET_ACCESS_KEY</code>,{" "}
+              <code className="text-amber-50">R2_BUCKET_NAME</code>, and{" "}
+              <code className="text-amber-50">R2_PUBLIC_BASE_URL</code> in Vercel
+              env, redeploy, then re-drop remaining EP## files.
             </p>
           </div>
         </div>
@@ -458,14 +483,24 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         </div>
       )}
 
-      <label className="flex items-center gap-2 text-sm text-white/70">
-        <input
-          type="checkbox"
-          checked={preferBlob}
-          onChange={(e) => setPreferBlob(e.target.checked)}
-          disabled={queueBusy}
-        />
-        Prefer Vercel Blob when configured (needed for large files on Vercel)
+      <label className="block space-y-1.5 text-sm">
+        <span className="text-xs font-semibold uppercase tracking-wider text-white/45">
+          Cloud storage
+        </span>
+        <select
+          className="h-11 w-full rounded-xl border border-white/15 bg-white/5 px-3 text-sm"
+          value={cloudTarget}
+          onChange={(e) => setCloudTarget(e.target.value as CloudTarget)}
+          disabled={queueBusy || uploadReady !== "ready"}
+        >
+          <option value="r2">Cloudflare R2 (free, recommended)</option>
+          <option value="blob">Vercel Blob</option>
+          <option value="local">Local public/uploads (dev only)</option>
+        </select>
+        <p className="text-xs text-white/40">
+          Large MP4s upload directly to cloud via signed URLs. R2 is preferred
+          while Blob remains suspended.
+        </p>
       </label>
 
       <input

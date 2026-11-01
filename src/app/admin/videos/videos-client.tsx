@@ -34,6 +34,7 @@ const emptyForm = {
 
 type StorageReportPayload = {
   ok?: boolean;
+  preferred?: "r2" | "blob" | "none";
   health?: {
     configured: boolean;
     listOk: boolean;
@@ -41,6 +42,26 @@ type StorageReportPayload = {
     readOk: boolean;
     suspended: boolean;
     message: string;
+  };
+  r2Health?: {
+    configured: boolean;
+    ok: boolean;
+    message: string;
+    objects?: number;
+    bytes?: number;
+  };
+  r2?: {
+    configured: boolean;
+    objects: number;
+    videos: number;
+    bytes: number;
+    videoBytes: number;
+    dramas: Array<{
+      dramaId: string;
+      files: number;
+      uniqueEpisodes: number;
+      bytes: number;
+    }>;
   };
   report?: {
     configured: boolean;
@@ -80,6 +101,8 @@ type StorageReportPayload = {
     reclaimable: string;
     orphans: string;
     duplicates: string;
+    r2Total?: string;
+    r2Videos?: string;
   };
   error?: string;
   message?: string;
@@ -418,6 +441,10 @@ export default function VideosClient() {
 
   const report = storage?.report;
   const reclaimable = report?.reclaimableBytes ?? 0;
+  const r2 = storage?.r2;
+  const preferred = storage?.preferred ?? "none";
+  const dramaTitle = (dramaId: string) =>
+    dramas.find((d) => d.id === dramaId)?.title || dramaId;
 
   return (
     <div className="space-y-8">
@@ -433,10 +460,10 @@ export default function VideosClient() {
       <section className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="font-semibold">Blob storage</h2>
+            <h2 className="font-semibold">Cloud storage</h2>
             <p className="mt-0.5 text-xs text-white/45">
-              Live usage across Vercel Blob. Orphans and duplicates can be purged
-              without touching catalog episodes.
+              Cloudflare R2 is preferred (free tier). Vercel Blob remains a
+              fallback — orphans there can still be purged.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -455,29 +482,141 @@ export default function VideosClient() {
                 purgeBusy ||
                 storageLoading ||
                 !report?.configured ||
-                reclaimable <= 0
+                reclaimable <= 0 ||
+                Boolean(storage?.health?.suspended)
               }
               onClick={() => void purgeOrphans()}
             >
               {purgeBusy
                 ? "Purging…"
                 : reclaimable > 0
-                  ? `Purge orphans (${storage?.formatted?.reclaimable ?? formatBytes(reclaimable)})`
+                  ? `Purge Blob orphans (${storage?.formatted?.reclaimable ?? formatBytes(reclaimable)})`
                   : "Nothing to purge"}
             </Button>
           </div>
         </div>
 
+        <div className="flex flex-wrap gap-2 text-xs">
+          <span
+            className={`rounded-full px-2.5 py-1 ${
+              preferred === "r2"
+                ? "bg-emerald-400/15 text-emerald-200"
+                : preferred === "blob"
+                  ? "bg-[var(--slop-violet)]/20 text-[var(--slop-lavender)]"
+                  : "bg-white/10 text-white/55"
+            }`}
+          >
+            Preferred:{" "}
+            {preferred === "r2"
+              ? "Cloudflare R2"
+              : preferred === "blob"
+                ? "Vercel Blob"
+                : "none configured"}
+          </span>
+        </div>
+
+        {storage?.r2Health && (
+          <div
+            className={`rounded-xl border px-3 py-3 text-sm ${
+              storage.r2Health.ok
+                ? "border-emerald-400/25 bg-emerald-400/10 text-emerald-50"
+                : storage.r2Health.configured
+                  ? "border-red-400/30 bg-red-400/10 text-red-50"
+                  : "border-white/15 bg-white/[0.04] text-white/80"
+            }`}
+          >
+            <p className="font-semibold">
+              Cloudflare R2{" "}
+              {storage.r2Health.ok
+                ? "ready"
+                : storage.r2Health.configured
+                  ? "misconfigured"
+                  : "not configured"}
+            </p>
+            <p className="mt-1 text-xs opacity-80">{storage.r2Health.message}</p>
+            {r2 && r2.configured && (
+              <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    R2 total
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">
+                    {storage.formatted?.r2Total ?? formatBytes(r2.bytes)}
+                  </p>
+                  <p className="text-xs opacity-60">{r2.objects} objects</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    R2 videos
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">
+                    {storage.formatted?.r2Videos ?? formatBytes(r2.videoBytes)}
+                  </p>
+                  <p className="text-xs opacity-60">{r2.videos} files</p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    Series
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">
+                    {r2.dramas.length}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide opacity-60">
+                    Unique eps
+                  </p>
+                  <p className="mt-1 font-display text-lg font-bold">
+                    {r2.dramas.reduce((s, d) => s + d.uniqueEpisodes, 0)}
+                  </p>
+                </div>
+              </div>
+            )}
+            {r2 && r2.dramas.length > 0 && (
+              <div className="mt-4 space-y-3">
+                <h3 className="text-sm font-semibold opacity-90">
+                  R2 size by series
+                </h3>
+                <SimpleBars
+                  labelWidth={120}
+                  formatValue={formatBytes}
+                  data={r2.dramas.slice(0, 10).map((d, i) => ({
+                    label: dramaTitle(d.dramaId),
+                    value: d.bytes,
+                    color:
+                      i === 0
+                        ? "var(--slop-violet)"
+                        : "rgba(185, 154, 255, 0.55)",
+                  }))}
+                />
+              </div>
+            )}
+            {!storage.r2Health.configured && (
+              <p className="mt-2 text-xs opacity-75">
+                Set <code className="text-white/80">R2_ACCOUNT_ID</code>,{" "}
+                <code className="text-white/80">R2_ACCESS_KEY_ID</code>,{" "}
+                <code className="text-white/80">R2_SECRET_ACCESS_KEY</code>,{" "}
+                <code className="text-white/80">R2_BUCKET_NAME</code>, and{" "}
+                <code className="text-white/80">R2_PUBLIC_BASE_URL</code> in
+                Vercel, then redeploy.
+              </p>
+            )}
+          </div>
+        )}
+
         {storage?.health?.suspended && (
           <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-sm text-amber-50">
             <p className="font-semibold">Vercel Blob store suspended</p>
             <p className="mt-1 text-xs text-amber-100/80">
-              {storage.health.message} Files may still appear in the graphs
-              below from list metadata, but uploads and playback are blocked
-              until the store is restored.
+              {storage.health.message} Legacy Blob graphs below still list
+              metadata, but new uploads should use Cloudflare R2.
             </p>
           </div>
         )}
+
+        <h3 className="text-sm font-semibold text-white/70">
+          Vercel Blob (legacy / fallback)
+        </h3>
 
         {storageLoading && !report ? (
           <p className="text-sm text-white/45">Loading storage report…</p>
@@ -487,9 +626,9 @@ export default function VideosClient() {
           </p>
         ) : report && !report.configured ? (
           <p className="text-sm text-white/45">
-            Blob not configured — set{" "}
-            <span className="text-white/70">BLOB_READ_WRITE_TOKEN</span> to track
-            cloud storage.
+            Blob not configured — optional once R2 is set.{" "}
+            <span className="text-white/70">BLOB_READ_WRITE_TOKEN</span> enables
+            legacy graphs and orphan purge.
           </p>
         ) : report ? (
           <>

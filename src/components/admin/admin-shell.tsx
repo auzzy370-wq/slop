@@ -155,7 +155,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </Link>
         </aside>
 
-        <div className="min-w-0 flex-1 px-4 py-5 md:px-0 md:py-0">
+        <div className="min-w-0 max-w-full flex-1 overflow-x-hidden px-4 py-5 md:px-0 md:py-0">
           {children}
         </div>
       </div>

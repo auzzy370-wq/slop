@@ -73,9 +73,43 @@ Publishing **episode 1 or 2** of a show triggers posts to Discord / Telegram / X
 2. Under **Mass upload**, pick a drama and drop many MP4s named `EP01`, `EP49`, etc.
 3. Files auto-sort by episode number (ascending) and publish into that series
 
-Locally, files save under `public/uploads/`. On Vercel, set `BLOB_READ_WRITE_TOKEN` (Vercel Blob) so large MP4s upload directly to cloud storage.
+Locally, files save under `public/uploads/`. On Vercel, use **Cloudflare R2** (free tier) for large MP4s:
 
-Episode **metadata** (titles, drama, episode numbers, Blob URLs) is saved to a server catalog (`/api/catalog/uploads`) so uploads survive refresh and show for everyone — not just the browser that uploaded them. Paste `SLOP_ADMIN_KEY` in the Mass upload key field on the public deploy.
+1. Cloudflare dashboard → **R2** → Create bucket (e.g. `slop-videos`)
+2. Enable **public access** (R2.dev subdomain or custom domain) → copy the public base URL (no trailing slash)
+3. **Manage R2 API Tokens** → Create token with Object Read & Write on that bucket
+4. On the bucket → **Settings → CORS policy** (required for browser mass upload):
+
+```json
+[
+  {
+    "AllowedOrigins": [
+      "https://slop-fawn.vercel.app",
+      "http://localhost:3456"
+    ],
+    "AllowedMethods": ["GET", "PUT", "HEAD"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+5. Set these in Vercel **Project → Settings → Environment Variables** (Production), then redeploy:
+
+| Variable | Example |
+| --- | --- |
+| `R2_ACCOUNT_ID` | Cloudflare account id |
+| `R2_ACCESS_KEY_ID` | API token access key |
+| `R2_SECRET_ACCESS_KEY` | API token secret |
+| `R2_BUCKET_NAME` | `slop-videos` |
+| `R2_PUBLIC_BASE_URL` | `https://pub-xxxxx.r2.dev` |
+
+Mass upload prefers R2 automatically when healthy. Resume unfinished series from the next episode number (e.g. EP57+).
+
+`BLOB_READ_WRITE_TOKEN` (Vercel Blob) remains an optional fallback; Hobby Blob can suspend when limits are exceeded.
+
+Episode **metadata** (titles, drama, episode numbers, cloud URLs) is saved to a server catalog (`/api/catalog/uploads`) so uploads survive refresh and show for everyone — not just the browser that uploaded them. Paste `SLOP_ADMIN_KEY` in the Mass upload key field on the public deploy.
 
 ## Analytics & Rewards
 

@@ -6,6 +6,7 @@ import {
   planOrphanPurge,
   purgeOrphanBlobs,
 } from "@/lib/admin/blob-storage";
+import { getR2Health, isR2Configured, r2ListObjects } from "@/lib/r2";
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -14,16 +15,69 @@ function formatBytes(n: number) {
   return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-/** GET — Blob storage usage report (totals, per-drama, orphans, reclaimable). */
+/** GET — Blob + R2 storage usage report. */
 export async function GET(request: Request) {
   const denied = requireAdminKey(request);
   if (denied) return denied;
 
   try {
-    const [report, health] = await Promise.all([
+    const [report, health, r2Health] = await Promise.all([
       getStorageReport(),
       getBlobHealth({ probeWrite: false }),
+      getR2Health(),
     ]);
+
+    let r2 = {
+      configured: isR2Configured(),
+      objects: 0,
+      videos: 0,
+      bytes: 0,
+      videoBytes: 0,
+      dramas: [] as Array<{
+        dramaId: string;
+        files: number;
+        uniqueEpisodes: number;
+        bytes: number;
+      }>,
+    };
+    if (r2Health.ok) {
+      const objects = await r2ListObjects("slop/");
+      const videos = objects.filter((o) => /\.(mp4|mov|webm)$/i.test(o.key));
+      const byDrama = new Map<
+        string,
+        { files: number; eps: Set<number>; bytes: number }
+      >();
+      for (const v of videos) {
+        const m = v.key.match(/^slop\/([^/]+)\/ep-0*(\d+)/i);
+        const dramaId = m?.[1] || "(unknown)";
+        const ep = m ? Number(m[2]) : null;
+        const cur = byDrama.get(dramaId) || {
+          files: 0,
+          eps: new Set<number>(),
+          bytes: 0,
+        };
+        cur.files += 1;
+        cur.bytes += v.size;
+        if (ep != null) cur.eps.add(ep);
+        byDrama.set(dramaId, cur);
+      }
+      r2 = {
+        configured: true,
+        objects: objects.length,
+        videos: videos.length,
+        bytes: objects.reduce((s, o) => s + o.size, 0),
+        videoBytes: videos.reduce((s, o) => s + o.size, 0),
+        dramas: [...byDrama.entries()]
+          .map(([dramaId, d]) => ({
+            dramaId,
+            files: d.files,
+            uniqueEpisodes: d.eps.size,
+            bytes: d.bytes,
+          }))
+          .sort((a, b) => b.bytes - a.bytes),
+      };
+    }
+
     const plan =
       report.reclaimableBytes > 0 && !health.suspended
         ? await planOrphanPurge()
@@ -31,6 +85,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       ok: true,
       health,
+      r2Health,
+      r2,
+      preferred: r2Health.ok ? "r2" : health.writeOk ? "blob" : "none",
       report,
       purgePreview: {
         files: plan.length,
@@ -48,6 +105,8 @@ export async function GET(request: Request) {
         reclaimable: formatBytes(report.reclaimableBytes),
         orphans: formatBytes(report.orphans.bytes),
         duplicates: formatBytes(report.duplicates.bytes),
+        r2Total: formatBytes(r2.bytes),
+        r2Videos: formatBytes(r2.videoBytes),
       },
     });
   } catch (err) {

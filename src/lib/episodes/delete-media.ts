@@ -68,9 +68,27 @@ export async function deleteEpisodeMedia(input: {
     }
   };
 
-  // 1) Exact URL from the episode row
+  const tryDelR2Url = async (url: string) => {
+    if (!url || seen.has(url)) return;
+    seen.add(url);
+    try {
+      const { isR2PublicUrl, r2DeleteByUrl } = await import("@/lib/r2");
+      if (!isR2PublicUrl(url)) return;
+      const ok = await r2DeleteByUrl(url);
+      if (ok) deletedUrls.push(url);
+    } catch (err) {
+      errors.push(
+        err instanceof Error ? err.message : `Failed to delete R2 ${url}`,
+      );
+    }
+  };
+
+  // 1) Exact URL from the episode row (Blob or R2)
   if (videoUrl && isBlobUrl(videoUrl)) {
     await tryDelBlobUrl(videoUrl);
+  }
+  if (videoUrl) {
+    await tryDelR2Url(videoUrl);
   }
 
   // 2) Sweep Blob prefix for this drama/episode (covers renamed re-uploads)
@@ -111,7 +129,48 @@ export async function deleteEpisodeMedia(input: {
     }
   }
 
-  // 3) Local public/uploads copy
+  // 3) Sweep R2 prefix for this drama/episode
+  if (dramaId && episodeNumber != null) {
+    try {
+      const { isR2Configured, r2ListObjects, r2DeleteObject } = await import(
+        "@/lib/r2"
+      );
+      if (isR2Configured()) {
+        const prefix = `slop/${dramaId}/`;
+        const objects = await r2ListObjects(prefix);
+        for (const obj of objects) {
+          if (!/\.(mp4|mov|webm)$/i.test(obj.key)) continue;
+          const m = obj.key.match(
+            new RegExp(
+              `^slop/${dramaId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}/ep-0*${episodeNumber}(?:[-_.]|$)`,
+              "i",
+            ),
+          );
+          if (!m || seen.has(obj.url) || seen.has(obj.key)) continue;
+          seen.add(obj.url);
+          seen.add(obj.key);
+          try {
+            await r2DeleteObject(obj.key);
+            deletedUrls.push(obj.url);
+          } catch (err) {
+            errors.push(
+              err instanceof Error
+                ? `R2 delete failed: ${err.message}`
+                : "R2 delete failed",
+            );
+          }
+        }
+      }
+    } catch (err) {
+      errors.push(
+        err instanceof Error
+          ? `R2 list failed: ${err.message}`
+          : "R2 list failed",
+      );
+    }
+  }
+
+  // 4) Local public/uploads copy
   const localCandidates: string[] = [];
   if (videoUrl && isLocalUploadUrl(videoUrl)) {
     const rel = videoUrl.replace(/^\//, "");
