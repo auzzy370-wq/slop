@@ -6,10 +6,13 @@ import {
   CheckCircle2,
   FileVideo,
   Loader2,
+  Plus,
   Upload,
   AlertTriangle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   formatEpisodeTitle,
   rankUploadFiles,
@@ -26,6 +29,8 @@ type UploadRow = RankedUploadFile & {
   error?: string;
   url?: string;
 };
+
+const NEW_DRAMA = "__new__";
 
 function adminHeaders(): HeadersInit {
   if (typeof window === "undefined") return {};
@@ -90,17 +95,30 @@ async function uploadBlob(
 
 export function MassUpload({ dramas }: { dramas: Drama[] }) {
   const videos = useSlopStore((s) => s.videos);
+  const categories = useSlopStore((s) => s.categories);
   const upsertVideo = useSlopStore((s) => s.upsertVideo);
   const upsertDrama = useSlopStore((s) => s.upsertDrama);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [dramaId, setDramaId] = useState(dramas[0]?.id ?? "");
+  const [dramaId, setDramaId] = useState(dramas[0]?.id ?? NEW_DRAMA);
   const [status, setStatus] = useState<PublicationStatus>("published");
   const [rows, setRows] = useState<UploadRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [preferBlob, setPreferBlob] = useState(true);
 
-  const drama = dramas.find((d) => d.id === dramaId);
+  const [newTitle, setNewTitle] = useState("");
+  const [newSynopsis, setNewSynopsis] = useState("");
+  const [newGenreIds, setNewGenreIds] = useState<string[]>([]);
+  const [newPosterUrl, setNewPosterUrl] = useState("");
+
+  const creatingNew = dramaId === NEW_DRAMA;
+  const existingDrama = creatingNew
+    ? undefined
+    : dramas.find((d) => d.id === dramaId);
+
+  const activeCats = categories
+    .filter((c) => c.active)
+    .sort((a, b) => a.displayOrder - b.displayOrder);
 
   const summary = useMemo(() => {
     const parsed = rows.filter((r) => r.parsed).length;
@@ -141,15 +159,66 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
     );
   };
 
-  const runUpload = async () => {
-    if (!drama) {
-      toast.error("Select a drama first");
-      return;
+  const resolveDrama = (): Drama | null => {
+    if (!creatingNew) {
+      return existingDrama ?? null;
     }
+
+    const title = newTitle.trim();
+    if (!title) {
+      toast.error("Name the new drama first");
+      return null;
+    }
+
+    const now = new Date().toISOString();
+    const slugBase = slugify(title) || "untitled-drama";
+    const slugTaken = dramas.some((d) => d.slug === slugBase);
+    const slug = slugTaken ? `${slugBase}-${uid("d").slice(-4)}` : slugBase;
+    const genreIds =
+      newGenreIds.length > 0
+        ? newGenreIds
+        : activeCats[0]
+          ? [activeCats[0].id]
+          : [];
+    const poster =
+      newPosterUrl.trim() ||
+      "/posters/forgotten-wife.jpg";
+
+    const drama: Drama = {
+      id: uid("drama"),
+      slug,
+      title,
+      synopsis:
+        newSynopsis.trim() ||
+        `Original short drama: ${title}. Uploaded via admin mass import.`,
+      posterUrl: poster,
+      bannerUrl: poster,
+      genreIds,
+      tags: [title.toLowerCase(), "admin-upload"],
+      status: status === "scheduled" ? "published" : status,
+      featured: false,
+      trendingRank: null,
+      episodeCount: 0,
+      viewCount: 0,
+      likeCount: 0,
+      sourceAttribution: title,
+      createdAt: now,
+      publishedAt: status === "draft" ? null : now,
+    };
+
+    upsertDrama(drama);
+    setDramaId(drama.id);
+    return drama;
+  };
+
+  const runUpload = async () => {
     if (rows.length === 0) {
       toast.error("Choose EP## MP4 files to upload");
       return;
     }
+
+    const drama = resolveDrama();
+    if (!drama) return;
 
     setBusy(true);
     let ok = 0;
@@ -165,13 +234,15 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           try {
             url = await uploadBlob(row.file, drama.id, row.episodeNumber);
           } catch (blobErr) {
-            // Fall back to local disk when Blob isn't configured.
             const msg =
               blobErr instanceof Error ? blobErr.message : String(blobErr);
-            if (/blob_not_configured|BLOB_READ_WRITE_TOKEN|not configured/i.test(msg)) {
+            if (
+              /blob_not_configured|BLOB_READ_WRITE_TOKEN|not configured/i.test(
+                msg,
+              )
+            ) {
               url = await uploadLocal(row.file, drama.id, row.episodeNumber);
             } else {
-              // Retry local once for non-Vercel / misconfig cases
               try {
                 url = await uploadLocal(row.file, drama.id, row.episodeNumber);
               } catch {
@@ -198,7 +269,10 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
             slugify(`${drama.slug}-ep-${row.episodeNumber}`),
           dramaId: drama.id,
           episodeNumber: row.episodeNumber,
-          title: existing?.title && existing.title !== title ? existing.title : title,
+          title:
+            existing?.title && existing.title !== title
+              ? existing.title
+              : title,
           description:
             existing?.description ||
             `${drama.title} · Episode ${row.episodeNumber}`,
@@ -217,7 +291,9 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           featured: existing?.featured ?? false,
           pinned: existing?.pinned ?? false,
           sourceAttribution:
-            existing?.sourceAttribution || drama.sourceAttribution || drama.title,
+            existing?.sourceAttribution ||
+            drama.sourceAttribution ||
+            drama.title,
           licensingNotes: existing?.licensingNotes || "Admin mass upload",
           viewCount: existing?.viewCount ?? 0,
           likeCount: existing?.likeCount ?? 0,
@@ -241,7 +317,6 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       }
     }
 
-    // Bump series episode count to cover the highest uploaded ep.
     const maxEp = Math.max(
       drama.episodeCount,
       ...rows.map((r) => r.episodeNumber),
@@ -249,17 +324,22 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         .filter((v) => v.dramaId === drama.id)
         .map((v) => v.episodeNumber),
     );
-    if (maxEp !== drama.episodeCount) {
-      upsertDrama({ ...drama, episodeCount: maxEp });
-    }
+    upsertDrama({ ...drama, episodeCount: maxEp });
 
     setBusy(false);
     if (failed === 0) {
-      toast.success(`Imported ${ok} episode${ok === 1 ? "" : "s"}`);
+      toast.success(
+        `Imported ${ok} episode${ok === 1 ? "" : "s"} into “${drama.title}”`,
+      );
     } else {
       toast.error(`Imported ${ok}, failed ${failed}`);
     }
   };
+
+  const canUpload =
+    rows.length > 0 &&
+    !busy &&
+    (creatingNew ? newTitle.trim().length > 0 : Boolean(existingDrama));
 
   return (
     <section className="space-y-4 rounded-2xl border border-[var(--slop-violet)]/30 bg-[rgba(185,154,255,0.06)] p-4 sm:p-5">
@@ -267,9 +347,10 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         <div>
           <h2 className="font-display text-xl font-bold">Mass upload</h2>
           <p className="mt-1 max-w-2xl text-sm text-white/55">
-            Drop a batch of MP4s named like <code className="text-[var(--slop-lavender)]">EP49</code>,{" "}
-            <code className="text-[var(--slop-lavender)]">EP48</code>, … — SLOP
-            auto-sorts them ascending and publishes into the selected drama.
+            Drop MP4s named like{" "}
+            <code className="text-[var(--slop-lavender)]">EP49</code> — SLOP
+            auto-sorts them and publishes into an existing drama or a new one
+            you name here.
           </p>
         </div>
         <span className="rounded-full border border-white/10 bg-black/30 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white/50">
@@ -288,7 +369,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
             onChange={(e) => setDramaId(e.target.value)}
             disabled={busy}
           >
-            <option value="">Select drama</option>
+            <option value={NEW_DRAMA}>+ Create new drama…</option>
             {dramas.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.title}
@@ -312,6 +393,81 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           </select>
         </label>
       </div>
+
+      {creatingNew && (
+        <div className="space-y-3 rounded-2xl border border-white/10 bg-black/25 p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white">
+            <Plus className="h-4 w-4 text-[var(--slop-violet)]" />
+            New drama details
+          </div>
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/45">
+              Title
+            </span>
+            <Input
+              placeholder="e.g. Midnight Contract"
+              value={newTitle}
+              onChange={(e) => setNewTitle(e.target.value)}
+              disabled={busy}
+              maxLength={120}
+            />
+          </label>
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/45">
+              Synopsis
+            </span>
+            <Textarea
+              placeholder="One or two sentences about the show (optional)"
+              value={newSynopsis}
+              onChange={(e) => setNewSynopsis(e.target.value)}
+              disabled={busy}
+              rows={3}
+            />
+          </label>
+          <label className="block space-y-1.5 text-sm">
+            <span className="text-xs font-semibold uppercase tracking-wider text-white/45">
+              Poster / banner URL (optional)
+            </span>
+            <Input
+              placeholder="/posters/… or https://…"
+              value={newPosterUrl}
+              onChange={(e) => setNewPosterUrl(e.target.value)}
+              disabled={busy}
+            />
+          </label>
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/45">
+              Genres
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {activeCats.map((c) => {
+                const on = newGenreIds.includes(c.id);
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    disabled={busy}
+                    onClick={() =>
+                      setNewGenreIds((prev) =>
+                        on
+                          ? prev.filter((id) => id !== c.id)
+                          : [...prev, c.id],
+                      )
+                    }
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                      on
+                        ? "bg-[var(--slop-violet)] text-[var(--slop-black)]"
+                        : "bg-white/10 text-white/70 hover:bg-white/15"
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
 
       <label className="flex items-center gap-2 text-sm text-white/70">
         <input
@@ -367,6 +523,9 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
               {summary.orphan > 0
                 ? ` · ${summary.orphan} assigned sequentially`
                 : ""}
+              {creatingNew && newTitle.trim()
+                ? ` · → “${newTitle.trim()}”`
+                : ""}
             </p>
             <Button
               size="sm"
@@ -421,7 +580,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
 
           <Button
             className="w-full sm:w-auto"
-            disabled={busy || !dramaId}
+            disabled={!canUpload}
             onClick={runUpload}
           >
             {busy ? (
@@ -429,6 +588,8 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Uploading…
               </>
+            ) : creatingNew ? (
+              <>Create “{newTitle.trim() || "drama"}” + upload {rows.length}</>
             ) : (
               <>Upload {rows.length} episodes</>
             )}
