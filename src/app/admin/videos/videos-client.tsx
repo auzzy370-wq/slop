@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { MassUpload } from "@/components/admin/mass-upload";
 import {
+  ColumnChart,
   SimpleBars,
   StackedShareBar,
 } from "@/components/admin/date-range-filter";
@@ -33,6 +34,14 @@ const emptyForm = {
 
 type StorageReportPayload = {
   ok?: boolean;
+  health?: {
+    configured: boolean;
+    listOk: boolean;
+    writeOk: boolean;
+    readOk: boolean;
+    suspended: boolean;
+    message: string;
+  };
   report?: {
     configured: boolean;
     totals: {
@@ -459,6 +468,17 @@ export default function VideosClient() {
           </div>
         </div>
 
+        {storage?.health?.suspended && (
+          <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-sm text-amber-50">
+            <p className="font-semibold">Vercel Blob store suspended</p>
+            <p className="mt-1 text-xs text-amber-100/80">
+              {storage.health.message} Files may still appear in the graphs
+              below from list metadata, but uploads and playback are blocked
+              until the store is restored.
+            </p>
+          </div>
+        )}
+
         {storageLoading && !report ? (
           <p className="text-sm text-white/45">Loading storage report…</p>
         ) : storage && !storage.ok && !report ? (
@@ -566,6 +586,40 @@ export default function VideosClient() {
                         : i === 0
                           ? "var(--slop-violet)"
                           : "rgba(185, 154, 255, 0.55)",
+                  }))}
+                />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-white/80">
+                  Episodes on Blob by series
+                </h3>
+                <ColumnChart
+                  height={140}
+                  data={report.dramas.slice(0, 12).map((d, i) => ({
+                    label: d.title.slice(0, 10),
+                    value: d.uniqueEpisodes,
+                    color:
+                      d.inCatalogEpisodes === 0
+                        ? "#f59e0b"
+                        : i === 0
+                          ? "var(--slop-violet)"
+                          : "rgba(185, 154, 255, 0.55)",
+                  }))}
+                />
+              </div>
+              <div className="space-y-3">
+                <h3 className="text-sm font-semibold text-white/80">
+                  Files vs catalog episodes
+                </h3>
+                <SimpleBars
+                  labelWidth={120}
+                  data={report.dramas.slice(0, 10).map((d) => ({
+                    label: d.title,
+                    value: d.files,
+                    color:
+                      d.files > d.inCatalogEpisodes
+                        ? "#f59e0b"
+                        : "var(--slop-violet)",
                   }))}
                 />
               </div>

@@ -54,7 +54,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
   const [preferBlob, setPreferBlob] = useState(true);
   const [adminKey, setAdminKey] = useState("");
   const [uploadReady, setUploadReady] = useState<
-    "unknown" | "ready" | "needs-key" | "no-blob"
+    "unknown" | "ready" | "needs-key" | "no-blob" | "suspended"
   >("unknown");
   const [readyMessage, setReadyMessage] = useState("");
   const [batch, setBatch] = useState<UploadBatch | null>(null);
@@ -91,6 +91,14 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         if (!data.blobConfigured) {
           setUploadReady("no-blob");
           setReadyMessage(data.message || "Blob storage is not configured.");
+          return;
+        }
+        if (data.blobSuspended || data.writeOk === false) {
+          setUploadReady("suspended");
+          setReadyMessage(
+            data.message ||
+              "Vercel Blob store is suspended/blocked. Unsuspend or create a new store, then retry from the first failed episode.",
+          );
           return;
         }
         setUploadReady("ready");
@@ -241,6 +249,12 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       toast.error("Paste the admin upload key first");
       return;
     }
+    if (uploadReady === "suspended" && preferBlob) {
+      toast.error(
+        "Blob store is suspended — unsuspend it in Vercel (or turn off Prefer Blob) before uploading.",
+      );
+      return;
+    }
 
     const drama = resolveDrama();
     if (!drama) return;
@@ -249,7 +263,8 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
       drama,
       publishStatus: status,
       adminKey,
-      preferBlob: preferBlob && uploadReady !== "no-blob",
+      preferBlob:
+        preferBlob && uploadReady !== "no-blob" && uploadReady !== "suspended",
       files: picked,
     });
 
@@ -302,7 +317,9 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
           className={`text-xs ${
             uploadReady === "ready"
               ? "text-emerald-400/90"
-              : uploadReady === "needs-key" || uploadReady === "no-blob"
+              : uploadReady === "needs-key" ||
+                  uploadReady === "no-blob" ||
+                  uploadReady === "suspended"
                 ? "text-amber-300/90"
                 : "text-white/40"
           }`}
@@ -311,6 +328,24 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
             "Cloud uploads need this key on the public deploy."}
         </p>
       </label>
+
+      {uploadReady === "suspended" && (
+        <div className="flex gap-3 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-3 text-sm text-amber-100">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <div className="space-y-1">
+            <p className="font-semibold text-amber-50">
+              Vercel Blob store suspended
+            </p>
+            <p className="text-xs text-amber-100/80">
+              Uploads and Blob video playback are blocked until you unsuspend
+              the store (or create a new one) in the Vercel dashboard and update{" "}
+              <code className="text-amber-50">BLOB_READ_WRITE_TOKEN</code>. After
+              it&apos;s fixed, re-drop only the failed/remaining EP## files — done
+              episodes are kept.
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-1.5 text-sm">

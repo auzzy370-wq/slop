@@ -1,6 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  ColumnChart,
+  SimpleBars,
+} from "@/components/admin/date-range-filter";
 import { formatCount } from "@/lib/utils";
 import { getFeed } from "@/lib/feed";
 import { useSlopStore } from "@/store/slop-store";
@@ -149,6 +153,42 @@ export default function AdminOverviewPage() {
             ) : null}
           </div>
         ))}
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/45">
+            Top plays (30d analytics)
+          </h2>
+          <SimpleBars
+            labelWidth={110}
+            data={[...episodes]
+              .sort((a, b) => b.plays - a.plays)
+              .slice(0, 8)
+              .map((e) => ({
+                label:
+                  videos.find((v) => v.id === e.episodeId)?.title ?? e.episodeId,
+                value: e.plays,
+              }))}
+          />
+        </section>
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wider text-white/45">
+            Watch time (min, 30d)
+          </h2>
+          <ColumnChart
+            height={130}
+            data={[...episodes]
+              .sort((a, b) => b.totalWatchMs - a.totalWatchMs)
+              .slice(0, 10)
+              .map((e) => ({
+                label: (
+                  videos.find((v) => v.id === e.episodeId)?.title ?? e.episodeId
+                ).slice(0, 8),
+                value: Math.round(e.totalWatchMs / 60000),
+              }))}
+          />
+        </section>
       </div>
 
       <section>

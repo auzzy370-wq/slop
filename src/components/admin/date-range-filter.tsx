@@ -180,3 +180,135 @@ export function StackedShareBar({
     </div>
   );
 }
+
+/** Compact vertical column chart for daily / categorical trends. */
+export function ColumnChart({
+  data,
+  height = 120,
+  formatValue,
+  emptyLabel = "No recorded data in this range yet.",
+}: {
+  data: { label: string; value: number; color?: string }[];
+  height?: number;
+  formatValue?: (value: number) => string;
+  emptyLabel?: string;
+}) {
+  const max = Math.max(1, ...data.map((d) => d.value));
+  if (data.length === 0) {
+    return <p className="text-sm text-[var(--slop-slate)]">{emptyLabel}</p>;
+  }
+  return (
+    <div className="space-y-2">
+      <div
+        className="flex items-end gap-1 overflow-x-auto pb-1"
+        style={{ height }}
+      >
+        {data.map((d) => {
+          const h = Math.max(2, Math.round((d.value / max) * (height - 28)));
+          return (
+            <div
+              key={d.label}
+              className="flex min-w-[18px] flex-1 flex-col items-center justify-end gap-1"
+              title={`${d.label}: ${formatValue ? formatValue(d.value) : d.value}`}
+            >
+              <span className="text-[9px] tabular-nums text-white/45">
+                {formatValue ? formatValue(d.value) : d.value}
+              </span>
+              <div
+                className="w-full max-w-[28px] rounded-t-md"
+                style={{
+                  height: h,
+                  backgroundColor: d.color || "var(--slop-violet)",
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-1 overflow-x-auto">
+        {data.map((d) => (
+          <span
+            key={`l-${d.label}`}
+            className="min-w-[18px] flex-1 truncate text-center text-[9px] text-white/40"
+          >
+            {d.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Grouped dual bars for comparing two series (e.g. sessions vs plays). */
+export function GroupedBars({
+  data,
+  aLabel,
+  bLabel,
+  aColor = "var(--slop-violet)",
+  bColor = "rgba(185, 154, 255, 0.45)",
+}: {
+  data: { label: string; a: number; b: number }[];
+  aLabel: string;
+  bLabel: string;
+  aColor?: string;
+  bColor?: string;
+}) {
+  const max = Math.max(1, ...data.flatMap((d) => [d.a, d.b]));
+  if (data.length === 0) {
+    return (
+      <p className="text-sm text-[var(--slop-slate)]">
+        No recorded data in this range yet.
+      </p>
+    );
+  }
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-4 text-xs text-white/55">
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: aColor }}
+          />
+          {aLabel}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: bColor }}
+          />
+          {bLabel}
+        </span>
+      </div>
+      <div className="space-y-2">
+        {data.map((d) => (
+          <div
+            key={d.label}
+            className="grid grid-cols-[64px_1fr] items-center gap-2 text-xs"
+          >
+            <span className="truncate text-white/55">{d.label}</span>
+            <div className="space-y-1">
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(d.a / max) * 100}%`,
+                    backgroundColor: aColor,
+                  }}
+                />
+              </div>
+              <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${(d.b / max) * 100}%`,
+                    backgroundColor: bColor,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   DateRangeFilter,
   MetricCard,
+  SimpleBars,
+  StackedShareBar,
 } from "@/components/admin/date-range-filter";
 import type { DateRangeKey } from "@/lib/analytics/types";
 import { Button } from "@/components/ui/button";
@@ -133,6 +135,60 @@ export default function RevenueAnalyticsPage() {
             />
           </div>
           <p className="text-xs text-[var(--slop-lavender)]">{String(r.note)}</p>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <h2 className="mb-4 font-semibold">Revenue mix</h2>
+              <StackedShareBar
+                formatValue={(n) => `$${(n / 100).toFixed(2)}`}
+                segments={[
+                  {
+                    label: "Subscriptions",
+                    value: Number(r.subscriptionRevenueCents) || 0,
+                    color: "var(--slop-violet)",
+                  },
+                  {
+                    label: "Ads",
+                    value: Number(r.advertisingRevenueCents) || 0,
+                    color: "#34d399",
+                  },
+                  {
+                    label: "Refunds",
+                    value: Number(r.refundsCents) || 0,
+                    color: "#f87171",
+                  },
+                ]}
+              />
+            </section>
+            <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+              <h2 className="mb-4 font-semibold">Ad funnel</h2>
+              <SimpleBars
+                labelWidth={100}
+                data={[
+                  {
+                    label: "Requests",
+                    value: Number(r.adRequests) || 0,
+                    color: "rgba(185, 154, 255, 0.4)",
+                  },
+                  {
+                    label: "Impressions",
+                    value: Number(r.adImpressions) || 0,
+                    color: "var(--slop-violet)",
+                  },
+                  {
+                    label: "Completions",
+                    value: Number(r.adCompletions) || 0,
+                    color: "#34d399",
+                  },
+                  {
+                    label: "Clicks",
+                    value: Number(r.adClicks) || 0,
+                    color: "#f59e0b",
+                  },
+                ]}
+              />
+            </section>
+          </div>
         </>
       )}
 

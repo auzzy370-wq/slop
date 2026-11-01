@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  ColumnChart,
   DateRangeFilter,
+  GroupedBars,
   MetricCard,
   SimpleBars,
 } from "@/components/admin/date-range-filter";
@@ -144,18 +146,52 @@ export default function AdminAnalyticsPage() {
         </p>
       )}
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-4 font-semibold">Daily sessions</h2>
+          <ColumnChart
+            height={140}
+            data={(data?.series ?? []).map((d) => ({
+              label: d.date.slice(5),
+              value: d.sessions,
+            }))}
+          />
+        </section>
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-4 font-semibold">Sessions vs plays</h2>
+          <GroupedBars
+            aLabel="Sessions"
+            bLabel="Plays"
+            data={(data?.series ?? []).map((d) => ({
+              label: d.date.slice(5),
+              a: d.sessions,
+              b: d.plays,
+            }))}
+          />
+        </section>
+      </div>
+
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-        <h2 className="mb-4 font-semibold">Daily trend (sessions)</h2>
+        <h2 className="mb-4 font-semibold">Daily registrations</h2>
         <SimpleBars
           data={(data?.series ?? []).map((d) => ({
             label: d.date.slice(5),
-            value: d.sessions,
+            value: d.registrations,
           }))}
         />
       </section>
 
       <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
         <h2 className="mb-4 font-semibold">Acquisition by source</h2>
+        <div className="mb-5">
+          <SimpleBars
+            labelWidth={100}
+            data={(data?.sources ?? []).map((s) => ({
+              label: s.source.replace(/_/g, " "),
+              value: s.sessions,
+            }))}
+          />
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead className="text-xs uppercase text-[var(--slop-slate)]">

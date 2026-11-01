@@ -74,6 +74,9 @@ function friendlyUploadError(raw: string) {
   if (/client token|unauthorized|admin key|admin_writes_locked/i.test(raw)) {
     return "Admin key missing or wrong — paste SLOP_ADMIN_KEY, then retry.";
   }
+  if (/store has been suspended|store is blocked|blob.*suspended/i.test(raw)) {
+    return "Vercel Blob store is suspended/blocked. Unsuspend or create a new Blob store in Vercel, update BLOB_READ_WRITE_TOKEN, then re-drop episodes from the first failed EP upward.";
+  }
   if (/blob_not_configured|BLOB_READ_WRITE_TOKEN/i.test(raw)) {
     return "Cloud storage not configured (BLOB_READ_WRITE_TOKEN).";
   }
@@ -81,6 +84,12 @@ function friendlyUploadError(raw: string) {
     return "This host needs Vercel Blob for MP4 uploads.";
   }
   return raw;
+}
+
+function isFatalBlobError(raw: string) {
+  return /store has been suspended|store is blocked|blob.*suspended|BLOB_READ_WRITE_TOKEN|not configured|use_blob|Admin key missing/i.test(
+    raw,
+  );
 }
 
 async function readDuration(file: File): Promise<number> {
@@ -320,11 +329,31 @@ async function processQueue() {
         error: undefined,
       });
     } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Upload failed";
       patchJob(job.id, {
         status: "error",
         progress: 0,
-        error: err instanceof Error ? err.message : "Upload failed",
+        error: message,
       });
+
+      // Suspended/blocked Blob (or missing key) will fail every remaining job —
+      // abort the rest so the UI stops at the first broken episode.
+      if (isFatalBlobError(message) && activeBatch) {
+        const skipMsg = /suspended|blocked/i.test(message)
+          ? `Skipped — Blob store suspended (fix store, then re-upload from EP ${String(job.episodeNumber).padStart(2, "0")} onward)`
+          : `Skipped — ${message}`;
+        activeBatch = {
+          ...activeBatch,
+          jobs: activeBatch.jobs.map((j) =>
+            j.status === "queued"
+              ? { ...j, status: "error", progress: 0, error: skipMsg }
+              : j,
+          ),
+        };
+        emit();
+        break;
+      }
     }
   }
 

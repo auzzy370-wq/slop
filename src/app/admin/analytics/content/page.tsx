@@ -3,8 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import {
+  ColumnChart,
   DateRangeFilter,
   MetricCard,
+  SimpleBars,
 } from "@/components/admin/date-range-filter";
 import type { DateRangeKey } from "@/lib/analytics/types";
 import { useSlopStore } from "@/store/slop-store";
@@ -97,6 +99,81 @@ export default function ContentAnalyticsPage() {
             episodes.reduce((a, e) => a + e.totalWatchMs, 0) / 60000,
           )} min`}
         />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-4 font-semibold">Top episodes by plays</h2>
+          <SimpleBars
+            labelWidth={110}
+            data={[...episodes]
+              .sort((a, b) => b.plays - a.plays)
+              .slice(0, 12)
+              .map((e) => ({
+                label: titleFor(e.episodeId),
+                value: e.plays,
+              }))}
+          />
+        </section>
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <h2 className="mb-4 font-semibold">Completion funnel (avg %)</h2>
+          <SimpleBars
+            labelWidth={72}
+            formatValue={(n) => `${n.toFixed(0)}%`}
+            data={[
+              {
+                label: "25%",
+                value:
+                  episodes.length === 0
+                    ? 0
+                    : (episodes.reduce((a, e) => a + e.completion25Rate, 0) /
+                        episodes.length) *
+                      100,
+                color: "rgba(185, 154, 255, 0.35)",
+              },
+              {
+                label: "50%",
+                value:
+                  episodes.length === 0
+                    ? 0
+                    : (episodes.reduce((a, e) => a + e.completion50Rate, 0) /
+                        episodes.length) *
+                      100,
+                color: "rgba(185, 154, 255, 0.55)",
+              },
+              {
+                label: "75%",
+                value:
+                  episodes.length === 0
+                    ? 0
+                    : (episodes.reduce((a, e) => a + e.completion75Rate, 0) /
+                        episodes.length) *
+                      100,
+                color: "rgba(185, 154, 255, 0.75)",
+              },
+              {
+                label: "100%",
+                value: avgCompletion * 100,
+                color: "var(--slop-violet)",
+              },
+            ]}
+          />
+          <div className="mt-6">
+            <h3 className="mb-3 text-sm font-semibold text-white/80">
+              Watch time by episode (min)
+            </h3>
+            <ColumnChart
+              height={120}
+              data={[...episodes]
+                .sort((a, b) => b.totalWatchMs - a.totalWatchMs)
+                .slice(0, 14)
+                .map((e) => ({
+                  label: titleFor(e.episodeId).slice(0, 8),
+                  value: Math.round(e.totalWatchMs / 60000),
+                }))}
+            />
+          </div>
+        </section>
       </div>
 
       <div className="overflow-x-auto rounded-2xl border border-white/10">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminKey } from "@/lib/admin-guard";
+import { getBlobHealth } from "@/lib/admin/blob-health";
 import {
   getStorageReport,
   planOrphanPurge,
@@ -19,10 +20,17 @@ export async function GET(request: Request) {
   if (denied) return denied;
 
   try {
-    const report = await getStorageReport();
-    const plan = report.reclaimableBytes > 0 ? await planOrphanPurge() : [];
+    const [report, health] = await Promise.all([
+      getStorageReport(),
+      getBlobHealth({ probeWrite: false }),
+    ]);
+    const plan =
+      report.reclaimableBytes > 0 && !health.suspended
+        ? await planOrphanPurge()
+        : [];
     return NextResponse.json({
       ok: true,
+      health,
       report,
       purgePreview: {
         files: plan.length,
