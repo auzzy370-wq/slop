@@ -18,7 +18,7 @@ function HouseAd({ index }: { index: number }) {
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(ellipse_at_top,_#1c1630_0%,_#111116_55%)] px-6 text-center">
-      <div className="absolute left-4 top-4 rounded-md border border-white/20 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/70">
+      <div className="absolute right-4 top-[max(1rem,calc(env(safe-area-inset-top)+3.25rem))] rounded-md border border-white/20 bg-black/50 px-2 py-1 text-[10px] font-bold uppercase tracking-widest text-white/70">
         Advertisement
       </div>
       <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--slop-violet)]/15 text-[var(--slop-violet)]">
