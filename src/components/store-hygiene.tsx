@@ -38,11 +38,11 @@ export function StoreHygiene() {
       catalog.dramas,
       state.likes,
       state.saves,
-      state.comments.filter((c) => !String(c.id).startsWith("cmt_")),
+      state.comments,
     );
     useSlopStore.setState({
       ...derived,
-      comments: state.comments.filter((c) => !String(c.id).startsWith("cmt_")),
+      comments: state.comments,
     });
 
     let cancelled = false;

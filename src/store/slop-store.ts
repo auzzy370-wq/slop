@@ -50,13 +50,26 @@ interface SlopState {
   settings: PlatformSettings;
   subscription: SubscriptionRecord | null;
 
-  toggleLike: (videoId: string) => { ok: boolean; needsAuth?: boolean };
+  /** Optional actorId for guests (anon id). Signed-in users use currentUser. */
+  toggleLike: (
+    videoId: string,
+    actor?: { id: string; displayName?: string },
+  ) => { ok: boolean; needsAuth?: boolean };
   toggleSave: (videoId: string) => { ok: boolean; needsAuth?: boolean };
   addComment: (
     videoId: string,
     text: string,
-    opts?: { parentId?: string; replyToName?: string },
+    opts?: {
+      parentId?: string;
+      replyToName?: string;
+      actor?: { id: string; displayName: string; avatarUrl?: string | null };
+    },
   ) => { ok: boolean; needsAuth?: boolean; error?: string };
+  /** Replace likes/comments from the shared server store. */
+  mergeSharedEngagement: (input: {
+    likes: Like[];
+    comments: Comment[];
+  }) => void;
   deleteComment: (commentId: string) => void;
   addReport: (input: {
     contentType: "video" | "comment";
@@ -154,11 +167,13 @@ export const useSlopStore = create<SlopState>()(
       settings: DEFAULT_SETTINGS,
       subscription: null,
 
-      toggleLike: (videoId) => {
+      toggleLike: (videoId, actor) => {
         const user = get().currentUser;
-        if (!user) return { ok: false, needsAuth: true };
+        const actorId = actor?.id || user?.id;
+        // Guests and free users can like — no account required.
+        if (!actorId) return { ok: false, needsAuth: true };
         const existing = get().likes.find(
-          (l) => l.userId === user.id && l.videoId === videoId,
+          (l) => l.userId === actorId && l.videoId === videoId,
         );
         if (existing) {
           set({
@@ -174,7 +189,7 @@ export const useSlopStore = create<SlopState>()(
             likes: [
               ...get().likes,
               {
-                userId: user.id,
+                userId: actorId,
                 videoId,
                 createdAt: new Date().toISOString(),
               },
@@ -222,7 +237,11 @@ export const useSlopStore = create<SlopState>()(
 
       addComment: (videoId, text, opts) => {
         const user = get().currentUser;
-        if (!user) return { ok: false, needsAuth: true };
+        const actor = opts?.actor;
+        const actorId = actor?.id || user?.id;
+        const displayName = actor?.displayName || user?.displayName;
+        // Guests and free users can comment — no account required.
+        if (!actorId || !displayName) return { ok: false, needsAuth: true };
         if (!get().settings.commentsEnabled) {
           return { ok: false, error: "Comments are disabled." };
         }
@@ -241,10 +260,10 @@ export const useSlopStore = create<SlopState>()(
         }
         const recent = get().comments.filter(
           (c) =>
-            c.userId === user.id &&
+            c.userId === actorId &&
             Date.now() - new Date(c.createdAt).getTime() < 15_000,
         );
-        if (recent.length >= 3) {
+        if (recent.length >= 5) {
           return { ok: false, error: "Slow down — rate limit hit." };
         }
         const replyToName = opts?.replyToName ?? null;
@@ -256,9 +275,9 @@ export const useSlopStore = create<SlopState>()(
         const comment: Comment = {
           id: uid("cmt"),
           videoId,
-          userId: user.id,
-          displayName: user.displayName,
-          avatarUrl: user.avatarUrl,
+          userId: actorId,
+          displayName,
+          avatarUrl: actor?.avatarUrl ?? user?.avatarUrl ?? null,
           text: body,
           createdAt: new Date().toISOString(),
           moderationStatus: "visible",
@@ -274,6 +293,21 @@ export const useSlopStore = create<SlopState>()(
           ),
         });
         return { ok: true };
+      },
+
+      mergeSharedEngagement: ({ likes, comments }) => {
+        const derived = applyEngagementCounts(
+          get().videos,
+          get().dramas,
+          likes,
+          get().saves,
+          comments,
+        );
+        set({
+          ...derived,
+          likes,
+          comments,
+        });
       },
 
       deleteComment: (commentId) => {
@@ -483,10 +517,9 @@ export const useSlopStore = create<SlopState>()(
 
         const likes = Array.isArray(p.likes) ? p.likes : [];
         const saves = Array.isArray(p.saves) ? p.saves : [];
-        // Drop seed demo comments; keep only user-authored (or empty)
-        const comments = Array.isArray(p.comments)
-          ? p.comments.filter((c) => !String(c.id).startsWith("cmt_"))
-          : [];
+        // Keep real comments (ids use cmt_ prefix via uid). Shared server
+        // engagement will overwrite these on hydrate.
+        const comments = Array.isArray(p.comments) ? p.comments : [];
         const catalog = catalogFromSeed(viewMap);
         const derived = applyEngagementCounts(
           catalog.videos,

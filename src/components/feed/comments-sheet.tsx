@@ -358,7 +358,7 @@ export function CommentsSheet({
                       ? `Reply to @${replyTo.displayName}…`
                       : canComment
                         ? "Add comment…"
-                        : "Sign in to comment"
+                        : "Comments are turned off"
                   }
                   maxLength={500}
                   className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-white/35"

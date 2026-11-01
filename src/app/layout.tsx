@@ -7,6 +7,7 @@ import { DesktopNav } from "@/components/layout/desktop-nav";
 import { AnalyticsProvider } from "@/components/analytics/analytics-provider";
 import { PwaRegister } from "@/components/pwa-register";
 import { StoreHygiene } from "@/components/store-hygiene";
+import { SocialHydrator } from "@/components/social-hydrator";
 import { UploadsHydrator } from "@/components/uploads-hydrator";
 import { UploadProgressDock } from "@/components/admin/upload-progress-dock";
 import { AdsenseScript } from "@/components/ads/adsense-script";
@@ -85,6 +86,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         <Suspense fallback={null}>
           <StoreHygiene />
           <UploadsHydrator />
+          <SocialHydrator />
           <AnalyticsProvider>
             <DesktopNav />
             <main className="min-h-full flex-1">{children}</main>

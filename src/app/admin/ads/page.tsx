@@ -54,9 +54,9 @@ export default function AdminAdsPage() {
         </p>
         <h1 className="mt-1 font-display text-3xl font-bold">Ads</h1>
         <p className="mt-2 max-w-2xl text-sm text-white/55">
-          Free viewers see a full-screen placement between episodes. Premium
-          skips them. Until AdSense is approved and wired, SLOP shows a house
-          ad that upsells Premium.
+          Free viewers see a full-screen break between episodes. Premium skips
+          them. Feed breaks use a house Premium CTA — AdSense iframes break the
+          reel pager, so the publisher id stays for ads.txt / verification only.
         </p>
       </div>
 

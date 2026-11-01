@@ -38,6 +38,11 @@ import {
 import { ScriptedPlayer } from "@/components/feed/scripted-player";
 import Link from "next/link";
 import { track } from "@/lib/analytics/client";
+import { resolveSocialActor } from "@/lib/social/guest";
+import {
+  syncAddComment,
+  syncToggleLike,
+} from "@/lib/social/engagement-client";
 import { getForgottenWifeScript } from "@/lib/series/forgotten-wife/scripts";
 import { getOriginalScript } from "@/lib/series/originals/catalog";
 
@@ -101,8 +106,13 @@ export function VideoCard({
   const toggleSave = useSlopStore((s) => s.toggleSave);
   const addComment = useSlopStore((s) => s.addComment);
   const deleteComment = useSlopStore((s) => s.deleteComment);
+  const mergeSharedEngagement = useSlopStore((s) => s.mergeSharedEngagement);
   const addReport = useSlopStore((s) => s.addReport);
   const recordView = useSlopStore((s) => s.recordView);
+  const [actorId, setActorId] = useState<string | null>(user?.id ?? null);
+  useEffect(() => {
+    setActorId(resolveSocialActor(user).id);
+  }, [user]);
   const drama = dramas.find((d) => d.id === video.dramaId);
   const seriesEpisodes = allVideos
     .filter((v) => v.dramaId === video.dramaId && v.status === "published")
@@ -119,7 +129,9 @@ export function VideoCard({
   const started = useRef(false);
   const endedOnce = useRef(false);
 
-  const liked = !!user && likes.some((l) => l.userId === user.id && l.videoId === video.id);
+  const liked =
+    !!actorId &&
+    likes.some((l) => l.userId === actorId && l.videoId === video.id);
   const saved = !!user && saves.some((s) => s.userId === user.id && s.videoId === video.id);
   const videoComments = comments.filter(
     (c) => c.videoId === video.id && c.moderationStatus === "visible",
@@ -465,7 +477,7 @@ export function VideoCard({
   const requireAuth = (action: string) => {
     // Bottom placement — clear of Dynamic Island / status bar and in thumb reach.
     toast.message(`Sign in to ${action}`, {
-      description: "Guests can watch and share. Accounts unlock social features.",
+      description: "Likes, comments, and shares work without an account. Saves need a sign-in.",
       position: "bottom-center",
       duration: 6000,
       action: {
@@ -478,15 +490,25 @@ export function VideoCard({
   };
 
   const onLike = () => {
-    const res = toggleLike(video.id);
-    if (res.needsAuth) requireAuth("like videos");
-    else {
-      void track("favorite_addition", {
-        userId: user?.id,
-        episodeId: video.id,
-        dramaId: video.dramaId,
-      });
+    const actor = resolveSocialActor(user);
+    const res = toggleLike(video.id, { id: actor.id });
+    if (!res.ok) {
+      toast.error("Could not like");
+      return;
     }
+    void track("favorite_addition", {
+      userId: user?.id ?? actor.id,
+      episodeId: video.id,
+      dramaId: video.dramaId,
+    });
+    void syncToggleLike({ videoId: video.id, user }).then((remote) => {
+      if (remote.ok && remote.likes) {
+        mergeSharedEngagement({
+          likes: remote.likes,
+          comments: useSlopStore.getState().comments,
+        });
+      }
+    });
   };
   const onSave = () => {
     const res = toggleSave(video.id);
@@ -503,17 +525,38 @@ export function VideoCard({
     parentId?: string;
     replyToName?: string;
   }) => {
-    const res = addComment(video.id, commentText, opts);
-    if (res.needsAuth) {
-      requireAuth("comment");
-      return;
-    }
+    const actor = resolveSocialActor(user);
+    const res = addComment(video.id, commentText, {
+      ...opts,
+      actor: {
+        id: actor.id,
+        displayName: actor.displayName,
+        avatarUrl: actor.avatarUrl,
+      },
+    });
     if (!res.ok) {
       toast.error(res.error ?? "Could not post comment");
       return;
     }
+    const postedText = commentText;
     setCommentText("");
     toast.success(opts?.parentId ? "Reply posted" : "Comment posted");
+    void syncAddComment({
+      videoId: video.id,
+      text: postedText,
+      user,
+      parentId: opts?.parentId,
+      replyToName: opts?.replyToName,
+    }).then((remote) => {
+      if (remote.ok && remote.comments) {
+        mergeSharedEngagement({
+          likes: useSlopStore.getState().likes,
+          comments: remote.comments,
+        });
+      } else if (!remote.ok) {
+        toast.error(remote.error ?? "Comment saved on this device only");
+      }
+    });
   };
 
   const shareUrl =
@@ -931,8 +974,8 @@ export function VideoCard({
         commentText={commentText}
         onCommentTextChange={setCommentText}
         onSubmit={onSubmitComment}
-        canComment={!!user}
-        currentUserId={user?.id}
+        canComment
+        currentUserId={actorId ?? undefined}
         isAdmin={user?.role === "admin"}
         onDelete={deleteComment}
       />
