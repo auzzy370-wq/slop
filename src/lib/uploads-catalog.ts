@@ -1,10 +1,13 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
+import type { Drama, Video } from "@/lib/types";
 import {
   emptyUploadsCatalog,
   UPLOADS_BLOB_PATH,
+  upsertUploadsCatalog,
   type UploadsCatalog,
 } from "@/lib/uploads-catalog-shared";
+import { slugify, uid } from "@/lib/utils";
 
 export {
   emptyUploadsCatalog,
@@ -45,7 +48,13 @@ async function readBlobCatalog(): Promise<UploadsCatalog | null> {
     const hit =
       blobs.find((b) => b.pathname === UPLOADS_BLOB_PATH) ?? blobs[0];
     if (!hit?.url) return null;
-    const res = await fetch(hit.url, { cache: "no-store" });
+    // Bust CDN — stale catalog reads during mass upload caused lost episodes.
+    const bust = `t=${Date.now()}`;
+    const url = hit.url.includes("?") ? `${hit.url}&${bust}` : `${hit.url}?${bust}`;
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+    });
     if (!res.ok) return null;
     const parsed = (await res.json()) as UploadsCatalog;
     if (!parsed || !Array.isArray(parsed.videos) || !Array.isArray(parsed.dramas)) {
@@ -65,6 +74,7 @@ async function writeBlobCatalog(catalog: UploadsCatalog): Promise<string | null>
     addRandomSuffix: false,
     allowOverwrite: true,
     contentType: "application/json",
+    cacheControlMaxAge: 0,
   });
   return blob.url;
 }
@@ -92,4 +102,144 @@ export async function saveUploadsCatalog(
     if (!url) throw err;
   }
   return { ok: true, url };
+}
+
+type BlobEpisodeHit = {
+  dramaId: string;
+  episodeNumber: number;
+  url: string;
+  pathname: string;
+};
+
+/** Scan Vercel Blob for mass-uploaded MP4s and fill any gaps in the catalog. */
+export async function rebuildUploadsCatalogFromBlobs(): Promise<{
+  catalog: UploadsCatalog;
+  added: number;
+  scanned: number;
+}> {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    throw new Error("BLOB_READ_WRITE_TOKEN is not configured");
+  }
+
+  const { list } = await import("@vercel/blob");
+  const current = await loadUploadsCatalog();
+  const hits: BlobEpisodeHit[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const page = await list({
+      prefix: "slop/",
+      limit: 1000,
+      cursor,
+    });
+    for (const blob of page.blobs) {
+      if (blob.pathname === UPLOADS_BLOB_PATH) continue;
+      if (!/\.mp4$/i.test(blob.pathname)) continue;
+      const m = blob.pathname.match(
+        /^slop\/(drama_[^/]+)\/ep-0*(\d+)/i,
+      );
+      if (!m) continue;
+      hits.push({
+        dramaId: m[1],
+        episodeNumber: Number(m[2]),
+        url: blob.url,
+        pathname: blob.pathname,
+      });
+    }
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+
+  // Latest upload wins per drama+episode
+  const latest = new Map<string, BlobEpisodeHit>();
+  for (const hit of hits) {
+    const key = `${hit.dramaId}:${hit.episodeNumber}`;
+    latest.set(key, hit);
+  }
+
+  // Only heal dramas already tracked in the catalog — ignore leftover Blob
+  // folders from abandoned upload attempts so we don't invent "Uploaded series".
+  const knownDramaIds = new Set(current.dramas.map((d) => d.id));
+  for (const v of current.videos) knownDramaIds.add(v.dramaId);
+
+  const synthesized: Video[] = [];
+  const now = new Date().toISOString();
+
+  for (const hit of latest.values()) {
+    if (!knownDramaIds.has(hit.dramaId)) continue;
+
+    const existing = current.videos.find(
+      (v) =>
+        v.dramaId === hit.dramaId && v.episodeNumber === hit.episodeNumber,
+    );
+    if (existing) {
+      if (existing.videoUrl !== hit.url) {
+        synthesized.push({ ...existing, videoUrl: hit.url });
+      }
+      continue;
+    }
+
+    const drama = current.dramas.find((d) => d.id === hit.dramaId);
+    const title = drama?.title ?? "Uploaded series";
+    synthesized.push({
+      id: uid("ep"),
+      slug: slugify(`${drama?.slug ?? hit.dramaId}-ep-${hit.episodeNumber}`),
+      dramaId: hit.dramaId,
+      episodeNumber: hit.episodeNumber,
+      title: `Episode ${hit.episodeNumber}`,
+      description: `${title} · Episode ${hit.episodeNumber}`,
+      videoUrl: hit.url,
+      thumbnailUrl: drama?.posterUrl || "/thumbnails/unsent-ep1.jpg",
+      durationSeconds: 15,
+      aspectRatio: "9:16",
+      categoryIds: drama?.genreIds ?? [],
+      tags: drama?.tags ?? [],
+      status: "published",
+      featured: false,
+      pinned: false,
+      sourceAttribution:
+        drama?.sourceAttribution || drama?.title || title,
+      licensingNotes: "Admin mass upload (rebuilt from Blob)",
+      viewCount: 0,
+      likeCount: 0,
+      commentCount: 0,
+      saveCount: 0,
+      createdAt: now,
+      publishedAt: now,
+      scheduledAt: null,
+      commentsDisabled: false,
+      playback: "video",
+    });
+  }
+
+  if (synthesized.length === 0) {
+    return { catalog: current, added: 0, scanned: latest.size };
+  }
+
+  const dramas = current.dramas.map((d) => {
+    const maxEp = Math.max(
+      d.episodeCount || 0,
+      ...[...latest.values()]
+        .filter((h) => h.dramaId === d.id)
+        .map((h) => h.episodeNumber),
+      ...synthesized
+        .filter((v) => v.dramaId === d.id)
+        .map((v) => v.episodeNumber),
+    );
+    return { ...d, episodeCount: Math.max(d.episodeCount || 0, maxEp) };
+  });
+
+  const catalog = upsertUploadsCatalog(current, {
+    dramas,
+    videos: synthesized,
+  });
+
+  await saveUploadsCatalog(catalog);
+  const added = synthesized.filter(
+    (v) =>
+      !current.videos.some(
+        (c) =>
+          c.dramaId === v.dramaId && c.episodeNumber === v.episodeNumber,
+      ),
+  ).length;
+  return { catalog, added, scanned: latest.size };
 }

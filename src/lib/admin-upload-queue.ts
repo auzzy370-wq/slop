@@ -147,14 +147,23 @@ async function uploadBlob(
   }
 }
 
-async function persistCatalog(drama: Drama, video: Video, adminKey: string) {
+/**
+ * Persist drama + every known episode for that series.
+ * Sending the full set avoids lost updates when Blob catalog reads are stale
+ * mid-batch (each single-episode save used to overwrite a lagging snapshot).
+ */
+async function persistCatalog(
+  drama: Drama,
+  videos: Video[],
+  adminKey: string,
+) {
   const res = await fetch("/api/admin/catalog/uploads", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       ...adminHeaders(adminKey),
     },
-    body: JSON.stringify({ dramas: [drama], videos: [video] }),
+    body: JSON.stringify({ dramas: [drama], videos }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
@@ -297,7 +306,12 @@ async function processQueue() {
       if (activeBatch) activeBatch.drama = drama;
 
       patchJob(job.id, { progress: 85 });
-      await persistCatalog(drama, video, batch.adminKey);
+      // Cumulative save: every episode already in the store for this drama,
+      // so a stale server snapshot can't drop earlier uploads in this batch.
+      const dramaVideos = useSlopStore
+        .getState()
+        .videos.filter((v) => v.dramaId === drama.id);
+      await persistCatalog(drama, dramaVideos, batch.adminKey);
 
       patchJob(job.id, {
         status: "done",
