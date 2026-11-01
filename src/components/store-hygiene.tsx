@@ -20,7 +20,7 @@ export function StoreHygiene() {
     if (typeof window === "undefined") return;
 
     for (const key of Object.keys(localStorage)) {
-      if (key.startsWith("slop-local-v") && key !== "slop-local-v8") {
+      if (key.startsWith("slop-local-v") && key !== "slop-local-v9") {
         localStorage.removeItem(key);
       }
     }

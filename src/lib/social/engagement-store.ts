@@ -15,6 +15,9 @@ const LOCAL_PATH = path.join(process.cwd(), "data", "social-engagement.json");
 
 let memory: SocialEngagementStore | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
+let memoryAt = 0;
+/** Never serve in-process memory older than this — serverless instances drift. */
+const MEMORY_TTL_MS = 2_000;
 
 export function emptySocialStore(): SocialEngagementStore {
   return {
@@ -100,9 +103,12 @@ async function loadFresh(): Promise<SocialEngagementStore> {
   return emptySocialStore();
 }
 
+/** Always prefer Blob/local — warm serverless memory goes stale across instances. */
 export async function readSocialStore(): Promise<SocialEngagementStore> {
-  if (memory) return memory;
+  const now = Date.now();
+  if (memory && now - memoryAt < MEMORY_TTL_MS) return memory;
   memory = await loadFresh();
+  memoryAt = Date.now();
   return memory;
 }
 
@@ -114,6 +120,7 @@ export async function updateSocialStore(
     await mutator(fresh);
     fresh.updatedAt = new Date().toISOString();
     memory = fresh;
+    memoryAt = Date.now();
     try {
       await writeBlob(fresh);
     } catch (err) {

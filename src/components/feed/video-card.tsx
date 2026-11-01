@@ -43,6 +43,7 @@ import {
   syncAddComment,
   syncToggleLike,
 } from "@/lib/social/engagement-client";
+import { requestEngagementRefresh } from "@/components/social-hydrator";
 import { getForgottenWifeScript } from "@/lib/series/forgotten-wife/scripts";
 import { getOriginalScript } from "@/lib/series/originals/catalog";
 
@@ -508,6 +509,7 @@ export function VideoCard({
           comments: useSlopStore.getState().comments,
         });
       }
+      requestEngagementRefresh();
     });
   };
   const onSave = () => {
@@ -525,38 +527,48 @@ export function VideoCard({
     parentId?: string;
     replyToName?: string;
   }) => {
+    const postedText = commentText.trim();
+    if (!postedText) return;
     const actor = resolveSocialActor(user);
-    const res = addComment(video.id, commentText, {
-      ...opts,
-      actor: {
-        id: actor.id,
-        displayName: actor.displayName,
-        avatarUrl: actor.avatarUrl,
-      },
-    });
-    if (!res.ok) {
-      toast.error(res.error ?? "Could not post comment");
-      return;
-    }
-    const postedText = commentText;
     setCommentText("");
-    toast.success(opts?.parentId ? "Reply posted" : "Comment posted");
-    void syncAddComment({
-      videoId: video.id,
-      text: postedText,
-      user,
-      parentId: opts?.parentId,
-      replyToName: opts?.replyToName,
-    }).then((remote) => {
+
+    // Server-first so every device sees the same thread. Fall back to local
+    // only if the network write fails.
+    void (async () => {
+      const remote = await syncAddComment({
+        videoId: video.id,
+        text: postedText,
+        user,
+        parentId: opts?.parentId,
+        replyToName: opts?.replyToName,
+      });
       if (remote.ok && remote.comments) {
         mergeSharedEngagement({
           likes: useSlopStore.getState().likes,
           comments: remote.comments,
         });
-      } else if (!remote.ok) {
-        toast.error(remote.error ?? "Comment saved on this device only");
+        toast.success(opts?.parentId ? "Reply posted" : "Comment posted");
+        requestEngagementRefresh();
+        return;
       }
-    });
+
+      const local = addComment(video.id, postedText, {
+        ...opts,
+        actor: {
+          id: actor.id,
+          displayName: actor.displayName,
+          avatarUrl: actor.avatarUrl,
+        },
+      });
+      if (!local.ok) {
+        setCommentText(postedText);
+        toast.error(remote.error ?? local.error ?? "Could not post comment");
+        return;
+      }
+      toast.message(opts?.parentId ? "Reply saved on this device" : "Comment saved on this device", {
+        description: "Couldn’t reach the shared feed — others may not see it yet.",
+      });
+    })();
   };
 
   const shareUrl =
@@ -771,6 +783,7 @@ export function VideoCard({
         <RailButton
           onClick={() => {
             revealChrome();
+            requestEngagementRefresh();
             setCommentsOpen(true);
           }}
           ariaLabel="Comments"

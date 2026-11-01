@@ -468,16 +468,16 @@ export const useSlopStore = create<SlopState>()(
       },
     }),
     {
-      name: "slop-local-v8",
-      version: 8,
+      name: "slop-local-v9",
+      version: 9,
       partialize: (state) => ({
         currentUser: state.currentUser,
-        // Persist only real interactions + view tallies by id — never seed fakes.
+        // Persist only personal data + view tallies. Likes/comments are shared
+        // via /api/social/* — persisting them locally let one device overwrite
+        // the server hydrate and hide comments from other viewers.
         viewCounts: Object.fromEntries(
           state.videos.map((v) => [v.id, v.viewCount] as const),
         ),
-        comments: state.comments,
-        likes: state.likes,
         saves: state.saves,
         reports: state.reports,
         settings: state.settings,
@@ -515,11 +515,10 @@ export const useSlopStore = create<SlopState>()(
           }
         }
 
-        const likes = Array.isArray(p.likes) ? p.likes : [];
         const saves = Array.isArray(p.saves) ? p.saves : [];
-        // Keep real comments (ids use cmt_ prefix via uid). Shared server
-        // engagement will overwrite these on hydrate.
-        const comments = Array.isArray(p.comments) ? p.comments : [];
+        // Likes/comments come from the shared server store (SocialHydrator).
+        const likes = current.likes ?? [];
+        const comments = current.comments ?? [];
         const catalog = catalogFromSeed(viewMap);
         const derived = applyEngagementCounts(
           catalog.videos,
@@ -558,7 +557,7 @@ export const useSlopStore = create<SlopState>()(
           for (const key of Object.keys(localStorage)) {
             if (
               key.startsWith("slop-local-v") &&
-              key !== "slop-local-v8"
+              key !== "slop-local-v9"
             ) {
               localStorage.removeItem(key);
             }
