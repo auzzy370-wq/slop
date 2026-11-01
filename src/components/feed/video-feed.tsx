@@ -108,14 +108,19 @@ export function VideoFeed({
 
   const measure = useCallback(() => {
     const el = viewportRef.current;
-    const parent = el?.parentElement;
+    if (!el) return pageHRef.current || 1;
+    const parent = el.parentElement;
+    // Stage box is source of truth. Never size slides from window.innerHeight —
+    // that disagrees with the absolute stage on iOS (URL chrome / PiP) and
+    // shows two reels at once around ad breaks.
+    const rectH = Math.round(
+      (parent ?? el).getBoundingClientRect().height,
+    );
     const fromParent = parent?.clientHeight ?? 0;
-    const fromSelf = el?.clientHeight ?? 0;
-    // Prefer the stage/parent height so every reel (and ad break) matches the
-    // visible frame. Max-ing with window.innerHeight made slides shorter than
-    // the viewport and showed two reels at once around ads.
+    const fromSelf = el.clientHeight;
     const h = Math.round(
-      (fromParent > 40 ? fromParent : 0) ||
+      (rectH > 40 ? rectH : 0) ||
+        (fromParent > 40 ? fromParent : 0) ||
         (fromSelf > 40 ? fromSelf : 0) ||
         window.visualViewport?.height ||
         window.innerHeight ||
@@ -125,10 +130,10 @@ export function VideoFeed({
     // Avoid redundant setState — ResizeObserver + height writes can otherwise
     // thrash into "Maximum update depth exceeded" on share landings.
     setPageH((prev) => (prev === h ? prev : h));
-    if (el) {
-      el.style.setProperty("--slop-feed-page", `${h}px`);
-      el.style.height = `${h}px`;
-    }
+    el.style.setProperty("--slop-feed-page", `${h}px`);
+    // Keep scroller locked to the stage; clear any prior inline height mismatch.
+    el.style.height = `${h}px`;
+    el.style.maxHeight = `${h}px`;
     return h;
   }, []);
 
@@ -145,7 +150,7 @@ export function VideoFeed({
 
   const goTo = useCallback(
     (idx: number, animate = true) => {
-      const h = pageHRef.current || measure();
+      const h = measure();
       const clamped = Math.max(0, Math.min(itemsLenRef.current - 1, idx));
       indexRef.current = clamped;
       setActiveIndex(clamped);
@@ -159,6 +164,10 @@ export function VideoFeed({
         animTimerRef.current = window.setTimeout(() => {
           animatingRef.current = false;
           animTimerRef.current = null;
+          // Hard-snap after the tween so a mid-drag / mid-ad never sticks
+          // between two slides.
+          const nextH = measure();
+          applyTransform(-indexRef.current * nextH, false);
         }, PAGE_MS + 20);
       } else {
         animatingRef.current = false;
@@ -207,15 +216,17 @@ export function VideoFeed({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: avoid re-paging on every items rebuild
   }, [hydrated, startVideoId, items.length]);
 
-  // Resize keeps the current page locked
+  // Resize / visualViewport keeps the current page locked (iOS chrome + PiP).
   useEffect(() => {
     if (!hydrated) return;
     const onResize = () => {
+      if (animatingRef.current) return;
       measure();
       goTo(indexRef.current, false);
     };
     window.addEventListener("resize", onResize);
     window.visualViewport?.addEventListener("resize", onResize);
+    window.visualViewport?.addEventListener("scroll", onResize);
     const parent = viewportRef.current?.parentElement;
     const ro =
       parent && typeof ResizeObserver !== "undefined"
@@ -225,6 +236,7 @@ export function VideoFeed({
     return () => {
       window.removeEventListener("resize", onResize);
       window.visualViewport?.removeEventListener("resize", onResize);
+      window.visualViewport?.removeEventListener("scroll", onResize);
       ro?.disconnect();
     };
   }, [hydrated, goTo, measure]);
