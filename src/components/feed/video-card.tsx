@@ -17,6 +17,7 @@ import {
   MoreHorizontal,
   Play,
   Share2,
+  Volume1,
   Volume2,
   VolumeX,
   Flag,
@@ -53,7 +54,9 @@ interface VideoCardProps {
   video: Video;
   active: boolean;
   muted: boolean;
+  volume?: number;
   onToggleMute: () => void;
+  onVolumeChange?: (volume: number) => void;
   categoryNames: string[];
   onJumpToVideo?: (videoId: string) => void;
   onEpisodeEnded?: () => void;
@@ -64,7 +67,9 @@ export function VideoCard({
   video,
   active,
   muted,
+  volume = 1,
   onToggleMute,
+  onVolumeChange,
   categoryNames,
   onJumpToVideo,
   onEpisodeEnded,
@@ -350,12 +355,13 @@ export function VideoCard({
     muted,
   ]);
 
-  // Keep mute attribute in sync without restarting playback.
+  // Keep mute / volume in sync without restarting playback.
   useEffect(() => {
     const el = videoRef.current;
     if (!el || !active) return;
-    el.muted = muted;
-  }, [muted, active, mediaKey]);
+    el.volume = Math.max(0, Math.min(1, volume));
+    el.muted = muted || volume <= 0;
+  }, [muted, volume, active, mediaKey]);
 
   useEffect(() => {
     if (!active) {
@@ -567,13 +573,41 @@ export function VideoCard({
     const onKey = (e: KeyboardEvent) => {
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key !== "f" && e.key !== "F") return;
-      e.preventDefault();
-      void toggleFullscreen();
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        void toggleFullscreen();
+        return;
+      }
+      if (isScripted) return;
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        revealChrome();
+        onToggleMute();
+        return;
+      }
+      if (e.key === "+" || e.key === "=" || e.key === "ArrowUp" && e.shiftKey) {
+        e.preventDefault();
+        revealChrome();
+        onVolumeChange?.(Math.min(1, volume + 0.1));
+        return;
+      }
+      if (e.key === "-" || e.key === "_" || e.key === "ArrowDown" && e.shiftKey) {
+        e.preventDefault();
+        revealChrome();
+        onVolumeChange?.(Math.max(0, volume - 0.1));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [active, toggleFullscreen]);
+  }, [
+    active,
+    toggleFullscreen,
+    isScripted,
+    onToggleMute,
+    onVolumeChange,
+    volume,
+    revealChrome,
+  ]);
 
   // Fullscreen: mouse / touch movement brings chrome back (same 10s hide timer).
   useEffect(() => {
@@ -1132,19 +1166,49 @@ export function VideoCard({
           <Share2 className="fill-transparent" />
         </RailButton>
         {!isScripted ? (
-          <RailButton
-            onClick={() => {
-              revealChrome();
-              onToggleMute();
-            }}
-            ariaLabel={muted ? "Unmute" : "Mute"}
+          <div
+            className="slop-volume-stack flex flex-col items-center gap-1"
+            data-no-swipe
           >
-            {muted ? (
-              <VolumeX className="fill-transparent" />
-            ) : (
-              <Volume2 className="fill-transparent" />
-            )}
-          </RailButton>
+            <button
+              type="button"
+              className="slop-volume-step"
+              aria-label="Volume up"
+              onClick={() => {
+                revealChrome();
+                onVolumeChange?.(Math.min(1, volume + 0.1));
+              }}
+            >
+              <span aria-hidden>+</span>
+            </button>
+            <RailButton
+              onClick={() => {
+                revealChrome();
+                onToggleMute();
+              }}
+              ariaLabel={muted || volume <= 0 ? "Unmute" : "Mute"}
+              label={`${Math.round((muted ? 0 : volume) * 100)}`}
+            >
+              {muted || volume <= 0 ? (
+                <VolumeX className="fill-transparent" />
+              ) : volume < 0.45 ? (
+                <Volume1 className="fill-transparent" />
+              ) : (
+                <Volume2 className="fill-transparent" />
+              )}
+            </RailButton>
+            <button
+              type="button"
+              className="slop-volume-step"
+              aria-label="Volume down"
+              onClick={() => {
+                revealChrome();
+                onVolumeChange?.(Math.max(0, volume - 0.1));
+              }}
+            >
+              <span aria-hidden>−</span>
+            </button>
+          </div>
         ) : null}
         <RailButton
           active={isFullscreen}

@@ -50,7 +50,31 @@ export function VideoFeed({
   const [activeIndex, setActiveIndex] = useState(0);
   // Desktop Chrome/Firefox block unmuted autoplay — start muted so PC plays.
   const [muted, setMuted] = useState(true);
+  const [volume, setVolume] = useState(1);
   const [pageH, setPageH] = useState(0);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("slop-volume");
+      if (raw == null) return;
+      const n = Number(raw);
+      if (Number.isFinite(n) && n >= 0 && n <= 1) setVolume(n);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const persistVolume = useCallback((next: number) => {
+    const clamped = Math.max(0, Math.min(1, Math.round(next * 10) / 10));
+    setVolume(clamped);
+    try {
+      localStorage.setItem("slop-volume", String(clamped));
+    } catch {
+      /* ignore */
+    }
+    if (clamped <= 0) setMuted(true);
+    else setMuted(false);
+  }, []);
   /** Hide live video during swipe so poster track can peek through. */
   const [peeking, setPeeking] = useState(false);
 
@@ -552,8 +576,18 @@ export function VideoFeed({
             key={activeVideo.id}
             video={activeVideo}
             active
-            muted={muted}
-            onToggleMute={() => setMuted((m) => !m)}
+            muted={muted || volume <= 0}
+            volume={volume}
+            onToggleMute={() => {
+              if (muted || volume <= 0) {
+                const restore = volume <= 0 ? 0.7 : volume;
+                persistVolume(restore);
+                setMuted(false);
+              } else {
+                setMuted(true);
+              }
+            }}
+            onVolumeChange={persistVolume}
             categoryNames={activeVideo.categoryIds
               .map((id) => categoryNameMap[id])
               .filter(Boolean)}
