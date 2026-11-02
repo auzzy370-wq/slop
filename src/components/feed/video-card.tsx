@@ -9,6 +9,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  Airplay,
   Bookmark,
   ChevronLeft,
   Clapperboard,
@@ -789,6 +790,45 @@ export function VideoCard({
     toast.message("Picture-in-picture isn’t available here", { duration: 1600 });
   }, [revealChrome]);
 
+  const openAirPlay = useCallback(() => {
+    revealChrome();
+    const el = videoRef.current as
+      | (HTMLVideoElement & {
+          webkitShowPlaybackTargetPicker?: () => void;
+          remote?: { prompt: () => Promise<void> };
+        })
+      | null;
+    if (!el) return;
+
+    // Safari / iOS / macOS AirPlay picker
+    if (typeof el.webkitShowPlaybackTargetPicker === "function") {
+      try {
+        el.webkitShowPlaybackTargetPicker();
+        setMoreOpen(false);
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+
+    // Chrome Remote Playback (Cast) when the browser exposes it
+    if (el.remote && typeof el.remote.prompt === "function") {
+      void el.remote
+        .prompt()
+        .then(() => setMoreOpen(false))
+        .catch(() => {
+          toast.message("Couldn’t open the cast picker", { duration: 1800 });
+        });
+      return;
+    }
+
+    toast.message("AirPlay isn’t available here", {
+      description:
+        "Open SLOP in Safari on iPhone, iPad, or Mac to stream to Apple TV.",
+      duration: 2800,
+    });
+  }, [revealChrome]);
+
   useEffect(() => {
     const onEnter = () => setIsPip(true);
     const onLeave = () => setIsPip(false);
@@ -1278,7 +1318,10 @@ export function VideoCard({
           />
           <video
             key={`${video.id}-${mediaKey}`}
-            ref={videoRef}
+            ref={(node) => {
+              videoRef.current = node;
+              if (node) node.setAttribute("x-webkit-airplay", "allow");
+            }}
             className="slop-feed-video"
             src={resolvePlaybackUrl(video.videoUrl)}
             playsInline
@@ -1906,6 +1949,16 @@ export function VideoCard({
                   {isPip ? "Exit picture-in-picture" : "Picture-in-picture"}
                 </button>
               </div>
+            ) : null}
+            {!isScripted ? (
+              <button
+                type="button"
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
+                onClick={() => openAirPlay()}
+              >
+                <Airplay className="h-4 w-4 text-white/60" />
+                AirPlay / stream to TV
+              </button>
             ) : null}
             <button
               type="button"
