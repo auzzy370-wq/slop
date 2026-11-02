@@ -11,6 +11,7 @@ import { DramaCard } from "@/components/browse/drama-card";
 import { useSlopStore } from "@/store/slop-store";
 import { getFeed } from "@/lib/feed";
 import { formatCount } from "@/lib/utils";
+import { watchHref } from "@/lib/watch-url";
 
 function SearchInner() {
   const params = useSearchParams();
@@ -98,10 +99,16 @@ function SearchInner() {
               Episodes
             </h2>
             <div className="space-y-3">
-              {episodeResults.map((video) => (
+              {episodeResults.map((video) => {
+                const series = dramas.find((d) => d.id === video.dramaId);
+                return (
                 <Link
                   key={video.id}
-                  href={`/watch?start=${video.id}`}
+                  href={watchHref({
+                    episodeId: video.id,
+                    dramaId: video.dramaId,
+                    dramaSlug: series?.slug,
+                  })}
                   className="flex gap-3 overflow-hidden rounded-2xl border border-white/10 bg-black/30"
                 >
                   <div
@@ -121,7 +128,8 @@ function SearchInner() {
                     </p>
                   </div>
                 </Link>
-              ))}
+                );
+              })}
             </div>
           </section>
         )}

@@ -7,6 +7,7 @@ import { SlopWordmark } from "@/components/brand/logo";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
 import { track } from "@/lib/analytics/client";
+import { watchHref } from "@/lib/watch-url";
 
 export function DramaDetail({ slug }: { slug: string }) {
   const dramas = useSlopStore((s) => s.dramas);
@@ -91,7 +92,11 @@ export function DramaDetail({ slug }: { slug: string }) {
             </p>
             {first && (
               <Link
-                href={`/watch?drama=${drama.id}&dramaSlug=${drama.slug}&start=${first.id}`}
+                href={watchHref({
+                  episodeId: first.id,
+                  dramaId: drama.id,
+                  dramaSlug: drama.slug,
+                })}
                 className="mt-6 inline-flex h-12 w-fit items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)]"
               >
                 <Play className="h-4 w-4 fill-current" /> Play Episode 1
@@ -112,7 +117,11 @@ export function DramaDetail({ slug }: { slug: string }) {
           {episodes.map((ep) => (
             <Link
               key={ep.id}
-              href={`/watch?drama=${drama.id}&dramaSlug=${drama.slug}&start=${ep.id}`}
+              href={watchHref({
+                episodeId: ep.id,
+                dramaId: drama.id,
+                dramaSlug: drama.slug,
+              })}
               className="flex gap-3 overflow-hidden rounded-2xl border border-white/10 bg-[var(--slop-panel)] transition hover:border-[var(--slop-violet)]/40"
             >
               <div className="relative h-24 w-16 shrink-0 sm:w-20">

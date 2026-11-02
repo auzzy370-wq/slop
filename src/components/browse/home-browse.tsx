@@ -12,6 +12,7 @@ import {
 import { sortDramasByChart } from "@/lib/engagement";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
+import { watchHref } from "@/lib/watch-url";
 import type { Drama } from "@/lib/types";
 
 export function HomeBrowse() {
@@ -102,7 +103,11 @@ export function HomeBrowse() {
                 <Link
                   href={
                     firstEpisode
-                      ? `/watch?start=${firstEpisode.id}`
+                      ? watchHref({
+                          episodeId: firstEpisode.id,
+                          dramaId: featured.id,
+                          dramaSlug: featured.slug,
+                        })
                       : `/drama/${featured.slug}`
                   }
                   className="inline-flex h-12 items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110"

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { getFeed } from "@/lib/feed";
 import type { FeedSection } from "@/lib/types";
 import { useSlopStore } from "@/store/slop-store";
+import { watchHref } from "@/lib/watch-url";
 import { AdSlot } from "./ad-slot";
 import { VideoCard } from "./video-card";
 
@@ -394,11 +395,13 @@ export function VideoFeed({
       const target = videos.find((v) => v.id === videoId);
       if (!target) return;
       const drama = dramas.find((d) => d.id === target.dramaId);
-      const params = new URLSearchParams();
-      params.set("start", target.id);
-      params.set("drama", target.dramaId);
-      if (drama?.slug) params.set("dramaSlug", drama.slug);
-      router.push(`/watch?${params.toString()}`);
+      router.push(
+        watchHref({
+          episodeId: target.id,
+          dramaId: target.dramaId,
+          dramaSlug: drama?.slug,
+        }),
+      );
     },
     [items, goTo, videos, dramas, router],
   );

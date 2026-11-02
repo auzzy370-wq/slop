@@ -5,6 +5,7 @@ import { ArrowLeft, Play } from "lucide-react";
 import { DramaCard } from "@/components/browse/drama-card";
 import { GenreTile, genreCount, genreCover } from "@/components/browse/genre-tile";
 import { useSlopStore } from "@/store/slop-store";
+import { watchHref } from "@/lib/watch-url";
 
 export function CategoryFeed({ slug }: { slug: string }) {
   const categories = useSlopStore((s) => s.categories);
@@ -83,13 +84,17 @@ export function CategoryFeed({ slug }: { slug: string }) {
             {category.description}
           </p>
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            {firstEpisode ? (
+            {firstEpisode && featuredDrama ? (
               <Link
-                href={`/watch?start=${firstEpisode.id}`}
+                href={watchHref({
+                  episodeId: firstEpisode.id,
+                  dramaId: featuredDrama.id,
+                  dramaSlug: featuredDrama.slug,
+                })}
                 className="inline-flex h-11 items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-5 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110"
               >
                 <Play className="h-4 w-4 fill-current" />
-                Watch {featuredDrama?.title}
+                Watch {featuredDrama.title}
               </Link>
             ) : null}
             <p className="text-xs uppercase tracking-[0.16em] text-white/40">

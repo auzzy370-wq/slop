@@ -13,11 +13,12 @@ import {
 import { VideoFeed } from "@/components/feed/video-feed";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
+import { watchHref } from "@/lib/watch-url";
 
 function WatchInner() {
   const params = useSearchParams();
   const start = params.get("start") ?? undefined;
-  const dramaId = params.get("drama") ?? undefined;
+  const dramaParam = params.get("drama") ?? undefined;
   const dramaSlug = params.get("dramaSlug") ?? undefined;
   const feed = params.get("feed");
 
@@ -25,34 +26,60 @@ function WatchInner() {
   const dramas = useSlopStore((s) => s.dramas);
   const hydrated = useSlopStore((s) => s.hydrated);
 
+  // Prefer explicit drama id, then slug, then the start episode's series.
+  // Desktop episode rail used to omit `drama=` and fell into For You — wrong EPs.
+  const resolvedDramaId = useMemo(() => {
+    if (!hydrated) return undefined;
+    if (dramaParam) return dramaParam;
+    if (dramaSlug) {
+      const bySlug = dramas.find((d) => d.slug === dramaSlug);
+      if (bySlug) return bySlug.id;
+    }
+    if (start) {
+      const ep = videos.find((v) => v.id === start);
+      if (ep?.dramaId) return ep.dramaId;
+    }
+    return undefined;
+  }, [hydrated, dramaParam, dramaSlug, dramas, start, videos]);
+
+  const seriesLocked = Boolean(resolvedDramaId);
+
   const startVideo = useMemo(() => {
     if (!hydrated) return undefined;
-    if (start) return videos.find((v) => v.id === start);
-    if (dramaId) {
+    if (start) {
+      const hit = videos.find((v) => v.id === start);
+      if (hit) return hit;
+    }
+    if (resolvedDramaId) {
       return videos
-        .filter((v) => v.dramaId === dramaId && v.status === "published")
+        .filter(
+          (v) => v.dramaId === resolvedDramaId && v.status === "published",
+        )
         .sort((a, b) => a.episodeNumber - b.episodeNumber)[0];
     }
     return videos.find((v) => v.status === "published");
-  }, [hydrated, videos, start, dramaId]);
+  }, [hydrated, videos, start, resolvedDramaId]);
 
   const drama = useMemo(() => {
-    if (!startVideo) return dramas.find((d) => d.slug === dramaSlug);
-    return dramas.find((d) => d.id === startVideo.dramaId);
-  }, [dramas, startVideo, dramaSlug]);
+    if (resolvedDramaId) {
+      return dramas.find((d) => d.id === resolvedDramaId);
+    }
+    if (dramaSlug) return dramas.find((d) => d.slug === dramaSlug);
+    if (startVideo) return dramas.find((d) => d.id === startVideo.dramaId);
+    return undefined;
+  }, [dramas, resolvedDramaId, dramaSlug, startVideo]);
 
   const episodeList = useMemo(() => {
     if (!drama) return [];
     return videos
       .filter((v) => v.dramaId === drama.id && v.status === "published")
-      .sort((a, b) => a.episodeNumber - b.episodeNumber)
-      .slice(0, 8);
+      .sort((a, b) => a.episodeNumber - b.episodeNumber);
   }, [videos, drama]);
 
-  const backHref = dramaSlug
-    ? `/drama/${dramaSlug}`
-    : drama
-      ? `/drama/${drama.slug}`
+  const backHref = drama
+    ? `/drama/${drama.slug}`
+    : dramaSlug
+      ? `/drama/${dramaSlug}`
       : "/";
 
   return (
@@ -119,10 +146,14 @@ function WatchInner() {
       <div className="slop-watch-stage">
         <VideoFeed
           section={
-            dramaId ? "drama" : feed === "trending" ? "trending" : "for-you"
+            seriesLocked
+              ? "drama"
+              : feed === "trending"
+                ? "trending"
+                : "for-you"
           }
-          categoryId={dramaId ?? undefined}
-          startVideoId={start}
+          categoryId={resolvedDramaId}
+          startVideoId={start ?? startVideo?.id}
         />
       </div>
 
@@ -133,13 +164,17 @@ function WatchInner() {
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">
               Episodes
             </p>
-            <ul className="mt-3 space-y-1">
+            <ul className="mt-3 max-h-[min(52vh,420px)] space-y-1 overflow-y-auto overscroll-contain pr-1">
               {episodeList.map((ep) => {
                 const active = startVideo?.id === ep.id;
                 return (
                   <li key={ep.id}>
                     <Link
-                      href={`/watch?start=${ep.id}&dramaSlug=${drama.slug}`}
+                      href={watchHref({
+                        episodeId: ep.id,
+                        dramaId: drama.id,
+                        dramaSlug: drama.slug,
+                      })}
                       className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition ${
                         active
                           ? "bg-[var(--slop-violet)]/20 text-white"
@@ -167,14 +202,12 @@ function WatchInner() {
                 );
               })}
             </ul>
-            {drama.episodeCount > episodeList.length && (
-              <Link
-                href={`/drama/${drama.slug}`}
-                className="mt-3 block text-center text-xs font-semibold text-[var(--slop-violet)]"
-              >
-                All {drama.episodeCount} episodes
-              </Link>
-            )}
+            <Link
+              href={`/drama/${drama.slug}`}
+              className="mt-3 block text-center text-xs font-semibold text-[var(--slop-violet)]"
+            >
+              Series details
+            </Link>
           </div>
         )}
 
