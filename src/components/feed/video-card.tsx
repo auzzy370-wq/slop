@@ -19,7 +19,6 @@ import {
   MoreHorizontal,
   PictureInPicture2,
   Play,
-  Plus,
   RotateCcw,
   Share2,
   Volume1,
@@ -211,7 +210,6 @@ export function VideoCard({
   );
   const seriesTitle = drama?.title ?? video.sourceAttribution;
   const dramaHref = drama ? `/drama/${drama.slug}` : "/";
-  const [followingSeries, setFollowingSeries] = useState(false);
 
   useEffect(() => {
     if (!active) {
@@ -1409,49 +1407,13 @@ export function VideoCard({
         </button>
       )}
 
-      {/* Social rail — Pine / TikTok lower-right: avatar · like · comment · save · share */}
+      {/* Social rail — Pine / TikTok lower-right: like · comment · save · share */}
       <div
         className={`slop-action-rail absolute right-2 bottom-[6.75rem] z-40 flex flex-col items-center gap-3.5 sm:right-2.5 sm:bottom-[7.25rem] sm:gap-4${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
-        <button
-          type="button"
-          onClick={() => {
-            revealChrome();
-            setFollowingSeries((v) => {
-              const next = !v;
-              toast.message(next ? "Following series" : "Unfollowed", {
-                duration: 1400,
-              });
-              return next;
-            });
-          }}
-          className="slop-rail-btn relative mb-0.5 flex h-11 w-11 items-center justify-center"
-          aria-label={followingSeries ? "Unfollow series" : "Follow series"}
-          aria-pressed={followingSeries}
-          data-no-swipe
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={drama?.posterUrl || video.thumbnailUrl}
-            alt=""
-            className="h-11 w-11 rounded-full object-cover ring-2 ring-white/90"
-            draggable={false}
-          />
-          <span
-            className={`absolute -bottom-1 left-1/2 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full ${
-              followingSeries ? "bg-white text-black" : "bg-[#fe2c55] text-white"
-            }`}
-          >
-            {followingSeries ? (
-              <span className="text-[10px] font-bold leading-none">✓</span>
-            ) : (
-              <Plus className="h-3 w-3" strokeWidth={3} />
-            )}
-          </span>
-        </button>
         <RailButton
           active={liked}
           onClick={() => {
