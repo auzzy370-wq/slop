@@ -11,7 +11,9 @@ import {
   Bookmark,
   Clapperboard,
   Heart,
+  Maximize2,
   MessageCircle,
+  Minimize2,
   MoreHorizontal,
   Play,
   Share2,
@@ -69,6 +71,7 @@ export function VideoCard({
   onPlaybackFailed,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const rootRef = useRef<HTMLElement>(null);
   const isScripted = video.playback === "scripted";
   const script = (() => {
     if (!isScripted || !video.scriptSeriesId) return undefined;
@@ -90,6 +93,7 @@ export function VideoCard({
   const notifiedFail = useRef(false);
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -430,6 +434,111 @@ export function VideoCard({
     scheduleChromeHide,
   ]);
 
+  const getFullscreenElement = () =>
+    document.fullscreenElement ||
+    // Safari / older Chromium (Opera Go)
+    (document as Document & { webkitFullscreenElement?: Element | null })
+      .webkitFullscreenElement ||
+    null;
+
+  const exitFullscreenSafe = useCallback(async () => {
+    const doc = document as Document & {
+      webkitExitFullscreen?: () => Promise<void> | void;
+      webkitCancelFullScreen?: () => Promise<void> | void;
+    };
+    try {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (doc.webkitExitFullscreen) await doc.webkitExitFullscreen();
+      else if (doc.webkitCancelFullScreen) await doc.webkitCancelFullScreen();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  const toggleFullscreen = useCallback(async () => {
+    revealChrome();
+    const root = rootRef.current;
+    if (!root) return;
+
+    if (getFullscreenElement()) {
+      await exitFullscreenSafe();
+      return;
+    }
+
+    const req =
+      root.requestFullscreen?.bind(root) ||
+      (
+        root as HTMLElement & {
+          webkitRequestFullscreen?: () => Promise<void> | void;
+          webkitRequestFullScreen?: () => Promise<void> | void;
+        }
+      ).webkitRequestFullscreen?.bind(root) ||
+      (
+        root as HTMLElement & {
+          webkitRequestFullScreen?: () => Promise<void> | void;
+        }
+      ).webkitRequestFullScreen?.bind(root);
+
+    if (req) {
+      try {
+        await req();
+        return;
+      } catch {
+        /* fall through to iOS video fullscreen */
+      }
+    }
+
+    // iOS Safari: element fullscreen is limited — use the video control.
+    const media = videoRef.current as
+      | (HTMLVideoElement & { webkitEnterFullscreen?: () => void })
+      | null;
+    if (media?.webkitEnterFullscreen) {
+      try {
+        media.webkitEnterFullscreen();
+        return;
+      } catch {
+        /* ignore */
+      }
+    }
+
+    toast.message("Fullscreen isn’t available in this browser", {
+      duration: 1800,
+    });
+  }, [exitFullscreenSafe, revealChrome]);
+
+  useEffect(() => {
+    const sync = () => setIsFullscreen(Boolean(getFullscreenElement()));
+    document.addEventListener("fullscreenchange", sync);
+    document.addEventListener("webkitfullscreenchange", sync);
+    return () => {
+      document.removeEventListener("fullscreenchange", sync);
+      document.removeEventListener("webkitfullscreenchange", sync);
+    };
+  }, []);
+
+  // Leave fullscreen when this card is no longer the active episode.
+  useEffect(() => {
+    if (active) return;
+    if (!getFullscreenElement()) return;
+    const root = rootRef.current;
+    if (root && getFullscreenElement() === root) {
+      void exitFullscreenSafe();
+    }
+  }, [active, exitFullscreenSafe]);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (e.key !== "f" && e.key !== "F") return;
+      e.preventDefault();
+      void toggleFullscreen();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active, toggleFullscreen]);
+
   const onTimeUpdate = () => {
     const el = videoRef.current;
     if (!el || !el.duration) return;
@@ -680,7 +789,12 @@ export function VideoCard({
   };
 
   return (
-    <article className="relative h-full w-full overflow-hidden bg-[var(--slop-black)]">
+    <article
+      ref={rootRef}
+      className={`slop-player-root relative h-full w-full overflow-hidden bg-[var(--slop-black)]${
+        isFullscreen ? " is-fullscreen" : ""
+      }`}
+    >
       {script ? (
         <ScriptedPlayer
           script={script}
@@ -953,6 +1067,19 @@ export function VideoCard({
           </RailButton>
         ) : null}
         <RailButton
+          active={isFullscreen}
+          onClick={() => {
+            void toggleFullscreen();
+          }}
+          ariaLabel={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+        >
+          {isFullscreen ? (
+            <Minimize2 className="fill-transparent" />
+          ) : (
+            <Maximize2 className="fill-transparent" />
+          )}
+        </RailButton>
+        <RailButton
           onClick={() => {
             revealChrome();
             setReportOpen(true);
@@ -1088,6 +1215,20 @@ export function VideoCard({
                 {formatSpeed(speed)}
               </button>
             ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                void toggleFullscreen();
+              }}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
           </div>
         </div>
       </div>
