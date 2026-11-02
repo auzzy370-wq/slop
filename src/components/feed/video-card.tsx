@@ -148,6 +148,18 @@ export function VideoCard({
   const videoComments = comments.filter(
     (c) => c.videoId === video.id && c.moderationStatus === "visible",
   );
+  // Prefer live store counters — prop video can lag after SocialHydrator merges.
+  const liveVideo = allVideos.find((v) => v.id === video.id);
+  const likeCount = Math.max(
+    liveVideo?.likeCount ?? 0,
+    likes.filter((l) => l.videoId === video.id).length,
+    video.likeCount ?? 0,
+  );
+  const commentCount = Math.max(
+    liveVideo?.commentCount ?? 0,
+    videoComments.length,
+    video.commentCount ?? 0,
+  );
 
   useEffect(() => {
     if (!active) {
@@ -1079,7 +1091,7 @@ export function VideoCard({
             onLike();
           }}
           ariaLabel="Like"
-          label={formatCount(video.likeCount)}
+          label={formatCount(likeCount)}
         >
           <Heart
             className={
@@ -1094,7 +1106,7 @@ export function VideoCard({
             setCommentsOpen(true);
           }}
           ariaLabel="Comments"
-          label={formatCount(video.commentCount)}
+          label={formatCount(commentCount)}
         >
           <MessageCircle className="fill-transparent" />
         </RailButton>

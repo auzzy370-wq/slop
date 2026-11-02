@@ -1,8 +1,15 @@
 import { mkdir, readFile, writeFile } from "fs/promises";
 import path from "path";
 import type { Comment, Like } from "@/lib/types";
+import {
+  isR2Configured,
+  r2GetObjectText,
+  r2PutObject,
+} from "@/lib/r2";
 
 export const SOCIAL_BLOB_PATH = "slop/social/engagement.json";
+/** Same key on R2 — Blob public reads are blocked on the suspended store. */
+export const SOCIAL_R2_KEY = SOCIAL_BLOB_PATH;
 
 export type SocialEngagementStore = {
   version: 1;
@@ -11,7 +18,18 @@ export type SocialEngagementStore = {
   updatedAt: string;
 };
 
-const LOCAL_PATH = path.join(process.cwd(), "data", "social-engagement.json");
+function isServerless() {
+  return Boolean(
+    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
+  );
+}
+
+function localPath() {
+  if (isServerless()) {
+    return path.join("/tmp", "slop-data", "social-engagement.json");
+  }
+  return path.join(process.cwd(), "data", "social-engagement.json");
+}
 
 let memory: SocialEngagementStore | null = null;
 let writeQueue: Promise<void> = Promise.resolve();
@@ -43,9 +61,25 @@ function normalize(raw: unknown): SocialEngagementStore {
   };
 }
 
+function pickNewer(
+  a: SocialEngagementStore | null,
+  b: SocialEngagementStore | null,
+): SocialEngagementStore | null {
+  if (!a) return b;
+  if (!b) return a;
+  const at = Date.parse(a.updatedAt || "");
+  const bt = Date.parse(b.updatedAt || "");
+  if (Number.isFinite(at) && Number.isFinite(bt)) {
+    return bt >= at ? b : a;
+  }
+  const aScore = (a.likes?.length ?? 0) + (a.comments?.length ?? 0);
+  const bScore = (b.likes?.length ?? 0) + (b.comments?.length ?? 0);
+  return bScore >= aScore ? b : a;
+}
+
 async function readLocal(): Promise<SocialEngagementStore | null> {
   try {
-    const raw = await readFile(LOCAL_PATH, "utf8");
+    const raw = await readFile(localPath(), "utf8");
     return normalize(JSON.parse(raw));
   } catch {
     return null;
@@ -53,8 +87,34 @@ async function readLocal(): Promise<SocialEngagementStore | null> {
 }
 
 async function writeLocal(store: SocialEngagementStore): Promise<void> {
-  await mkdir(path.dirname(LOCAL_PATH), { recursive: true });
-  await writeFile(LOCAL_PATH, JSON.stringify(store), "utf8");
+  try {
+    const file = localPath();
+    await mkdir(path.dirname(file), { recursive: true });
+    await writeFile(file, JSON.stringify(store), "utf8");
+  } catch {
+    /* local FS may be read-only on serverless */
+  }
+}
+
+async function readR2(): Promise<SocialEngagementStore | null> {
+  if (!isR2Configured()) return null;
+  try {
+    const raw = await r2GetObjectText(SOCIAL_R2_KEY);
+    if (!raw) return null;
+    return normalize(JSON.parse(raw));
+  } catch {
+    return null;
+  }
+}
+
+async function writeR2(store: SocialEngagementStore): Promise<void> {
+  if (!isR2Configured()) return;
+  await r2PutObject({
+    key: SOCIAL_R2_KEY,
+    body: JSON.stringify(store),
+    contentType: "application/json",
+    cacheControl: "no-cache",
+  });
 }
 
 async function readBlob(): Promise<SocialEngagementStore | null> {
@@ -85,25 +145,35 @@ async function readBlob(): Promise<SocialEngagementStore | null> {
 
 async function writeBlob(store: SocialEngagementStore): Promise<void> {
   if (!process.env.BLOB_READ_WRITE_TOKEN) return;
-  const { put } = await import("@vercel/blob");
-  await put(SOCIAL_BLOB_PATH, JSON.stringify(store), {
-    access: "public",
-    addRandomSuffix: false,
-    allowOverwrite: true,
-    contentType: "application/json",
-    cacheControlMaxAge: 0,
-  });
+  try {
+    const { put } = await import("@vercel/blob");
+    await put(SOCIAL_BLOB_PATH, JSON.stringify(store), {
+      access: "public",
+      addRandomSuffix: false,
+      allowOverwrite: true,
+      contentType: "application/json",
+      cacheControlMaxAge: 0,
+    });
+  } catch (err) {
+    // Blob store is often suspended — R2 is the source of truth.
+    console.warn(
+      "social blob write skipped",
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 async function loadFresh(): Promise<SocialEngagementStore> {
-  const fromBlob = await readBlob();
-  if (fromBlob) return fromBlob;
-  const fromLocal = await readLocal();
-  if (fromLocal) return fromLocal;
-  return emptySocialStore();
+  const [fromR2, fromBlob, fromLocal] = await Promise.all([
+    readR2(),
+    readBlob(),
+    readLocal(),
+  ]);
+  const best = pickNewer(pickNewer(fromR2, fromBlob), fromLocal);
+  return best ?? emptySocialStore();
 }
 
-/** Always prefer Blob/local — warm serverless memory goes stale across instances. */
+/** Always prefer cloud — warm serverless memory goes stale across instances. */
 export async function readSocialStore(): Promise<SocialEngagementStore> {
   const now = Date.now();
   if (memory && now - memoryAt < MEMORY_TTL_MS) return memory;
@@ -122,15 +192,16 @@ export async function updateSocialStore(
     memory = fresh;
     memoryAt = Date.now();
     try {
-      await writeBlob(fresh);
+      await writeR2(fresh);
     } catch (err) {
-      console.error("social blob write failed", err);
+      console.error("social r2 write failed", err);
     }
     try {
-      await writeLocal(fresh);
+      await writeBlob(fresh);
     } catch {
-      /* local FS may be read-only on serverless */
+      /* optional */
     }
+    await writeLocal(fresh);
   });
   await writeQueue;
   return memory!;
