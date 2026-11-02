@@ -239,7 +239,7 @@ function WatchInner() {
               Scroll or drag to change episodes
             </li>
             <li>Space play/pause · click player also works</li>
-            <li>← / → skip 10s · R restart · M mute · +/− volume</li>
+            <li>← / → skip 10s · R restart · M mute · drag volume</li>
             <li>P picture-in-picture · F fullscreen · Esc to exit</li>
           </ul>
         </div>

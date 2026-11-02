@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
@@ -1433,20 +1434,34 @@ export function VideoCard({
         </RailButton>
         {!isScripted ? (
           <div
-            className="slop-volume-stack flex flex-col items-center gap-1"
+            className="slop-volume-stack flex flex-col items-center gap-1.5"
             data-no-swipe
           >
-            <button
-              type="button"
-              className="slop-volume-step"
-              aria-label="Volume up"
-              onClick={() => {
-                revealChrome();
-                onVolumeChange?.(Math.min(1, volume + 0.1));
-              }}
+            <label
+              className="slop-volume-slider-wrap"
+              style={
+                {
+                  ["--slop-vol"]: `${Math.round((muted ? 0 : volume) * 100)}%`,
+                } as CSSProperties
+              }
             >
-              <span aria-hidden>+</span>
-            </button>
+              <span className="sr-only">Volume</span>
+              <input
+                type="range"
+                className="slop-volume-slider"
+                min={0}
+                max={100}
+                step={1}
+                value={Math.round((muted ? 0 : volume) * 100)}
+                aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)} percent`}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  revealChrome();
+                  onVolumeChange?.(Number(e.target.value) / 100);
+                }}
+              />
+            </label>
             <RailButton
               onClick={() => {
                 revealChrome();
@@ -1463,17 +1478,6 @@ export function VideoCard({
                 <Volume2 className="fill-transparent" />
               )}
             </RailButton>
-            <button
-              type="button"
-              className="slop-volume-step"
-              aria-label="Volume down"
-              onClick={() => {
-                revealChrome();
-                onVolumeChange?.(Math.max(0, volume - 0.1));
-              }}
-            >
-              <span aria-hidden>−</span>
-            </button>
           </div>
         ) : null}
         {!isScripted ? (

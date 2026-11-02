@@ -84,7 +84,7 @@ export function VideoFeed({
   }, []);
 
   const persistVolume = useCallback((next: number) => {
-    const clamped = Math.max(0, Math.min(1, Math.round(next * 10) / 10));
+    const clamped = Math.max(0, Math.min(1, Math.round(next * 100) / 100));
     setVolume(clamped);
     try {
       localStorage.setItem("slop-volume", String(clamped));
