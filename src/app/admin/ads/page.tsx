@@ -41,7 +41,7 @@ export default function AdminAdsPage() {
     !settings.adsEnabled
       ? "Ads disabled in settings"
       : ads.provider === "adsense" && ads.configured
-        ? "AdSense live"
+        ? "AdSense in feed (house fallback)"
         : ads.provider === "adsense"
           ? "AdSense selected — missing env vars"
           : "House ads (Premium CTA)";
@@ -54,9 +54,10 @@ export default function AdminAdsPage() {
         </p>
         <h1 className="mt-1 font-display text-3xl font-bold">Ads</h1>
         <p className="mt-2 max-w-2xl text-sm text-white/55">
-          Free viewers see a full-screen break between episodes. Premium skips
-          them. Feed breaks use a house Premium CTA — AdSense iframes break the
-          reel pager, so the publisher id stays for ads.txt / verification only.
+          Free viewers see a full-screen break every N episodes. Premium skips
+          them. When AdSense env is set, the feed mounts a fixed-size AdSense
+          unit; if it doesn’t fill (approval / inventory), viewers see the
+          Premium house CTA instead.
         </p>
       </div>
 

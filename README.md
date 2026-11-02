@@ -170,8 +170,9 @@ Production-ready event analytics, attribution, campaigns, content/revenue dashbo
 Between-episode placements for free users (Premium skips them).
 
 1. Open **Admin → Ads** for the checklist and frequency control
-2. Default provider is **house** (Premium upsell CTA) so the feed monetization path works before AdSense approval
-3. After Google AdSense approves your site, set on Vercel and redeploy:
+2. Default without AdSense env is **house** (Premium upsell CTA)
+3. With AdSense configured, the feed shows a fixed-size AdSense unit on each break; empty fills fall back to the house CTA
+4. After Google AdSense approves your site, set on Vercel and redeploy:
 
 ```bash
 NEXT_PUBLIC_ADS_PROVIDER=adsense
@@ -181,4 +182,4 @@ NEXT_PUBLIC_ADS_SLOT_FEED=##########
 NEXT_PUBLIC_ADS_TEST_MODE=true
 ```
 
-`/ads.txt` is generated from your publisher id. Import daily AdSense totals under **Admin → Analytics → Revenue** (never invented).
+`/ads.txt` is generated from your publisher id. Import daily AdSense totals under **Admin → Analytics → Revenue** (never invented). Until AdSense serves inventory, you will still see the Premium CTA fallback.
