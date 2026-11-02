@@ -1346,7 +1346,7 @@ export function VideoCard({
 
       {/* Top strip — Pine layout, SLOP chrome */}
       <div
-        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-2.5 pt-[max(0.55rem,env(safe-area-inset-top))]${
+        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-2.5 pt-[max(3.25rem,calc(env(safe-area-inset-top,0px)+0.65rem))] lg:pt-[max(0.85rem,calc(env(safe-area-inset-top,0px)+0.5rem))]${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
@@ -1368,7 +1368,7 @@ export function VideoCard({
             </span>
           </span>
         </Link>
-        <div className="pointer-events-none absolute left-1/2 top-[max(0.7rem,calc(env(safe-area-inset-top)+0.15rem))] hidden -translate-x-1/2 items-center gap-1.5 lg:flex">
+        <div className="pointer-events-none absolute left-1/2 top-[max(1rem,calc(env(safe-area-inset-top,0px)+0.5rem))] hidden -translate-x-1/2 items-center gap-1.5 lg:flex">
           <SlopMarkMini className="h-3.5 w-3.5" />
           <span className="font-display text-[11px] font-bold tracking-[0.22em] text-white/80">
             SLOP
