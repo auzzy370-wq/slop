@@ -137,33 +137,8 @@ function WatchInner() {
         )}
       </header>
 
-      {/* Desktop left rail — live comments / chat */}
-      <aside className="slop-watch-comments hidden min-h-0 w-full max-w-sm justify-self-end lg:flex lg:flex-col lg:pr-2">
-        <DesktopCommentsRail
-          videoId={activeEpisodeId}
-          commentsDisabled={!!activeVideo?.commentsDisabled}
-        />
-      </aside>
-
-      {/* Phone stage */}
-      <div className="slop-watch-stage">
-        <VideoFeed
-          section={
-            seriesLocked
-              ? "drama"
-              : feed === "trending"
-                ? "trending"
-                : "for-you"
-          }
-          categoryId={resolvedDramaId}
-          startVideoId={start ?? startVideo?.id}
-          focusVideoId={focusEpisodeId}
-          onActiveVideoChange={onActiveVideoChange}
-        />
-      </div>
-
-      {/* Desktop right rail — episode list only */}
-      <aside className="slop-watch-episodes hidden w-full max-w-[15rem] justify-self-start lg:flex lg:flex-col lg:pl-2">
+      {/* Desktop left rail — episode list */}
+      <aside className="slop-watch-episodes hidden w-full max-w-[15rem] justify-self-end lg:flex lg:flex-col lg:pr-2">
         {episodeList.length > 0 && drama ? (
           <div className="animate-fade flex min-h-0 flex-1 flex-col">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
@@ -209,6 +184,31 @@ function WatchInner() {
             </ul>
           </div>
         ) : null}
+      </aside>
+
+      {/* Phone stage */}
+      <div className="slop-watch-stage">
+        <VideoFeed
+          section={
+            seriesLocked
+              ? "drama"
+              : feed === "trending"
+                ? "trending"
+                : "for-you"
+          }
+          categoryId={resolvedDramaId}
+          startVideoId={start ?? startVideo?.id}
+          focusVideoId={focusEpisodeId}
+          onActiveVideoChange={onActiveVideoChange}
+        />
+      </div>
+
+      {/* Desktop right rail — live comments / chat */}
+      <aside className="slop-watch-comments hidden min-h-0 w-full max-w-sm justify-self-start lg:flex lg:flex-col lg:pl-2">
+        <DesktopCommentsRail
+          videoId={activeEpisodeId}
+          commentsDisabled={!!activeVideo?.commentsDisabled}
+        />
       </aside>
     </div>
   );

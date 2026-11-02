@@ -95,11 +95,11 @@ a {
 @media (min-width: 1024px) {
   .slop-watch-shell {
     display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(360px, 420px) minmax(180px, 0.9fr);
+    grid-template-columns: minmax(160px, 0.85fr) minmax(360px, 420px) minmax(220px, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       "header header header"
-      "comments stage episodes";
+      "episodes stage comments";
     align-items: stretch;
     justify-items: center;
     column-gap: 1.5rem;
@@ -119,10 +119,10 @@ a {
     padding: 0 0.25rem;
   }
 
-  .slop-watch-comments {
-    grid-area: comments;
+  .slop-watch-episodes {
+    grid-area: episodes;
     width: 100%;
-    max-width: 22rem;
+    max-width: 15rem;
     height: min(calc(100dvh - 9.5rem), 860px);
     align-self: center;
   }
@@ -143,10 +143,10 @@ a {
     background: #000;
   }
 
-  .slop-watch-episodes {
-    grid-area: episodes;
+  .slop-watch-comments {
+    grid-area: comments;
     width: 100%;
-    max-width: 15rem;
+    max-width: 22rem;
     height: min(calc(100dvh - 9.5rem), 860px);
     align-self: center;
   }
