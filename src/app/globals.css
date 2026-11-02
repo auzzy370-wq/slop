@@ -95,21 +95,44 @@ a {
 @media (min-width: 1024px) {
   .slop-watch-shell {
     display: grid;
-    grid-template-columns: minmax(160px, 0.85fr) minmax(360px, 420px) minmax(160px, 0.85fr);
-    align-items: center;
+    grid-template-columns: minmax(220px, 1fr) minmax(360px, 420px) minmax(180px, 0.9fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-areas:
+      "header header header"
+      "comments stage episodes";
+    align-items: stretch;
     justify-items: center;
-    gap: 1.5rem;
-    padding: 4.5rem 1.5rem 2rem;
+    column-gap: 1.5rem;
+    row-gap: 1rem;
+    padding: 5.25rem 1.5rem 1.5rem;
     background:
       radial-gradient(ellipse 55% 50% at 50% 45%, rgba(185, 154, 255, 0.12), transparent 60%),
       radial-gradient(ellipse 40% 35% at 15% 80%, rgba(185, 154, 255, 0.05), transparent),
       linear-gradient(180deg, #0c0c10 0%, #111116 100%);
   }
 
+  .slop-watch-header {
+    grid-area: header;
+    width: 100%;
+    max-width: 1100px;
+    justify-self: center;
+    padding: 0 0.25rem;
+  }
+
+  .slop-watch-comments {
+    grid-area: comments;
+    width: 100%;
+    max-width: 22rem;
+    height: min(calc(100dvh - 9.5rem), 860px);
+    align-self: center;
+  }
+
   .slop-watch-stage {
+    grid-area: stage;
     position: relative;
-    height: min(calc(100dvh - 6.5rem), 860px);
-    width: min(420px, calc(min(100dvh - 6.5rem, 860px) * 9 / 16));
+    height: min(calc(100dvh - 9.5rem), 860px);
+    width: min(420px, calc(min(100dvh - 9.5rem, 860px) * 9 / 16));
+    align-self: center;
     overflow: hidden;
     border-radius: 1.25rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -118,6 +141,14 @@ a {
       0 28px 80px rgba(0, 0, 0, 0.55),
       0 0 60px rgba(185, 154, 255, 0.08);
     background: #000;
+  }
+
+  .slop-watch-episodes {
+    grid-area: episodes;
+    width: 100%;
+    max-width: 15rem;
+    height: min(calc(100dvh - 9.5rem), 860px);
+    align-self: center;
   }
 
   .slop-watch-stage .slop-feed-scroller {

@@ -5,6 +5,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Play } from "lucide-react";
 import { VideoFeed } from "@/components/feed/video-feed";
+import { DesktopCommentsRail } from "@/components/feed/desktop-comments-rail";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
 
@@ -78,6 +79,11 @@ function WatchInner() {
       .sort((a, b) => a.episodeNumber - b.episodeNumber);
   }, [videos, drama]);
 
+  const activeVideo = useMemo(
+    () => videos.find((v) => v.id === activeEpisodeId),
+    [videos, activeEpisodeId],
+  );
+
   const backHref = drama
     ? `/drama/${drama.slug}`
     : dramaSlug
@@ -98,8 +104,8 @@ function WatchInner() {
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
 
-      {/* Desktop left rail — series title only */}
-      <aside className="hidden w-full max-w-xs justify-self-end lg:flex lg:flex-col lg:gap-4 lg:pr-2">
+      {/* Desktop top title — moved up from the left rail */}
+      <header className="slop-watch-header hidden animate-fade lg:block">
         <Link
           href={backHref}
           className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-white/60 transition hover:text-white"
@@ -107,13 +113,12 @@ function WatchInner() {
           <ArrowLeft className="h-4 w-4" />
           {drama ? "Back to series" : "Back home"}
         </Link>
-
         {drama ? (
-          <div className="animate-fade">
-            <h1 className="font-display text-2xl font-bold tracking-tight text-white">
+          <div className="mt-2 flex flex-wrap items-end gap-x-4 gap-y-1">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-white xl:text-3xl">
               {drama.title}
             </h1>
-            <p className="mt-2 text-xs text-white/40">
+            <p className="pb-1 text-xs text-white/40">
               {drama.episodeCount} episodes
               {drama.viewCount > 0
                 ? ` · ${formatCount(drama.viewCount)} views`
@@ -121,13 +126,23 @@ function WatchInner() {
             </p>
           </div>
         ) : (
-          <div className="animate-fade">
+          <div className="mt-2">
             <h1 className="font-display text-2xl font-bold tracking-tight text-white">
               For you
             </h1>
-            <p className="mt-2 text-sm text-white/45">Scroll for the next episode</p>
+            <p className="mt-1 text-sm text-white/45">
+              Scroll for the next episode
+            </p>
           </div>
         )}
+      </header>
+
+      {/* Desktop left rail — live comments / chat */}
+      <aside className="slop-watch-comments hidden min-h-0 w-full max-w-sm justify-self-end lg:flex lg:flex-col lg:pr-2">
+        <DesktopCommentsRail
+          videoId={activeEpisodeId}
+          commentsDisabled={!!activeVideo?.commentsDisabled}
+        />
       </aside>
 
       {/* Phone stage */}
@@ -148,13 +163,13 @@ function WatchInner() {
       </div>
 
       {/* Desktop right rail — episode list only */}
-      <aside className="hidden w-full max-w-[15rem] justify-self-start lg:flex lg:flex-col lg:pl-2">
+      <aside className="slop-watch-episodes hidden w-full max-w-[15rem] justify-self-start lg:flex lg:flex-col lg:pl-2">
         {episodeList.length > 0 && drama ? (
-          <div className="animate-fade">
+          <div className="animate-fade flex min-h-0 flex-1 flex-col">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
               Episodes
             </p>
-            <ul className="scrollbar-none mt-3 max-h-[min(60vh,480px)] space-y-0.5 overflow-y-auto overscroll-contain">
+            <ul className="scrollbar-none mt-3 min-h-0 flex-1 space-y-0.5 overflow-y-auto overscroll-contain">
               {episodeList.map((ep) => {
                 const active = activeEpisodeId === ep.id;
                 return (

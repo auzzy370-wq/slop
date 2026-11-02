@@ -1476,6 +1476,18 @@ export function VideoCard({
           onClick={() => {
             revealChrome();
             requestEngagementRefresh();
+            // Desktop watch page has a live comments rail — focus it instead of a sheet.
+            if (
+              typeof window !== "undefined" &&
+              window.matchMedia("(min-width: 1024px)").matches
+            ) {
+              const input = document.getElementById(
+                "watch-desktop-comment-input",
+              ) as HTMLInputElement | null;
+              input?.focus();
+              input?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+              return;
+            }
             setCommentsOpen(true);
           }}
           ariaLabel="Comments"
