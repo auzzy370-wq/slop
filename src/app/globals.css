@@ -213,16 +213,8 @@ main:has(.slop-watch-shell) {
     overflow: hidden;
   }
 
-  /* Vertically center the in-player social rail so it doesn’t sit heavy bottom-right. */
   .slop-watch-stage .slop-action-rail {
-    top: 50%;
-    bottom: auto;
     right: 0.65rem;
-    transform: translateY(-50%);
-  }
-
-  .slop-watch-stage .slop-action-rail.is-hidden {
-    transform: translate(10px, -50%);
   }
 
   .slop-watch-stage .slop-feed-scroller {

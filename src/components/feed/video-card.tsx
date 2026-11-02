@@ -1450,11 +1450,11 @@ export function VideoCard({
           </button>
         )}
 
-      {/* Social rail — above bottom chrome so More stays clickable */}
+      {/* Social rail — vertically centered so the frame doesn’t feel bottom-right heavy */}
       <div
-        className={`slop-action-rail absolute right-2.5 z-40 flex flex-col items-center gap-2.5 sm:right-3.5 sm:gap-3 ${
-          chromeVisible ? "bottom-[4.5rem]" : "bottom-[3.25rem]"
-        }${isFullscreen && !chromeVisible ? " is-hidden" : ""}`}
+        className={`slop-action-rail absolute right-2.5 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2.5 sm:right-3.5 sm:gap-3${
+          isFullscreen && !chromeVisible ? " is-hidden" : ""
+        }`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
         <RailButton
