@@ -53,6 +53,13 @@ import {
 import { requestEngagementRefresh } from "@/components/social-hydrator";
 import { getOriginalScript } from "@/lib/series/originals/catalog";
 import { isVercelBlobUrl, resolvePlaybackUrl } from "@/lib/media-url";
+import {
+  CONTINUE_COMPLETE_RATIO,
+  CONTINUE_MIN_SECONDS,
+  getContinueForEpisode,
+  removeContinueWatching,
+  upsertContinueWatching,
+} from "@/lib/continue-watching";
 
 interface VideoCardProps {
   video: Video;
@@ -148,8 +155,36 @@ export function VideoCard({
   const viewed = useRef(false);
   const playbackId = useRef(uid("pb"));
   const lastProgressSent = useRef(0);
+  const lastContinueSaved = useRef(0);
+  const resumeApplied = useRef(false);
   const started = useRef(false);
   const endedOnce = useRef(false);
+
+  const persistContinue = useCallback(
+    (force = false) => {
+      if (isScripted) return;
+      const el = videoRef.current;
+      if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
+      const positionSec = el.currentTime;
+      const durationSec = el.duration;
+      if (!force && positionSec < CONTINUE_MIN_SECONDS) return;
+      const now = Date.now();
+      if (!force && now - lastContinueSaved.current < 4000) return;
+      lastContinueSaved.current = now;
+      if (positionSec / durationSec >= CONTINUE_COMPLETE_RATIO) {
+        removeContinueWatching(video.dramaId);
+        return;
+      }
+      upsertContinueWatching({
+        dramaId: video.dramaId,
+        episodeId: video.id,
+        episodeNumber: video.episodeNumber,
+        positionSec,
+        durationSec,
+      });
+    },
+    [isScripted, video.dramaId, video.id, video.episodeNumber],
+  );
 
   const liked =
     !!actorId &&
@@ -265,6 +300,7 @@ export function VideoCard({
     if (paused) {
       el.pause();
       setIsPlaying(false);
+      persistContinue(true);
       if (started.current) {
         void track("video_paused", {
           userId: user?.id,
@@ -351,8 +387,29 @@ export function VideoCard({
       cancelled = true;
       el.removeEventListener("canplay", kickPlay);
       el.removeEventListener("loadeddata", kickPlay);
-      // Hard-stop on effect teardown (route change / episode swap) so audio
-      // can't keep playing after leaving Watch for the homepage.
+      // Save progress, then hard-stop so audio can't leak after leaving Watch.
+      try {
+        if (
+          Number.isFinite(el.currentTime) &&
+          Number.isFinite(el.duration) &&
+          el.duration > 0 &&
+          el.currentTime >= CONTINUE_MIN_SECONDS
+        ) {
+          if (el.currentTime / el.duration >= CONTINUE_COMPLETE_RATIO) {
+            removeContinueWatching(video.dramaId);
+          } else {
+            upsertContinueWatching({
+              dramaId: video.dramaId,
+              episodeId: video.id,
+              episodeNumber: video.episodeNumber,
+              positionSec: el.currentTime,
+              durationSec: el.duration,
+            });
+          }
+        }
+      } catch {
+        /* ignore */
+      }
       el.pause();
     };
   }, [
@@ -361,11 +418,13 @@ export function VideoCard({
     recordView,
     video.id,
     video.dramaId,
+    video.episodeNumber,
     video.durationSeconds,
     user?.id,
     isScripted,
     mediaKey,
     muted,
+    persistContinue,
   ]);
 
   // Keep mute / volume in sync without restarting playback.
@@ -375,6 +434,60 @@ export function VideoCard({
     el.volume = Math.max(0, Math.min(1, volume));
     el.muted = muted || volume <= 0;
   }, [muted, volume, active, mediaKey]);
+
+  // Resume from the last saved position for this episode.
+  useEffect(() => {
+    if (!active || isScripted) {
+      resumeApplied.current = false;
+      return;
+    }
+    resumeApplied.current = false;
+    const saved = getContinueForEpisode(video.id);
+    if (!saved || saved.positionSec < CONTINUE_MIN_SECONDS) return;
+    if (
+      saved.durationSec > 0 &&
+      saved.positionSec / saved.durationSec >= CONTINUE_COMPLETE_RATIO
+    ) {
+      return;
+    }
+
+    const el = videoRef.current;
+    if (!el) return;
+
+    const apply = () => {
+      if (resumeApplied.current) return;
+      const node = videoRef.current;
+      if (!node || !Number.isFinite(node.duration) || node.duration <= 0) return;
+      const target = Math.min(saved.positionSec, Math.max(0, node.duration - 0.5));
+      if (target < CONTINUE_MIN_SECONDS) return;
+      resumeApplied.current = true;
+      node.currentTime = target;
+      setProgress(target / node.duration);
+      setDuration(node.duration);
+    };
+
+    if (el.readyState >= HTMLMediaElement.HAVE_METADATA) apply();
+    else {
+      el.addEventListener("loadedmetadata", apply);
+      el.addEventListener("loadeddata", apply);
+      return () => {
+        el.removeEventListener("loadedmetadata", apply);
+        el.removeEventListener("loadeddata", apply);
+      };
+    }
+  }, [active, isScripted, video.id, mediaKey]);
+
+  // Flush progress on tab hide / navigation.
+  useEffect(() => {
+    if (!active || isScripted) return;
+    const flush = () => persistContinue(true);
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", flush);
+    };
+  }, [active, isScripted, persistContinue]);
 
   useEffect(() => {
     if (!active) {
@@ -659,6 +772,26 @@ export function VideoCard({
       const node = videoRef.current ?? el;
       if (node) {
         try {
+          // Capture progress before tearing the element down.
+          if (
+            !isScripted &&
+            Number.isFinite(node.currentTime) &&
+            Number.isFinite(node.duration) &&
+            node.duration > 0 &&
+            node.currentTime >= CONTINUE_MIN_SECONDS
+          ) {
+            if (node.currentTime / node.duration >= CONTINUE_COMPLETE_RATIO) {
+              removeContinueWatching(video.dramaId);
+            } else {
+              upsertContinueWatching({
+                dramaId: video.dramaId,
+                episodeId: video.id,
+                episodeNumber: video.episodeNumber,
+                positionSec: node.currentTime,
+                durationSec: node.duration,
+              });
+            }
+          }
           node.pause();
           node.muted = true;
           node.removeAttribute("src");
@@ -675,7 +808,7 @@ export function VideoCard({
         void document.exitPictureInPicture().catch(() => {});
       }
     };
-  }, [mediaKey, video.id]);
+  }, [mediaKey, video.id, video.dramaId, video.episodeNumber, isScripted]);
 
   const onTimeUpdate = () => {
     const el = videoRef.current;
@@ -684,6 +817,7 @@ export function VideoCard({
     if (scrubbing) return;
     const ratio = el.currentTime / el.duration;
     setProgress(ratio);
+    persistContinue(false);
     const now = Date.now();
     if (now - lastProgressSent.current > 5000) {
       lastProgressSent.current = now;
@@ -704,6 +838,7 @@ export function VideoCard({
       });
     }
     if (ratio >= 0.95) {
+      removeContinueWatching(video.dramaId);
       void track("video_completed", {
         userId: user?.id,
         episodeId: video.id,

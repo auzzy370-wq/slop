@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ArrowUpRight, Play, Search } from "lucide-react";
 import { SlopWordmark } from "@/components/brand/logo";
 import { DramaCard } from "@/components/browse/drama-card";
+import { ContinueWatchingRow } from "@/components/browse/continue-watching-row";
 import {
   GenreTile,
   genreCount,
@@ -11,6 +12,7 @@ import {
 } from "@/components/browse/genre-tile";
 import { sortDramasByChart } from "@/lib/engagement";
 import { useSlopStore } from "@/store/slop-store";
+import { getContinueForDrama } from "@/lib/continue-watching";
 import { formatCount } from "@/lib/utils";
 import { watchHref } from "@/lib/watch-url";
 import type { Drama } from "@/lib/types";
@@ -52,6 +54,12 @@ export function HomeBrowse() {
       v.status === "published" &&
       v.episodeNumber === 1,
   );
+  const featuredContinue = featured
+    ? getContinueForDrama(featured.id)
+    : null;
+  const featuredContinueEpisode = featuredContinue
+    ? videos.find((v) => v.id === featuredContinue.episodeId)
+    : null;
   const activeCats = categories
     .filter((c) => c.active)
     .sort((a, b) => a.displayOrder - b.displayOrder);
@@ -102,18 +110,26 @@ export function HomeBrowse() {
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link
                   href={
-                    firstEpisode
+                    featuredContinueEpisode
                       ? watchHref({
-                          episodeId: firstEpisode.id,
+                          episodeId: featuredContinueEpisode.id,
                           dramaId: featured.id,
                           dramaSlug: featured.slug,
                         })
-                      : `/drama/${featured.slug}`
+                      : firstEpisode
+                        ? watchHref({
+                            episodeId: firstEpisode.id,
+                            dramaId: featured.id,
+                            dramaSlug: featured.slug,
+                          })
+                        : `/drama/${featured.slug}`
                   }
                   className="inline-flex h-12 items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)] transition hover:brightness-110"
                 >
                   <Play className="h-4 w-4 fill-current" />
-                  Watch {featured.title}
+                  {featuredContinueEpisode
+                    ? `Continue Ep ${featuredContinue!.episodeNumber}`
+                    : `Watch ${featured.title}`}
                 </Link>
                 <Link
                   href={`/drama/${featured.slug}`}
@@ -135,6 +151,8 @@ export function HomeBrowse() {
       )}
 
       <div className="mx-auto max-w-[1400px] space-y-10 px-4 pt-8 sm:px-6 lg:space-y-14 lg:px-12 lg:pt-12">
+        <ContinueWatchingRow />
+
         <section>
           <div className="mb-3 flex items-end justify-between lg:mb-5">
             <h2 className="font-display text-xl font-bold lg:text-2xl">
