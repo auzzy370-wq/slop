@@ -703,18 +703,6 @@ export function VideoCard({
     return clearChromeHideTimer;
   }, [active, video.id, clearChromeHideTimer, scheduleChromeHide]);
 
-  // Desktop already has the right-rail episode list — never stack a second picker.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const sync = () => {
-      if (mq.matches) setEpisodesOpen(false);
-    };
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
   useEffect(() => {
     if (!active) return;
     if (
@@ -742,24 +730,36 @@ export function VideoCard({
     scheduleChromeHide,
   ]);
 
-  // Desktop already has the right-rail episode list — never stack a second picker.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const mq = window.matchMedia("(min-width: 1024px)");
-    const sync = () => {
-      if (mq.matches) setEpisodesOpen(false);
-    };
-    sync();
-    mq.addEventListener("change", sync);
-    return () => mq.removeEventListener("change", sync);
-  }, []);
-
   const getFullscreenElement = () =>
     document.fullscreenElement ||
     // Safari / older Chromium (Opera GX)
     (document as Document & { webkitFullscreenElement?: Element | null })
       .webkitFullscreenElement ||
     null;
+
+  // Desktop rail covers episode picking — close the in-player sheet except when
+  // fullscreen (the rail is outside the fullscreen element and unavailable).
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      const fs = !!(
+        document.fullscreenElement ||
+        (document as Document & { webkitFullscreenElement?: Element | null })
+          .webkitFullscreenElement
+      );
+      if (mq.matches && !fs) setEpisodesOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    document.addEventListener("fullscreenchange", sync);
+    document.addEventListener("webkitfullscreenchange", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      document.removeEventListener("fullscreenchange", sync);
+      document.removeEventListener("webkitfullscreenchange", sync);
+    };
+  }, []);
 
   /** Persist across episode swaps — never fullscreen the remounting card itself. */
   const getFullscreenTarget = useCallback((): HTMLElement | null => {
@@ -2092,8 +2092,9 @@ export function VideoCard({
             className="mt-2 flex items-center gap-2 rounded-2xl border border-white/12 bg-black/50 px-2 py-1.5 backdrop-blur-md sm:px-2.5"
             data-no-swipe
           >
-            {/* Episode controls — mobile always; desktop while PiP (rail may be covered). */}
-            {isPip ? (
+            {/* Episode controls — mobile always; desktop while PiP/fullscreen
+                (the side episode rail is outside the fullscreen surface). */}
+            {isPip || isFullscreen ? (
               <div className="pointer-events-auto flex min-w-0 max-w-[75%] shrink items-center gap-0.5">
                 <button
                   type="button"
