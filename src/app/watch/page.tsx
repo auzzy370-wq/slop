@@ -138,7 +138,7 @@ function WatchInner() {
       </header>
 
       {/* Desktop left rail — episode list */}
-      <aside className="slop-watch-episodes hidden w-full max-w-[15rem] justify-self-end lg:flex lg:flex-col lg:pr-2">
+      <aside className="slop-watch-episodes hidden w-full lg:flex lg:flex-col lg:pr-1">
         {episodeList.length > 0 && drama ? (
           <div className="animate-fade flex min-h-0 flex-1 flex-col">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
@@ -204,7 +204,7 @@ function WatchInner() {
       </div>
 
       {/* Desktop right rail — live comments / chat */}
-      <aside className="slop-watch-comments hidden min-h-0 w-full max-w-sm justify-self-start lg:flex lg:flex-col lg:pl-2">
+      <aside className="slop-watch-comments hidden min-h-0 w-full lg:flex lg:flex-col lg:pl-1">
         <DesktopCommentsRail
           videoId={activeEpisodeId}
           commentsDisabled={!!activeVideo?.commentsDisabled}

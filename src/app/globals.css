@@ -139,19 +139,20 @@ main:has(.slop-watch-shell) {
 @media (min-width: 1024px) {
   .slop-watch-shell {
     display: grid;
-    grid-template-columns: minmax(160px, 0.85fr) minmax(360px, 420px) minmax(220px, 1fr);
+    /* Equal side columns keep the player optically centered on desktop. */
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
     grid-template-rows: auto minmax(0, 1fr);
     grid-template-areas:
       "header header header"
       "episodes stage comments";
     align-items: stretch;
     justify-items: center;
-    column-gap: 1.5rem;
+    column-gap: 1.25rem;
     row-gap: 0.75rem;
     height: 100dvh;
     max-height: 100dvh;
     min-height: 0;
-    padding: 5rem 1.5rem 1rem;
+    padding: 5rem 1.25rem 1rem;
     overflow: hidden;
     background:
       radial-gradient(ellipse 55% 50% at 50% 45%, rgba(185, 154, 255, 0.12), transparent 60%),
@@ -162,7 +163,7 @@ main:has(.slop-watch-shell) {
   .slop-watch-header {
     grid-area: header;
     width: 100%;
-    max-width: 1100px;
+    max-width: calc(420px + 18rem + 18rem + 2.5rem);
     justify-self: center;
     padding: 0 0.25rem;
     min-height: 0;
@@ -171,10 +172,11 @@ main:has(.slop-watch-shell) {
   .slop-watch-episodes {
     grid-area: episodes;
     width: 100%;
-    max-width: 15rem;
+    max-width: 18rem;
     height: 100%;
     max-height: 100%;
     min-height: 0;
+    justify-self: end;
     align-self: stretch;
     overflow: hidden;
   }
@@ -202,12 +204,25 @@ main:has(.slop-watch-shell) {
   .slop-watch-comments {
     grid-area: comments;
     width: 100%;
-    max-width: 22rem;
+    max-width: 18rem;
     height: 100%;
     max-height: 100%;
     min-height: 0;
+    justify-self: start;
     align-self: stretch;
     overflow: hidden;
+  }
+
+  /* Vertically center the in-player social rail so it doesn’t sit heavy bottom-right. */
+  .slop-watch-stage .slop-action-rail {
+    top: 50%;
+    bottom: auto;
+    right: 0.65rem;
+    transform: translateY(-50%);
+  }
+
+  .slop-watch-stage .slop-action-rail.is-hidden {
+    transform: translate(10px, -50%);
   }
 
   .slop-watch-stage .slop-feed-scroller {
