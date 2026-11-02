@@ -60,6 +60,7 @@ import {
   removeContinueWatching,
   upsertContinueWatching,
 } from "@/lib/continue-watching";
+import { hardStopFeedPlayback } from "@/lib/media-silence";
 
 interface VideoCardProps {
   video: Video;
@@ -1273,7 +1274,7 @@ export function VideoCard({
             src={resolvePlaybackUrl(video.videoUrl)}
             playsInline
             muted={muted}
-            autoPlay={active && !paused}
+            // Imperative play only — autoPlay can resume the wrong episode after back/bfcache.
             preload="auto"
             onTimeUpdate={onTimeUpdate}
             onLoadedMetadata={(e) => {
@@ -1391,6 +1392,13 @@ export function VideoCard({
       >
         <Link
           href={dramaHref}
+          onClick={() => {
+            // Stop audio before the route transition — unmount cleanup alone
+            // can lose a race with an in-flight play() and leak the next feed item.
+            setPaused(true);
+            setIsPlaying(false);
+            hardStopFeedPlayback();
+          }}
           className="pointer-events-auto inline-flex min-w-0 items-center gap-1 rounded-full border border-white/12 bg-black/40 py-1.5 pl-1 pr-2.5 text-white backdrop-blur-md drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)] lg:pointer-events-none lg:invisible"
           aria-label={`Back to ${seriesTitle}`}
           data-no-swipe
@@ -1983,6 +1991,7 @@ function silenceFeedVideos(keep?: HTMLVideoElement | null) {
       const el = node as HTMLVideoElement;
       el.pause();
       el.muted = true;
+      el.volume = 0;
     } catch {
       /* ignore */
     }

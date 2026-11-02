@@ -8,6 +8,7 @@ import { VideoFeed } from "@/components/feed/video-feed";
 import { DesktopCommentsRail } from "@/components/feed/desktop-comments-rail";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
+import { hardStopFeedPlayback } from "@/lib/media-silence";
 
 function WatchInner() {
   const params = useSearchParams();
@@ -100,6 +101,7 @@ function WatchInner() {
       <header className="slop-watch-header hidden animate-fade lg:block">
         <Link
           href={backHref}
+          onClick={() => hardStopFeedPlayback()}
           className="inline-flex w-fit items-center gap-2 text-sm font-semibold text-white/60 transition hover:text-white"
         >
           <ArrowLeft className="h-4 w-4" />

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getFeed } from "@/lib/feed";
+import { hardStopFeedPlayback } from "@/lib/media-silence";
 import type { FeedSection } from "@/lib/types";
 import { useSlopStore } from "@/store/slop-store";
 import { watchHref } from "@/lib/watch-url";
@@ -65,23 +66,9 @@ export function VideoFeed({
   }, []);
 
   // Leaving /watch must kill any in-flight audio (incl. PiP leftovers).
-  // Query the document — viewportRef is often already null in this cleanup.
   useEffect(() => {
     return () => {
-      document.querySelectorAll("video.slop-feed-video").forEach((node) => {
-        try {
-          const el = node as HTMLVideoElement;
-          el.pause();
-          el.muted = true;
-          el.removeAttribute("src");
-          el.load();
-        } catch {
-          /* ignore */
-        }
-      });
-      if (document.pictureInPictureElement) {
-        void document.exitPictureInPicture().catch(() => {});
-      }
+      hardStopFeedPlayback();
     };
   }, []);
 

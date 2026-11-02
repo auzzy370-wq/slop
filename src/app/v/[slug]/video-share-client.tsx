@@ -10,6 +10,7 @@ import {
   type UploadsCatalog,
 } from "@/lib/uploads-catalog-shared";
 import { useSlopStore } from "@/store/slop-store";
+import { hardStopFeedPlayback } from "@/lib/media-silence";
 
 export function VideoShareClient({
   slug,
@@ -109,6 +110,7 @@ export function VideoShareClient({
           const dramaSlug = dramas.find((d) => d.id === dramaId)?.slug;
           return dramaSlug ? `/drama/${dramaSlug}` : "/";
         })()}
+        onClick={() => hardStopFeedPlayback()}
         className="fixed left-4 z-50 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur top-[max(1rem,env(safe-area-inset-top))] lg:left-[max(1.5rem,calc((100vw-420px)/2-12rem))] lg:top-20"
       >
         <ArrowLeft className="h-4 w-4" /> Back
