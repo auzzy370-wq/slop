@@ -63,6 +63,11 @@ import {
   upsertContinueWatching,
 } from "@/lib/continue-watching";
 import { hardStopFeedPlayback } from "@/lib/media-silence";
+import {
+  getDocumentPip,
+  openDocPipPlayer,
+  type DocPipSession,
+} from "@/lib/doc-pip-player";
 
 interface VideoCardProps {
   video: Video;
@@ -75,6 +80,8 @@ interface VideoCardProps {
   onJumpToVideo?: (videoId: string) => void;
   onEpisodeEnded?: () => void;
   onPlaybackFailed?: () => void;
+  /** Fired when classic or Document PiP opens/closes (feed skips ads while active). */
+  onPictureInPictureChange?: (active: boolean) => void;
 }
 
 export function VideoCard({
@@ -88,6 +95,7 @@ export function VideoCard({
   onJumpToVideo,
   onEpisodeEnded,
   onPlaybackFailed,
+  onPictureInPictureChange,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef = useRef<HTMLElement>(null);
@@ -114,6 +122,9 @@ export function VideoCard({
   const [chromeVisible, setChromeVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPip, setIsPip] = useState(false);
+  /** Document PiP session (Chrome/Edge) — owns its own video + episode buttons. */
+  const docPipRef = useRef<DocPipSession | null>(null);
+  const [docPipActive, setDocPipActive] = useState(false);
   /** Audio plays but videoWidth stays 0 — usually HEVC in Chrome / Opera GX. */
   const [codecBlocked, setCodecBlocked] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -233,6 +244,33 @@ export function VideoCard({
   );
   const seriesTitle = drama?.title ?? video.sourceAttribution;
   const dramaHref = drama ? `/drama/${drama.slug}` : "/";
+  const seriesEpIndex = seriesEpisodes.findIndex((e) => e.id === video.id);
+  const prevSeriesEpisode =
+    seriesEpIndex > 0 ? seriesEpisodes[seriesEpIndex - 1] : undefined;
+  const nextSeriesEpisode =
+    seriesEpIndex >= 0 && seriesEpIndex < seriesEpisodes.length - 1
+      ? seriesEpisodes[seriesEpIndex + 1]
+      : undefined;
+
+  const jumpSeriesEpisode = useCallback(
+    (dir: -1 | 1) => {
+      const target = dir < 0 ? prevSeriesEpisode : nextSeriesEpisode;
+      if (!target) {
+        toast.message(dir > 0 ? "Last episode" : "First episode", {
+          duration: 1200,
+        });
+        return;
+      }
+      onJumpToVideo?.(target.id);
+    },
+    [nextSeriesEpisode, onJumpToVideo, prevSeriesEpisode],
+  );
+
+  // Keep Document PiP callbacks fresh without reopening the window.
+  const jumpSeriesEpisodeRef = useRef(jumpSeriesEpisode);
+  jumpSeriesEpisodeRef.current = jumpSeriesEpisode;
+  const onEpisodeEndedRef = useRef(onEpisodeEnded);
+  onEpisodeEndedRef.current = onEpisodeEnded;
 
   useEffect(() => {
     if (!active) {
@@ -318,6 +356,20 @@ export function VideoCard({
         started.current = false;
         playbackId.current = uid("pb");
         lastProgressSent.current = 0;
+      }
+      return;
+    }
+
+    // Document PiP owns playback — keep the in-page element quiet.
+    if (docPipActive) {
+      const idle = videoRef.current;
+      if (idle) {
+        try {
+          idle.pause();
+          idle.muted = true;
+        } catch {
+          /* ignore */
+        }
       }
       return;
     }
@@ -502,6 +554,7 @@ export function VideoCard({
     isScripted,
     mediaKey,
     persistContinue,
+    docPipActive,
   ]);
 
   // Keep mute / volume in sync without restarting playback.
@@ -734,6 +787,12 @@ export function VideoCard({
   }, []);
 
   const exitPipSafe = useCallback(async () => {
+    const docPip = docPipRef.current;
+    if (docPip) {
+      docPip.close();
+      docPipRef.current = null;
+      setDocPipActive(false);
+    }
     if (!document.pictureInPictureElement) return;
     try {
       await document.exitPictureInPicture();
@@ -769,8 +828,12 @@ export function VideoCard({
     // PiP and element fullscreen can't coexist. Start both exits/requests in
     // the same user-gesture turn — awaiting PiP alone first often burns the
     // transient activation and Chrome silently rejects fullscreen.
-    const wasPip = !!document.pictureInPictureElement;
-    const pipExit = wasPip
+    const wasDocPip = !!docPipRef.current;
+    if (wasDocPip) {
+      await exitPipSafe();
+    }
+    const wasPip = !!document.pictureInPictureElement || wasDocPip;
+    const pipExit = document.pictureInPictureElement
       ? document.exitPictureInPicture().catch(() => {})
       : Promise.resolve();
 
@@ -852,9 +915,16 @@ export function VideoCard({
   const togglePip = useCallback(async () => {
     revealChrome();
     const el = videoRef.current;
-    if (!el) return;
+
+    // Already in Document PiP — close it.
+    if (docPipRef.current) {
+      await exitPipSafe();
+      setIsPip(false);
+      return;
+    }
+
     try {
-      if (document.pictureInPictureElement === el) {
+      if (el && document.pictureInPictureElement === el) {
         await document.exitPictureInPicture();
         return;
       }
@@ -865,7 +935,72 @@ export function VideoCard({
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
       }
-      if (el.requestPictureInPicture) {
+
+      // Prefer Document PiP so the floating window can host next/prev episode
+      // buttons — classic video PiP can't render custom controls.
+      if (getDocumentPip() && !isScripted) {
+        const main = videoRef.current;
+        const src = resolvePlaybackUrl(video.videoUrl);
+        const session = await openDocPipPlayer({
+          src,
+          currentTime: main?.currentTime ?? 0,
+          muted: muted || volume <= 0,
+          volume,
+          playbackRate: speed,
+          chrome: {
+            episodeNumber: video.episodeNumber,
+            episodeTotal: epTotalCount,
+            seriesTitle,
+            hasPrev: !!prevSeriesEpisode,
+            hasNext: !!nextSeriesEpisode,
+          },
+          callbacks: {
+            onPrev: () => jumpSeriesEpisodeRef.current(-1),
+            onNext: () => jumpSeriesEpisodeRef.current(1),
+            onEnded: () => {
+              endedOnce.current = true;
+              onEpisodeEndedRef.current?.();
+            },
+            onClose: ({ currentTime, paused: wasPaused }) => {
+              docPipRef.current = null;
+              setDocPipActive(false);
+              setIsPip(false);
+              const node = videoRef.current;
+              if (!node) return;
+              try {
+                if (Number.isFinite(currentTime)) node.currentTime = currentTime;
+              } catch {
+                /* ignore */
+              }
+              setPaused(wasPaused);
+              if (!wasPaused) {
+                void node.play().catch(() => {
+                  setPaused(true);
+                });
+              } else {
+                node.pause();
+              }
+            },
+          },
+        });
+        if (session) {
+          docPipRef.current = session;
+          setDocPipActive(true);
+          setIsPip(true);
+          // Stop the in-page element so audio doesn't double.
+          if (main) {
+            try {
+              main.pause();
+              main.muted = true;
+            } catch {
+              /* ignore */
+            }
+          }
+          return;
+        }
+      }
+
+      if (el?.requestPictureInPicture) {
         await el.requestPictureInPicture();
         return;
       }
@@ -873,7 +1008,56 @@ export function VideoCard({
       /* fall through */
     }
     toast.message("Picture-in-picture isn’t available here", { duration: 1600 });
-  }, [exitFullscreenSafe, revealChrome]);
+  }, [
+    epTotalCount,
+    exitFullscreenSafe,
+    exitPipSafe,
+    isScripted,
+    muted,
+    nextSeriesEpisode,
+    prevSeriesEpisode,
+    revealChrome,
+    seriesTitle,
+    speed,
+    video.episodeNumber,
+    video.videoUrl,
+    volume,
+  ]);
+
+  // Keep the Document PiP window on the current episode + chrome without
+  // sending the user back to the tab.
+  useEffect(() => {
+    const session = docPipRef.current;
+    if (!session || !docPipActive) return;
+    session.updateChrome({
+      episodeNumber: video.episodeNumber,
+      episodeTotal: epTotalCount,
+      seriesTitle,
+      hasPrev: !!prevSeriesEpisode,
+      hasNext: !!nextSeriesEpisode,
+    });
+    const want = resolvePlaybackUrl(video.videoUrl);
+    const pipVideo = session.video;
+    const attr = pipVideo.getAttribute("src") || "";
+    if (attr !== want) {
+      endedOnce.current = false;
+      session.loadEpisode(want, { autoplay: true });
+    }
+    pipVideo.muted = muted || volume <= 0;
+    pipVideo.volume = Math.max(0, Math.min(1, volume));
+    pipVideo.playbackRate = speed;
+  }, [
+    docPipActive,
+    epTotalCount,
+    muted,
+    nextSeriesEpisode,
+    prevSeriesEpisode,
+    seriesTitle,
+    speed,
+    video.episodeNumber,
+    video.videoUrl,
+    volume,
+  ]);
 
   const openAirPlay = useCallback(() => {
     revealChrome();
@@ -916,7 +1100,11 @@ export function VideoCard({
 
   useEffect(() => {
     const onEnter = () => setIsPip(true);
-    const onLeave = () => setIsPip(false);
+    const onLeave = () => {
+      // Document PiP keeps isPip true via docPipActive — don't clear it here.
+      if (docPipRef.current) return;
+      setIsPip(false);
+    };
     const el = videoRef.current;
     el?.addEventListener("enterpictureinpicture", onEnter);
     el?.addEventListener("leavepictureinpicture", onLeave);
@@ -926,28 +1114,9 @@ export function VideoCard({
     };
   }, [active, mediaKey]);
 
-  const seriesEpIndex = seriesEpisodes.findIndex((e) => e.id === video.id);
-  const prevSeriesEpisode =
-    seriesEpIndex > 0 ? seriesEpisodes[seriesEpIndex - 1] : undefined;
-  const nextSeriesEpisode =
-    seriesEpIndex >= 0 && seriesEpIndex < seriesEpisodes.length - 1
-      ? seriesEpisodes[seriesEpIndex + 1]
-      : undefined;
-
-  const jumpSeriesEpisode = useCallback(
-    (dir: -1 | 1) => {
-      const target =
-        dir < 0 ? prevSeriesEpisode : nextSeriesEpisode;
-      if (!target) {
-        toast.message(dir > 0 ? "Last episode" : "First episode", {
-          duration: 1200,
-        });
-        return;
-      }
-      onJumpToVideo?.(target.id);
-    },
-    [nextSeriesEpisode, onJumpToVideo, prevSeriesEpisode],
-  );
+  useEffect(() => {
+    onPictureInPictureChange?.(isPip || docPipActive);
+  }, [isPip, docPipActive, onPictureInPictureChange]);
 
   // PiP / lock-screen / headset controls — next/prev show in the floating window.
   useEffect(() => {
@@ -1098,6 +1267,12 @@ export function VideoCard({
   // to an ad). Must NOT re-run on episode id — that closes PiP on next-ep.
   useEffect(() => {
     return () => {
+      try {
+        docPipRef.current?.close();
+      } catch {
+        /* ignore */
+      }
+      docPipRef.current = null;
       const node = videoRef.current;
       const meta = videoMetaRef.current;
       if (node) {

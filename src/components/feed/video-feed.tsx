@@ -165,20 +165,53 @@ export function VideoFeed({
   itemsRef.current = items;
 
   // Keep a reactive PiP flag so ad slides can't unmount the live <video>.
+  // Includes Document PiP (`documentPictureInPicture.window`), which does not
+  // fire the classic video enter/leavepictureinpicture events.
   useEffect(() => {
     if (typeof document === "undefined") return;
+    type Dpi = {
+      window: Window | null;
+      addEventListener: (type: "enter", listener: (ev: Event & { window?: Window }) => void) => void;
+      removeEventListener: (type: "enter", listener: (ev: Event & { window?: Window }) => void) => void;
+    };
+    const dpi = (
+      window as Window & { documentPictureInPicture?: Dpi }
+    ).documentPictureInPicture;
+
     const sync = () => {
-      const on = !!document.pictureInPictureElement;
+      const on = !!(document.pictureInPictureElement || dpi?.window);
       pipActiveRef.current = on;
       setPipActive(on);
     };
     sync();
+
+    const onDocEnter = (ev: Event & { window?: Window }) => {
+      sync();
+      ev.window?.addEventListener("pagehide", sync);
+    };
+
     document.addEventListener("enterpictureinpicture", sync, true);
     document.addEventListener("leavepictureinpicture", sync, true);
+    dpi?.addEventListener("enter", onDocEnter);
     return () => {
       document.removeEventListener("enterpictureinpicture", sync, true);
       document.removeEventListener("leavepictureinpicture", sync, true);
+      dpi?.removeEventListener("enter", onDocEnter);
     };
+  }, []);
+
+  const onCardPipChange = useCallback((active: boolean) => {
+    if (active) {
+      pipActiveRef.current = true;
+      setPipActive(true);
+      return;
+    }
+    const dpi = (
+      window as Window & { documentPictureInPicture?: { window: Window | null } }
+    ).documentPictureInPicture;
+    const on = !!(document.pictureInPictureElement || dpi?.window);
+    pipActiveRef.current = on;
+    setPipActive(on);
   }, []);
 
   const measure = useCallback(() => {
@@ -690,6 +723,7 @@ export function VideoFeed({
             onJumpToVideo={onJumpToVideo}
             onEpisodeEnded={onEpisodeEnded}
             onPlaybackFailed={onPlaybackFailed}
+            onPictureInPictureChange={onCardPipChange}
           />
         ) : null}
       </div>
