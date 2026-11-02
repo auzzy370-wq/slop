@@ -1583,14 +1583,14 @@ export function VideoCard({
                 revealChrome();
                 setEpisodesOpen(true);
               }}
-              className="pointer-events-auto inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
+              className="pointer-events-auto inline-flex h-9 max-w-[70%] shrink items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
               aria-label="Choose episode"
             >
               <Clapperboard className="h-4 w-4 shrink-0 text-white/90" />
               <span className="truncate">
                 Episode {video.episodeNumber}/{epTotalCount}
               </span>
-              <span className="ml-auto text-white/55" aria-hidden>
+              <span className="text-white/55" aria-hidden>
                 ˄
               </span>
             </button>
