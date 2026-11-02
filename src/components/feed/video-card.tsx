@@ -458,10 +458,21 @@ export function VideoCard({
 
   const getFullscreenElement = () =>
     document.fullscreenElement ||
-    // Safari / older Chromium (Opera Go)
+    // Safari / older Chromium (Opera GX)
     (document as Document & { webkitFullscreenElement?: Element | null })
       .webkitFullscreenElement ||
     null;
+
+  /** Persist across episode swaps — never fullscreen the remounting card itself. */
+  const getFullscreenTarget = useCallback((): HTMLElement | null => {
+    const root = rootRef.current;
+    if (!root) return null;
+    return (
+      (root.closest(".slop-feed-scroller") as HTMLElement | null) ||
+      (root.closest(".slop-watch-stage") as HTMLElement | null) ||
+      root
+    );
+  }, []);
 
   const exitFullscreenSafe = useCallback(async () => {
     const doc = document as Document & {
@@ -479,8 +490,8 @@ export function VideoCard({
 
   const toggleFullscreen = useCallback(async () => {
     revealChrome();
-    const root = rootRef.current;
-    if (!root) return;
+    const target = getFullscreenTarget();
+    if (!target) return;
 
     if (getFullscreenElement()) {
       await exitFullscreenSafe();
@@ -488,18 +499,18 @@ export function VideoCard({
     }
 
     const req =
-      root.requestFullscreen?.bind(root) ||
+      target.requestFullscreen?.bind(target) ||
       (
-        root as HTMLElement & {
+        target as HTMLElement & {
           webkitRequestFullscreen?: () => Promise<void> | void;
           webkitRequestFullScreen?: () => Promise<void> | void;
         }
-      ).webkitRequestFullscreen?.bind(root) ||
+      ).webkitRequestFullscreen?.bind(target) ||
       (
-        root as HTMLElement & {
+        target as HTMLElement & {
           webkitRequestFullScreen?: () => Promise<void> | void;
         }
-      ).webkitRequestFullScreen?.bind(root);
+      ).webkitRequestFullScreen?.bind(target);
 
     if (req) {
       try {
@@ -526,10 +537,11 @@ export function VideoCard({
     toast.message("Fullscreen isn’t available in this browser", {
       duration: 1800,
     });
-  }, [exitFullscreenSafe, revealChrome]);
+  }, [exitFullscreenSafe, getFullscreenTarget, revealChrome]);
 
   useEffect(() => {
     const sync = () => setIsFullscreen(Boolean(getFullscreenElement()));
+    sync();
     document.addEventListener("fullscreenchange", sync);
     document.addEventListener("webkitfullscreenchange", sync);
     return () => {
@@ -537,16 +549,6 @@ export function VideoCard({
       document.removeEventListener("webkitfullscreenchange", sync);
     };
   }, []);
-
-  // Leave fullscreen when this card is no longer the active episode.
-  useEffect(() => {
-    if (active) return;
-    if (!getFullscreenElement()) return;
-    const root = rootRef.current;
-    if (root && getFullscreenElement() === root) {
-      void exitFullscreenSafe();
-    }
-  }, [active, exitFullscreenSafe]);
 
   useEffect(() => {
     if (!active) return;

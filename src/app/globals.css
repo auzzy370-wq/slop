@@ -184,7 +184,11 @@ a {
   background: #000;
 }
 
-/* Fullscreen player — keep the full card (chrome + video), not just <video>. */
+/* Fullscreen the persistent feed scroller (survives episode remounts). */
+.slop-feed-scroller:fullscreen,
+.slop-feed-scroller:-webkit-full-screen,
+.slop-watch-stage:fullscreen,
+.slop-watch-stage:-webkit-full-screen,
 .slop-player-root:fullscreen,
 .slop-player-root:-webkit-full-screen {
   width: 100%;
@@ -195,9 +199,20 @@ a {
   background: #000;
 }
 
+.slop-feed-scroller:fullscreen .slop-feed-video,
+.slop-feed-scroller:-webkit-full-screen .slop-feed-video,
+.slop-watch-stage:fullscreen .slop-feed-video,
+.slop-watch-stage:-webkit-full-screen .slop-feed-video,
 .slop-player-root:fullscreen .slop-feed-video,
 .slop-player-root:-webkit-full-screen .slop-feed-video {
   object-fit: contain;
+}
+
+/* Keep the live player visible during episode peeks while fullscreen. */
+.slop-feed-scroller:fullscreen .slop-feed-live-layer.is-peeking,
+.slop-feed-scroller:-webkit-full-screen .slop-feed-live-layer.is-peeking {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .animate-in-up {
