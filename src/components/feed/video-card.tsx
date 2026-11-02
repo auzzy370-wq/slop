@@ -364,16 +364,13 @@ export function VideoCard({
         markStarted(node);
         return;
       }
-      // Always start muted so desktop autoplay is allowed, then restore
-      // the user's unmute preference if they already turned sound on.
-      // Do NOT flip React mute state here — that was cutting audio on scroll.
-      // Mute preference is read at kick time (not an effect dep) so toggling
-      // mute doesn't tear down / restart playback.
+      // Prefer playing at the user's real mute state. The old muted→play→unmute
+      // dance satisfies desktop autoplay, but FaceTime/screen-share often loses
+      // the audio track for remote listeners while local playback still works.
       const wantSound = !muted;
-      node.muted = true;
-      void node
-        .play()
-        .then(() => {
+      const playWithMute = (startMuted: boolean) => {
+        node.muted = startMuted;
+        return node.play().then(() => {
           if (cancelled || videoRef.current !== node) {
             try {
               node.pause();
@@ -383,17 +380,29 @@ export function VideoCard({
             }
             return;
           }
-          if (wantSound) {
-            node.muted = false;
-          }
+          if (wantSound) node.muted = false;
+          else node.muted = true;
           markStarted(node);
-        })
-        .catch(() => {
+        });
+      };
+
+      void playWithMute(!wantSound).catch(() => {
+        if (cancelled || !wantSound) {
+          if (!cancelled) {
+            setIsPlaying(false);
+            setPaused(true);
+            setLoading(false);
+          }
+          return;
+        }
+        // Autoplay blocked unmuted — fall back once, then unmute after start.
+        void playWithMute(true).catch(() => {
           if (cancelled) return;
           setIsPlaying(false);
           setPaused(true);
           setLoading(false);
         });
+      });
     };
 
     if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
