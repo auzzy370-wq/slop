@@ -16,6 +16,7 @@ import {
   MessageCircle,
   Minimize2,
   MoreHorizontal,
+  Pause,
   PictureInPicture2,
   Play,
   RotateCcw,
@@ -1367,16 +1368,62 @@ export function VideoCard({
         </div>
       )}
 
-      {active && !scrubbing && !loading && !failed && !isPlaying && (
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="slop-pause-ring absolute left-1/2 top-[42%] z-20 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-black/45 text-white backdrop-blur-md"
-          aria-label="Play"
-        >
-          <Play className="ml-0.5 h-7 w-7 fill-white text-white" />
-        </button>
-      )}
+      {active &&
+        !scrubbing &&
+        !loading &&
+        !failed &&
+        chromeVisible &&
+        !isScripted && (
+          <div
+            className="slop-transport absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-5"
+            data-no-swipe
+          >
+            <button
+              type="button"
+              onClick={() => seekBy(-10)}
+              className="slop-transport-btn slop-transport-btn--side"
+              aria-label="Skip back 10 seconds"
+            >
+              <SkipBack className="h-5 w-5 fill-white text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={togglePlay}
+              className="slop-transport-btn slop-transport-btn--main slop-pause-ring"
+              aria-label={isPlaying ? "Pause" : "Play"}
+            >
+              {isPlaying ? (
+                <Pause className="h-7 w-7 fill-white text-white" />
+              ) : (
+                <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => seekBy(10)}
+              className="slop-transport-btn slop-transport-btn--side"
+              aria-label="Skip forward 10 seconds"
+            >
+              <SkipForward className="h-5 w-5 fill-white text-white" />
+            </button>
+          </div>
+        )}
+      {active &&
+        !scrubbing &&
+        !loading &&
+        !failed &&
+        chromeVisible &&
+        isScripted &&
+        !isPlaying && (
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="slop-transport-btn slop-transport-btn--main slop-pause-ring absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
+            aria-label="Play"
+          >
+            <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
+          </button>
+        )}
 
       {/* Social rail — keep lean; playback tools live in the bottom bar */}
       <div
@@ -1600,22 +1647,6 @@ export function VideoCard({
                     }}
                   />
                 </label>
-                <button
-                  type="button"
-                  onClick={() => seekBy(-10)}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
-                  aria-label="Skip back 10 seconds"
-                >
-                  <SkipBack className="h-3.5 w-3.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => seekBy(10)}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
-                  aria-label="Skip forward 10 seconds"
-                >
-                  <SkipForward className="h-3.5 w-3.5" />
-                </button>
                 <button
                   type="button"
                   onClick={() => {

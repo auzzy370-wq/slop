@@ -587,6 +587,43 @@ a {
   animation: slop-spin-diamond 0.75s linear infinite;
 }
 
+.slop-transport {
+  pointer-events: auto;
+  animation: slop-pause-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.slop-transport-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 140ms ease, background 140ms ease;
+}
+
+.slop-transport-btn:hover {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+.slop-transport-btn:active {
+  transform: scale(0.92);
+}
+
+.slop-transport-btn--main {
+  position: relative;
+  width: 4.25rem;
+  height: 4.25rem;
+}
+
+.slop-transport-btn--side {
+  width: 3.15rem;
+  height: 3.15rem;
+}
+
 .slop-pause-ring {
   animation: slop-pause-in 280ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
