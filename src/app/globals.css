@@ -92,6 +92,20 @@ a {
   overflow: hidden;
 }
 
+/* Lock the document while watching — only inner rails/player scroll. */
+html:has(.slop-watch-shell),
+body:has(.slop-watch-shell) {
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
+main:has(.slop-watch-shell) {
+  height: 100%;
+  max-height: 100dvh;
+  overflow: hidden;
+}
+
 @media (min-width: 1024px) {
   .slop-watch-shell {
     display: grid;
@@ -103,8 +117,12 @@ a {
     align-items: stretch;
     justify-items: center;
     column-gap: 1.5rem;
-    row-gap: 1rem;
-    padding: 5.25rem 1.5rem 1.5rem;
+    row-gap: 0.75rem;
+    height: 100dvh;
+    max-height: 100dvh;
+    min-height: 0;
+    padding: 5rem 1.5rem 1rem;
+    overflow: hidden;
     background:
       radial-gradient(ellipse 55% 50% at 50% 45%, rgba(185, 154, 255, 0.12), transparent 60%),
       radial-gradient(ellipse 40% 35% at 15% 80%, rgba(185, 154, 255, 0.05), transparent),
@@ -117,22 +135,30 @@ a {
     max-width: 1100px;
     justify-self: center;
     padding: 0 0.25rem;
+    min-height: 0;
   }
 
   .slop-watch-episodes {
     grid-area: episodes;
     width: 100%;
     max-width: 15rem;
-    height: min(calc(100dvh - 9.5rem), 860px);
-    align-self: center;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    align-self: stretch;
+    overflow: hidden;
   }
 
   .slop-watch-stage {
     grid-area: stage;
     position: relative;
-    height: min(calc(100dvh - 9.5rem), 860px);
-    width: min(420px, calc(min(100dvh - 9.5rem, 860px) * 9 / 16));
+    height: 100%;
+    max-height: 100%;
+    width: auto;
+    aspect-ratio: 9 / 16;
+    max-width: min(420px, 100%);
     align-self: center;
+    justify-self: center;
     overflow: hidden;
     border-radius: 1.25rem;
     border: 1px solid rgba(255, 255, 255, 0.1);
@@ -147,8 +173,11 @@ a {
     grid-area: comments;
     width: 100%;
     max-width: 22rem;
-    height: min(calc(100dvh - 9.5rem), 860px);
-    align-self: center;
+    height: 100%;
+    max-height: 100%;
+    min-height: 0;
+    align-self: stretch;
+    overflow: hidden;
   }
 
   .slop-watch-stage .slop-feed-scroller {
