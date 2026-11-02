@@ -85,11 +85,14 @@ export function VideoFeed({
   }, []);
   /** Hide live video during swipe so poster track can peek through. */
   const [peeking, setPeeking] = useState(false);
+  /** Reactive PiP flag — `document.pictureInPictureElement` alone won't re-render. */
+  const [pipActive, setPipActive] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const indexRef = useRef(0);
   const pageHRef = useRef(0);
+  const pipActiveRef = useRef(false);
   const dragRef = useRef<{
     pointerId: number;
     startX: number;
@@ -158,6 +161,25 @@ export function VideoFeed({
 
   const itemsLenRef = useRef(items.length);
   itemsLenRef.current = items.length;
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+
+  // Keep a reactive PiP flag so ad slides can't unmount the live <video>.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const sync = () => {
+      const on = !!document.pictureInPictureElement;
+      pipActiveRef.current = on;
+      setPipActive(on);
+    };
+    sync();
+    document.addEventListener("enterpictureinpicture", sync, true);
+    document.addEventListener("leavepictureinpicture", sync, true);
+    return () => {
+      document.removeEventListener("enterpictureinpicture", sync, true);
+      document.removeEventListener("leavepictureinpicture", sync, true);
+    };
+  }, []);
 
   const measure = useCallback(() => {
     const el = viewportRef.current;
@@ -210,7 +232,32 @@ export function VideoFeed({
   const goTo = useCallback(
     (idx: number, animate = true) => {
       const h = measure();
-      const clamped = Math.max(0, Math.min(itemsLenRef.current - 1, idx));
+      let clamped = Math.max(0, Math.min(itemsLenRef.current - 1, idx));
+      // PiP is tied to one <video> node — landing on an ad unmounts it and
+      // closes the window. Skip ad slides while picture-in-picture is open.
+      if (pipActiveRef.current) {
+        const list = itemsRef.current;
+        if (list[clamped]?.kind === "ad") {
+          const dir = clamped >= indexRef.current ? 1 : -1;
+          let found = -1;
+          for (let i = clamped; i >= 0 && i < list.length; i += dir) {
+            if (list[i]?.kind === "video") {
+              found = i;
+              break;
+            }
+          }
+          if (found < 0) {
+            for (let i = clamped; i >= 0 && i < list.length; i -= dir) {
+              if (list[i]?.kind === "video") {
+                found = i;
+                break;
+              }
+            }
+          }
+          if (found < 0) return;
+          clamped = found;
+        }
+      }
       indexRef.current = clamped;
       setActiveIndex(clamped);
       if (animTimerRef.current) {
@@ -505,7 +552,8 @@ export function VideoFeed({
 
   const onEpisodeEnded = useCallback(() => {
     const current = indexRef.current;
-    // Prefer the next episode of the same series when present in this feed.
+    // PiP is tied to one <video> node — remounting onto an ad slide exits it.
+    // Always advance to the next real episode (prefer same series).
     const currentItem = items[current];
     if (currentItem?.kind === "video") {
       const currentVideo = videos.find((v) => v.id === currentItem.videoId);
@@ -525,10 +573,32 @@ export function VideoFeed({
         }
       }
     }
-    if (current < itemsLenRef.current - 1) {
-      goTo(current + 1, true);
+    for (let i = current + 1; i < itemsLenRef.current; i++) {
+      if (items[i]?.kind === "video") {
+        goTo(i, true);
+        return;
+      }
     }
   }, [items, videos, goTo]);
+
+  // If an ad becomes active while PiP is open, jump to the next episode so
+  // the picture-in-picture window isn't torn down by swapping to AdSlot.
+  useEffect(() => {
+    if (!pipActive) return;
+    if (items[activeIndex]?.kind !== "ad") return;
+    for (let i = activeIndex + 1; i < items.length; i++) {
+      if (items[i]?.kind === "video") {
+        goTo(i, false);
+        return;
+      }
+    }
+    for (let i = activeIndex - 1; i >= 0; i--) {
+      if (items[i]?.kind === "video") {
+        goTo(i, false);
+        return;
+      }
+    }
+  }, [activeIndex, items, goTo, pipActive]);
 
   const onPlaybackFailed = useCallback(() => {
     const current = indexRef.current;
@@ -569,6 +639,13 @@ export function VideoFeed({
     activeItem?.kind === "video"
       ? feedVideos.find((v) => v.id === activeItem.videoId)
       : undefined;
+  // While PiP is open, never unmount the live player — even if we briefly land
+  // on an ad index before the skip effect runs.
+  const liveVideo =
+    activeVideo ??
+    (pipActive && lastVideoIdRef.current
+      ? feedVideos.find((v) => v.id === lastVideoIdRef.current)
+      : undefined);
 
   return (
     <div
@@ -586,12 +663,14 @@ export function VideoFeed({
         className={`slop-feed-live-layer${peeking ? " is-peeking" : ""}`}
         aria-hidden={peeking}
       >
-        {activeItem?.kind === "ad" ? (
+        {activeItem?.kind === "ad" && !pipActive ? (
           <AdSlot index={activeIndex} />
-        ) : activeVideo ? (
+        ) : liveVideo ? (
           <VideoCard
-            key={activeVideo.id}
-            video={activeVideo}
+            // Stable key so episode advances reuse the same <video> node and
+            // Picture-in-Picture can keep playing into the next episode.
+            key="slop-live-player"
+            video={liveVideo}
             active
             muted={muted || volume <= 0}
             volume={volume}
@@ -605,7 +684,7 @@ export function VideoFeed({
               }
             }}
             onVolumeChange={persistVolume}
-            categoryNames={activeVideo.categoryIds
+            categoryNames={liveVideo.categoryIds
               .map((id) => categoryNameMap[id])
               .filter(Boolean)}
             onJumpToVideo={onJumpToVideo}

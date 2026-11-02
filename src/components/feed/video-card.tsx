@@ -160,6 +160,25 @@ export function VideoCard({
   const resumeApplied = useRef(false);
   const started = useRef(false);
   const endedOnce = useRef(false);
+  /** Latest episode meta for unmount-only teardown (must not re-run on id change). */
+  const videoMetaRef = useRef(video);
+  videoMetaRef.current = video;
+  const isScriptedRef = useRef(isScripted);
+  isScriptedRef.current = isScripted;
+  // Reset session refs synchronously when the live player advances episodes so
+  // the play effect (declared earlier) still records a fresh start — and so we
+  // never remount the <video> node (that would close Picture-in-Picture).
+  const episodeIdRef = useRef(video.id);
+  if (episodeIdRef.current !== video.id) {
+    episodeIdRef.current = video.id;
+    started.current = false;
+    viewed.current = false;
+    endedOnce.current = false;
+    resumeApplied.current = false;
+    playbackId.current = uid("pb");
+    lastProgressSent.current = 0;
+    lastContinueSaved.current = 0;
+  }
 
   const persistContinue = useCallback(
     (force = false) => {
@@ -327,6 +346,22 @@ export function VideoCard({
       return;
     }
 
+    // Same <video> node across episodes (keeps PiP open). Swap src + load when
+    // the episode changes or the previous one ended — React's src attr alone
+    // is not always enough after `ended`.
+    const wantSrc = resolvePlaybackUrl(video.videoUrl);
+    const attrSrc = el.getAttribute("src") || "";
+    if (attrSrc !== wantSrc) {
+      el.src = wantSrc;
+      el.load();
+    } else if (el.ended) {
+      try {
+        el.currentTime = 0;
+      } catch {
+        el.load();
+      }
+    }
+
     let cancelled = false;
     const markStarted = (node: HTMLVideoElement) => {
       if (cancelled) return;
@@ -417,7 +452,7 @@ export function VideoCard({
       cancelled = true;
       el.removeEventListener("canplay", kickPlay);
       el.removeEventListener("loadeddata", kickPlay);
-      // Save progress, then hard-stop so audio can't leak after leaving Watch.
+      // Save progress for the episode we're leaving.
       try {
         if (
           Number.isFinite(el.currentTime) &&
@@ -440,19 +475,25 @@ export function VideoCard({
       } catch {
         /* ignore */
       }
-      try {
-        el.pause();
-        el.muted = true;
-      } catch {
-        /* ignore */
+      // Stay soft while this node is in PiP — pausing/muting mid-advance can
+      // make some browsers dismiss the floating window before the next src loads.
+      const inPip = document.pictureInPictureElement === el;
+      if (!inPip) {
+        try {
+          el.pause();
+          el.muted = true;
+        } catch {
+          /* ignore */
+        }
+        silenceFeedVideos(el);
       }
-      silenceFeedVideos(el);
     };
   }, [
     active,
     paused,
     recordView,
     video.id,
+    video.videoUrl,
     video.dramaId,
     video.episodeNumber,
     video.durationSeconds,
@@ -863,27 +904,29 @@ export function VideoCard({
     };
   }, [active, isFullscreen, getFullscreenTarget, revealChrome]);
 
-  // Stop media when leaving the player entirely (homepage / other routes).
+  // Stop media / exit PiP only when the card unmounts (leaving Watch, swapping
+  // to an ad). Must NOT re-run on episode id — that closes PiP on next-ep.
   useEffect(() => {
     return () => {
       const node = videoRef.current;
+      const meta = videoMetaRef.current;
       if (node) {
         try {
           // Capture progress before tearing the element down.
           if (
-            !isScripted &&
+            !isScriptedRef.current &&
             Number.isFinite(node.currentTime) &&
             Number.isFinite(node.duration) &&
             node.duration > 0 &&
             node.currentTime >= CONTINUE_MIN_SECONDS
           ) {
             if (node.currentTime / node.duration >= CONTINUE_COMPLETE_RATIO) {
-              removeContinueWatching(video.dramaId);
+              removeContinueWatching(meta.dramaId);
             } else {
               upsertContinueWatching({
-                dramaId: video.dramaId,
-                episodeId: video.id,
-                episodeNumber: video.episodeNumber,
+                dramaId: meta.dramaId,
+                episodeId: meta.id,
+                episodeNumber: meta.episodeNumber,
                 positionSec: node.currentTime,
                 durationSec: node.duration,
               });
@@ -905,7 +948,7 @@ export function VideoCard({
         void document.exitPictureInPicture().catch(() => {});
       }
     };
-  }, [mediaKey, video.id, video.dramaId, video.episodeNumber, isScripted]);
+  }, []);
 
   const onTimeUpdate = () => {
     const el = videoRef.current;
@@ -1317,7 +1360,9 @@ export function VideoCard({
             draggable={false}
           />
           <video
-            key={`${video.id}-${mediaKey}`}
+            // Stable across episode advances so Picture-in-Picture stays open.
+            // Only remount on mediaKey (retry / abort recovery).
+            key={mediaKey}
             ref={(node) => {
               videoRef.current = node;
               if (node) node.setAttribute("x-webkit-airplay", "allow");
