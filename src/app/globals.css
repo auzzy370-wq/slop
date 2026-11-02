@@ -550,9 +550,9 @@ main:has(.slop-watch-shell) {
 }
 
 .slop-rail-label {
-  color: #fff;
+  color: var(--slop-lavender);
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.75);
-  letter-spacing: 0;
+  letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -636,7 +636,7 @@ main:has(.slop-watch-shell) {
 
 .slop-scrub-track {
   height: 2px;
-  background: rgba(255, 255, 255, 0.22);
+  background: rgba(233, 222, 255, 0.22);
   border-radius: 999px;
   overflow: visible;
   transition: height 160ms ease;
@@ -650,16 +650,22 @@ main:has(.slop-watch-shell) {
 .slop-scrub-fill {
   height: 100%;
   border-radius: inherit;
-  background: #fff;
+  background: linear-gradient(
+    90deg,
+    var(--slop-violet-dim) 0%,
+    var(--slop-lavender) 100%
+  );
 }
 
 .slop-scrub-thumb {
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #fff;
+  background: var(--slop-lavender);
   transform: translate(-50%, -50%);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 0 0 2px rgba(17, 17, 22, 0.55),
+    0 1px 6px rgba(185, 154, 255, 0.55);
   transition: width 140ms ease, height 140ms ease;
 }
 
@@ -708,6 +714,10 @@ main:has(.slop-watch-shell) {
 .slop-transport-btn--main {
   width: 4.25rem;
   height: 4.25rem;
+  border-color: rgba(185, 154, 255, 0.45);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(233, 222, 255, 0.12);
 }
 
 .slop-transport-btn--side {

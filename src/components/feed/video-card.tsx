@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import type { Video } from "@/lib/types";
 import { formatCount, uid } from "@/lib/utils";
 import { useSlopStore } from "@/store/slop-store";
+import { SlopMarkMini } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -1343,7 +1344,7 @@ export function VideoCard({
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-vignette" />
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-grain" aria-hidden />
 
-      {/* Top strip — Pine: ← Episode N …… ⋮ */}
+      {/* Top strip — Pine layout, SLOP chrome */}
       <div
         className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-2.5 pt-[max(0.55rem,env(safe-area-inset-top))]${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
@@ -1352,15 +1353,27 @@ export function VideoCard({
       >
         <Link
           href={dramaHref}
-          className="pointer-events-auto inline-flex min-w-0 items-center gap-0.5 rounded-md py-1.5 pl-0.5 pr-2 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)] lg:pointer-events-none lg:invisible"
+          className="pointer-events-auto inline-flex min-w-0 items-center gap-1 rounded-full border border-white/12 bg-black/40 py-1.5 pl-1 pr-2.5 text-white backdrop-blur-md drop-shadow-[0_1px_3px_rgba(0,0,0,0.55)] lg:pointer-events-none lg:invisible"
           aria-label={`Back to ${seriesTitle}`}
           data-no-swipe
         >
-          <ChevronLeft className="h-6 w-6 shrink-0" strokeWidth={2.25} />
-          <span className="truncate text-[17px] font-semibold leading-none tracking-tight">
-            Episode {video.episodeNumber}
+          <ChevronLeft
+            className="h-5 w-5 shrink-0 text-[var(--slop-lavender)]"
+            strokeWidth={2.25}
+          />
+          <span className="font-display truncate text-[15px] font-bold leading-none tracking-tight">
+            Episode{" "}
+            <span className="tabular-nums text-[var(--slop-lavender)]">
+              {video.episodeNumber}
+            </span>
           </span>
         </Link>
+        <div className="pointer-events-none absolute left-1/2 top-[max(0.7rem,calc(env(safe-area-inset-top)+0.15rem))] hidden -translate-x-1/2 items-center gap-1.5 lg:flex">
+          <SlopMarkMini className="h-3.5 w-3.5" />
+          <span className="font-display text-[11px] font-bold tracking-[0.22em] text-white/80">
+            SLOP
+          </span>
+        </div>
         <button
           type="button"
           onClick={() => {
@@ -1368,11 +1381,11 @@ export function VideoCard({
             setMoreView("menu");
             setMoreOpen(true);
           }}
-          className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]"
+          className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/12 bg-black/40 text-white backdrop-blur-md transition hover:bg-black/55"
           aria-label="More"
           data-no-swipe
         >
-          <MoreHorizontal className="h-6 w-6" strokeWidth={2.25} />
+          <MoreHorizontal className="h-5 w-5" strokeWidth={2.25} />
         </button>
       </div>
 
@@ -1425,7 +1438,9 @@ export function VideoCard({
         >
           <Heart
             className={
-              liked ? "fill-[#ff3040] text-[#ff3040]" : "fill-transparent"
+              liked
+                ? "fill-[var(--slop-violet)] text-[var(--slop-violet)]"
+                : "fill-transparent"
             }
           />
         </RailButton>
@@ -1453,7 +1468,11 @@ export function VideoCard({
           label={formatCount(saveCount)}
         >
           <Bookmark
-            className={saved ? "fill-white text-white" : "fill-transparent"}
+            className={
+              saved
+                ? "fill-[var(--slop-lavender)] text-[var(--slop-lavender)]"
+                : "fill-transparent"
+            }
           />
         </RailButton>
         <RailButton
@@ -1482,11 +1501,15 @@ export function VideoCard({
           }`}
           aria-hidden={!chromeVisible && !isFullscreen}
         >
-          <p className="truncate text-[14px] font-bold uppercase tracking-[0.02em] text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
+          <div className="mb-1 flex items-center gap-1.5">
+            <SlopMarkMini className="h-3.5 w-3.5 shrink-0 lg:hidden" />
+            <span className="slop-meta-slash" aria-hidden />
+            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--slop-violet)]">
+              Ep {video.episodeNumber}
+            </p>
+          </div>
+          <p className="font-display truncate text-[1.05rem] font-bold leading-tight tracking-tight text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)] sm:text-[1.15rem]">
             {seriesTitle}
-          </p>
-          <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
-            {video.episodeNumber}
           </p>
         </div>
 
@@ -1535,7 +1558,7 @@ export function VideoCard({
           </div>
 
           <div
-            className="mt-2 flex items-center gap-2 rounded-xl bg-black/55 px-2 py-1.5 backdrop-blur-md sm:px-2.5"
+            className="mt-2 flex items-center gap-2 rounded-2xl border border-white/12 bg-black/50 px-2 py-1.5 backdrop-blur-md sm:px-2.5"
             data-no-swipe
           >
             {/* Mobile episode sheet — desktop uses the left episode rail */}
@@ -1545,14 +1568,15 @@ export function VideoCard({
                 revealChrome();
                 setEpisodesOpen(true);
               }}
-              className="pointer-events-auto inline-flex h-9 max-w-[70%] shrink items-center gap-1.5 rounded-lg px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
+              className="pointer-events-auto inline-flex h-9 max-w-[70%] shrink items-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
               aria-label="Choose episode"
             >
-              <Clapperboard className="h-4 w-4 shrink-0 text-white/90" />
-              <span className="truncate">
-                Episode {video.episodeNumber}/{epTotalCount}
+              <Clapperboard className="h-4 w-4 shrink-0 text-[var(--slop-violet)]" />
+              <span className="truncate font-display tracking-tight">
+                Episode {video.episodeNumber}
+                <span className="text-white/40">/{epTotalCount}</span>
               </span>
-              <span className="text-white/55" aria-hidden>
+              <span className="text-[var(--slop-lavender)]/70" aria-hidden>
                 ˄
               </span>
             </button>
@@ -1634,7 +1658,7 @@ export function VideoCard({
                   duration: 1200,
                 });
               }}
-              className="pointer-events-auto ml-auto inline-flex h-9 shrink-0 items-center justify-center rounded-lg px-2.5 text-[13px] font-bold tabular-nums text-white transition hover:bg-white/10"
+              className="pointer-events-auto ml-auto inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/5 px-2.5 font-display text-[13px] font-bold tabular-nums text-[var(--slop-lavender)] transition hover:bg-white/10"
               aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
             >
               {formatSpeed(speed)}
