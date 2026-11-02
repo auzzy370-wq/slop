@@ -15,8 +15,12 @@ import {
   MessageCircle,
   Minimize2,
   MoreHorizontal,
+  PictureInPicture2,
   Play,
+  RotateCcw,
   Share2,
+  SkipBack,
+  SkipForward,
   Volume1,
   Volume2,
   VolumeX,
@@ -99,6 +103,7 @@ export function VideoCard({
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPip, setIsPip] = useState(false);
   /** Audio plays but videoWidth stays 0 — usually HEVC in Chrome / Opera GX. */
   const [codecBlocked, setCodecBlocked] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -230,6 +235,11 @@ export function VideoCard({
 
     // Video node only exists while this card is active (Safari single-decoder).
     if (!active) {
+      const idle = videoRef.current;
+      if (idle) {
+        idle.pause();
+        idle.muted = true;
+      }
       if (started.current) {
         void track("video_abandoned", {
           userId: user?.id,
@@ -341,6 +351,9 @@ export function VideoCard({
       cancelled = true;
       el.removeEventListener("canplay", kickPlay);
       el.removeEventListener("loadeddata", kickPlay);
+      // Hard-stop on effect teardown (route change / episode swap) so audio
+      // can't keep playing after leaving Watch for the homepage.
+      el.pause();
     };
   }, [
     active,
@@ -568,46 +581,54 @@ export function VideoCard({
     };
   }, []);
 
+  const seekBy = useCallback(
+    (deltaSec: number) => {
+      const el = videoRef.current;
+      if (!el || !Number.isFinite(el.duration) || el.duration <= 0) return;
+      const next = Math.max(0, Math.min(el.duration, el.currentTime + deltaSec));
+      el.currentTime = next;
+      setProgress(next / el.duration);
+      revealChrome();
+      toast.message(deltaSec < 0 ? `${deltaSec}s` : `+${deltaSec}s`, {
+        duration: 700,
+      });
+    },
+    [revealChrome],
+  );
+
+  const togglePip = useCallback(async () => {
+    revealChrome();
+    const el = videoRef.current;
+    if (!el) return;
+    try {
+      if (document.pictureInPictureElement === el) {
+        await document.exitPictureInPicture();
+        return;
+      }
+      if (document.pictureInPictureElement) {
+        await document.exitPictureInPicture();
+      }
+      if (el.requestPictureInPicture) {
+        await el.requestPictureInPicture();
+        return;
+      }
+    } catch {
+      /* fall through */
+    }
+    toast.message("Picture-in-picture isn’t available here", { duration: 1600 });
+  }, [revealChrome]);
+
   useEffect(() => {
-    if (!active) return;
-    const onKey = (e: KeyboardEvent) => {
-      const tag = (e.target as HTMLElement | null)?.tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA") return;
-      if (e.key === "f" || e.key === "F") {
-        e.preventDefault();
-        void toggleFullscreen();
-        return;
-      }
-      if (isScripted) return;
-      if (e.key === "m" || e.key === "M") {
-        e.preventDefault();
-        revealChrome();
-        onToggleMute();
-        return;
-      }
-      if (e.key === "+" || e.key === "=" || e.key === "ArrowUp" && e.shiftKey) {
-        e.preventDefault();
-        revealChrome();
-        onVolumeChange?.(Math.min(1, volume + 0.1));
-        return;
-      }
-      if (e.key === "-" || e.key === "_" || e.key === "ArrowDown" && e.shiftKey) {
-        e.preventDefault();
-        revealChrome();
-        onVolumeChange?.(Math.max(0, volume - 0.1));
-      }
+    const onEnter = () => setIsPip(true);
+    const onLeave = () => setIsPip(false);
+    const el = videoRef.current;
+    el?.addEventListener("enterpictureinpicture", onEnter);
+    el?.addEventListener("leavepictureinpicture", onLeave);
+    return () => {
+      el?.removeEventListener("enterpictureinpicture", onEnter);
+      el?.removeEventListener("leavepictureinpicture", onLeave);
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [
-    active,
-    toggleFullscreen,
-    isScripted,
-    onToggleMute,
-    onVolumeChange,
-    volume,
-    revealChrome,
-  ]);
+  }, [active, mediaKey]);
 
   // Fullscreen: mouse / touch movement brings chrome back (same 10s hide timer).
   useEffect(() => {
@@ -630,6 +651,31 @@ export function VideoCard({
       target.removeEventListener("pointerdown", onMove);
     };
   }, [active, isFullscreen, getFullscreenTarget, revealChrome]);
+
+  // Stop media when leaving the player entirely (homepage / other routes).
+  useEffect(() => {
+    const el = videoRef.current;
+    return () => {
+      const node = videoRef.current ?? el;
+      if (node) {
+        try {
+          node.pause();
+          node.muted = true;
+          node.removeAttribute("src");
+          node.load();
+        } catch {
+          /* ignore */
+        }
+      }
+      if (
+        document.pictureInPictureElement &&
+        (document.pictureInPictureElement === node ||
+          document.pictureInPictureElement === el)
+      ) {
+        void document.exitPictureInPicture().catch(() => {});
+      }
+    };
+  }, [mediaKey, video.id]);
 
   const onTimeUpdate = () => {
     const el = videoRef.current;
@@ -755,6 +801,91 @@ export function VideoCard({
       return true;
     });
   }, [scheduleChromeHide, muted]);
+
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement | null)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+      if (commentsOpen || shareOpen || reportOpen || episodesOpen) return;
+
+      if (e.key === " " || e.code === "Space") {
+        e.preventDefault();
+        togglePlay();
+        return;
+      }
+      if (e.key === "f" || e.key === "F") {
+        e.preventDefault();
+        void toggleFullscreen();
+        return;
+      }
+      if (e.key === "p" || e.key === "P") {
+        if (isScripted) return;
+        e.preventDefault();
+        void togglePip();
+        return;
+      }
+      if (e.key === "ArrowLeft") {
+        if (isScripted) return;
+        e.preventDefault();
+        seekBy(-10);
+        return;
+      }
+      if (e.key === "ArrowRight") {
+        if (isScripted) return;
+        e.preventDefault();
+        seekBy(10);
+        return;
+      }
+      if (isScripted) return;
+      if (e.key === "m" || e.key === "M") {
+        e.preventDefault();
+        revealChrome();
+        onToggleMute();
+        return;
+      }
+      if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        const el = videoRef.current;
+        if (!el) return;
+        el.currentTime = 0;
+        setProgress(0);
+        setPaused(false);
+        void el.play().catch(() => {});
+        revealChrome();
+        toast.message("Restarted", { duration: 800 });
+        return;
+      }
+      if (e.key === "+" || e.key === "=" || (e.key === "ArrowUp" && e.shiftKey)) {
+        e.preventDefault();
+        revealChrome();
+        onVolumeChange?.(Math.min(1, volume + 0.1));
+        return;
+      }
+      if (e.key === "-" || e.key === "_" || (e.key === "ArrowDown" && e.shiftKey)) {
+        e.preventDefault();
+        revealChrome();
+        onVolumeChange?.(Math.max(0, volume - 0.1));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    active,
+    toggleFullscreen,
+    togglePip,
+    togglePlay,
+    seekBy,
+    isScripted,
+    onToggleMute,
+    onVolumeChange,
+    volume,
+    revealChrome,
+    commentsOpen,
+    shareOpen,
+    reportOpen,
+    episodesOpen,
+  ]);
 
   const onVideoSurfaceTap = useCallback(() => {
     if (!chromeVisible) {
@@ -1210,6 +1341,17 @@ export function VideoCard({
             </button>
           </div>
         ) : null}
+        {!isScripted ? (
+          <RailButton
+            active={isPip}
+            onClick={() => {
+              void togglePip();
+            }}
+            ariaLabel={isPip ? "Exit picture-in-picture" : "Picture-in-picture"}
+          >
+            <PictureInPicture2 className="fill-transparent" />
+          </RailButton>
+        ) : null}
         <RailButton
           active={isFullscreen}
           onClick={() => {
@@ -1346,23 +1488,57 @@ export function VideoCard({
               </span>
             </button>
             {!isScripted ? (
-              <button
-                type="button"
-                onClick={() => {
-                  revealChrome();
-                  const next = nextPlaybackSpeed(speed);
-                  setSpeed(next);
-                  savePlaybackSpeed(next);
-                  if (videoRef.current) videoRef.current.playbackRate = next;
-                  toast.message(`Speed ${formatSpeed(next)}`, {
-                    duration: 1200,
-                  });
-                }}
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-3 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
-                aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
-              >
-                {formatSpeed(speed)}
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={() => seekBy(-10)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
+                  aria-label="Skip back 10 seconds"
+                >
+                  <SkipBack className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => seekBy(10)}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
+                  aria-label="Skip forward 10 seconds"
+                >
+                  <SkipForward className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = videoRef.current;
+                    if (!el) return;
+                    el.currentTime = 0;
+                    setProgress(0);
+                    setPaused(false);
+                    void el.play().catch(() => {});
+                    revealChrome();
+                  }}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
+                  aria-label="Restart episode"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    revealChrome();
+                    const next = nextPlaybackSpeed(speed);
+                    setSpeed(next);
+                    savePlaybackSpeed(next);
+                    if (videoRef.current) videoRef.current.playbackRate = next;
+                    toast.message(`Speed ${formatSpeed(next)}`, {
+                      duration: 1200,
+                    });
+                  }}
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-3 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
+                  aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
+                >
+                  {formatSpeed(speed)}
+                </button>
+              </>
             ) : null}
             <button
               type="button"

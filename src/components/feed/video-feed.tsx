@@ -64,6 +64,25 @@ export function VideoFeed({
     }
   }, []);
 
+  // Leaving /watch must kill any in-flight audio (incl. PiP leftovers).
+  useEffect(() => {
+    return () => {
+      viewportRef.current?.querySelectorAll("video").forEach((node) => {
+        try {
+          node.pause();
+          node.muted = true;
+          node.removeAttribute("src");
+          node.load();
+        } catch {
+          /* ignore */
+        }
+      });
+      if (document.pictureInPictureElement) {
+        void document.exitPictureInPicture().catch(() => {});
+      }
+    };
+  }, []);
+
   const persistVolume = useCallback((next: number) => {
     const clamped = Math.max(0, Math.min(1, Math.round(next * 10) / 10));
     setVolume(clamped);
