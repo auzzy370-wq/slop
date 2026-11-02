@@ -1608,8 +1608,8 @@ export function VideoCard({
             </div>
           </div>
 
-          {/* Mobile: episode sheet opener. Desktop: More opens as a bottom sheet. */}
           <div className="mt-1 flex items-center gap-2" data-no-swipe>
+            {/* Mobile episode sheet opener */}
             <button
               type="button"
               onClick={() => {
@@ -1627,6 +1627,118 @@ export function VideoCard({
                 ˄
               </span>
             </button>
+
+            {/* Desktop: playback controls back on the bottom bar */}
+            {!isScripted ? (
+              <>
+                <label
+                  className="slop-volume-bar pointer-events-auto hidden h-8 w-[7rem] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-2.5 backdrop-blur-md lg:inline-flex"
+                  style={
+                    {
+                      ["--slop-vol"]: `${Math.round((muted ? 0 : volume) * 100)}%`,
+                    } as CSSProperties
+                  }
+                >
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-white"
+                    aria-label={muted || volume <= 0 ? "Unmute" : "Mute"}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      revealChrome();
+                      onToggleMute();
+                    }}
+                  >
+                    {muted || volume <= 0 ? (
+                      <VolumeX className="h-3.5 w-3.5" />
+                    ) : volume < 0.45 ? (
+                      <Volume1 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Volume2 className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <span className="sr-only">Volume</span>
+                  <input
+                    type="range"
+                    className="slop-volume-slider-h"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round((muted ? 0 : volume) * 100)}
+                    aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)} percent`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      revealChrome();
+                      onVolumeChange?.(Number(e.target.value) / 100);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = videoRef.current;
+                    if (!el) return;
+                    el.currentTime = 0;
+                    setProgress(0);
+                    setPaused(false);
+                    void el.play().catch(() => {});
+                    revealChrome();
+                  }}
+                  className="pointer-events-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+                  aria-label="Restart episode"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    revealChrome();
+                    const next = nextPlaybackSpeed(speed);
+                    setSpeed(next);
+                    savePlaybackSpeed(next);
+                    if (videoRef.current) videoRef.current.playbackRate = next;
+                    toast.message(`Speed ${formatSpeed(next)}`, {
+                      duration: 1200,
+                    });
+                  }}
+                  className="pointer-events-auto hidden h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-2.5 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+                  aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
+                >
+                  {formatSpeed(speed)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void togglePip();
+                  }}
+                  className={`pointer-events-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex ${
+                    isPip
+                      ? "border-[var(--slop-violet)]/50 text-[var(--slop-lavender)]"
+                      : ""
+                  }`}
+                  aria-label={
+                    isPip ? "Exit picture-in-picture" : "Picture-in-picture"
+                  }
+                >
+                  <PictureInPicture2 className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                void toggleFullscreen();
+              }}
+              className="pointer-events-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-3.5 w-3.5" />
+              ) : (
+                <Maximize2 className="h-3.5 w-3.5" />
+              )}
+            </button>
             <button
               type="button"
               onClick={() => {
@@ -1634,14 +1746,10 @@ export function VideoCard({
                 setMoreView("menu");
                 setMoreOpen(true);
               }}
-              className="pointer-events-auto hidden h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+              className="pointer-events-auto ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
               aria-label="More"
             >
-              <MoreHorizontal className="h-3.5 w-3.5 shrink-0 text-white/80" />
-              <span className="truncate">More</span>
-              <span className="ml-auto text-white/45" aria-hidden>
-                ˄
-              </span>
+              <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -1709,8 +1817,9 @@ export function VideoCard({
       >
         {moreView === "menu" ? (
           <div className="space-y-1">
+            {/* Playback extras stay in More on mobile only; desktop uses the bottom bar */}
             {!isScripted ? (
-              <>
+              <div className="space-y-1 lg:hidden">
                 <div
                   className="rounded-xl px-3 py-3"
                   style={
@@ -1797,11 +1906,11 @@ export function VideoCard({
                   <PictureInPicture2 className="h-4 w-4 text-white/60" />
                   {isPip ? "Exit picture-in-picture" : "Picture-in-picture"}
                 </button>
-              </>
+              </div>
             ) : null}
             <button
               type="button"
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5 lg:hidden"
               onClick={() => {
                 setMoreOpen(false);
                 void toggleFullscreen();
