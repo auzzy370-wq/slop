@@ -1506,16 +1506,39 @@ export function VideoCard({
         </div>
       )}
 
-      {/* Pine/TikTok-style: play glyph only while paused — no permanent skip cluster */}
+      {/* Paused center: small IG-style mute chip above play. Volume fine-tune stays in More. */}
       {active && !scrubbing && !loading && !failed && !isPlaying && (
-        <button
-          type="button"
-          onClick={togglePlay}
-          className="slop-transport-btn slop-transport-btn--main absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
-          aria-label="Play"
+        <div
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center gap-3"
+          data-no-swipe
         >
-          <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
-        </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              revealChrome();
+              onToggleMute();
+            }}
+            className="pointer-events-auto inline-flex h-9 w-9 items-center justify-center rounded-full bg-black/45 text-white backdrop-blur-md ring-1 ring-white/15 transition active:scale-95"
+            aria-label={muted || volume <= 0 ? "Unmute" : "Mute"}
+          >
+            {muted || volume <= 0 ? (
+              <VolumeX className="h-4 w-4" strokeWidth={2.25} />
+            ) : volume < 0.45 ? (
+              <Volume1 className="h-4 w-4" strokeWidth={2.25} />
+            ) : (
+              <Volume2 className="h-4 w-4" strokeWidth={2.25} />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={togglePlay}
+            className="slop-transport-btn slop-transport-btn--main pointer-events-auto"
+            aria-label="Play"
+          >
+            <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
+          </button>
+        </div>
       )}
 
       {/* Social rail — Pine / TikTok lower-right: like · comment · save · share */}
