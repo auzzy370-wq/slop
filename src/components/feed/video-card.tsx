@@ -12,6 +12,7 @@ import {
   Airplay,
   Bookmark,
   ChevronLeft,
+  ChevronRight,
   Clapperboard,
   Heart,
   Maximize2,
@@ -925,6 +926,152 @@ export function VideoCard({
     };
   }, [active, mediaKey]);
 
+  const seriesEpIndex = seriesEpisodes.findIndex((e) => e.id === video.id);
+  const prevSeriesEpisode =
+    seriesEpIndex > 0 ? seriesEpisodes[seriesEpIndex - 1] : undefined;
+  const nextSeriesEpisode =
+    seriesEpIndex >= 0 && seriesEpIndex < seriesEpisodes.length - 1
+      ? seriesEpisodes[seriesEpIndex + 1]
+      : undefined;
+
+  const jumpSeriesEpisode = useCallback(
+    (dir: -1 | 1) => {
+      const target =
+        dir < 0 ? prevSeriesEpisode : nextSeriesEpisode;
+      if (!target) {
+        toast.message(dir > 0 ? "Last episode" : "First episode", {
+          duration: 1200,
+        });
+        return;
+      }
+      onJumpToVideo?.(target.id);
+    },
+    [nextSeriesEpisode, onJumpToVideo, prevSeriesEpisode],
+  );
+
+  // PiP / lock-screen / headset controls — next/prev show in the floating window.
+  useEffect(() => {
+    if (!active) return;
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) {
+      return;
+    }
+    const ms = navigator.mediaSession;
+    const setHandler = (
+      action: MediaSessionAction,
+      handler: MediaSessionActionHandler | null,
+    ) => {
+      try {
+        ms.setActionHandler(action, handler);
+      } catch {
+        /* action unsupported in this browser */
+      }
+    };
+
+    try {
+      ms.metadata = new MediaMetadata({
+        title: `Episode ${video.episodeNumber}`,
+        artist: seriesTitle,
+        album: "SLOP",
+        artwork: video.thumbnailUrl
+          ? [
+              {
+                src: video.thumbnailUrl,
+                sizes: "512x512",
+                type: "image/jpeg",
+              },
+            ]
+          : [],
+      });
+    } catch {
+      /* MediaMetadata unsupported */
+    }
+
+    setHandler("play", () => {
+      setPaused(false);
+      const node = videoRef.current;
+      if (node) void node.play().catch(() => {});
+      try {
+        ms.playbackState = "playing";
+      } catch {
+        /* ignore */
+      }
+    });
+    setHandler("pause", () => {
+      setPaused(true);
+      videoRef.current?.pause();
+      try {
+        ms.playbackState = "paused";
+      } catch {
+        /* ignore */
+      }
+    });
+    setHandler(
+      "previoustrack",
+      prevSeriesEpisode
+        ? () => {
+            onJumpToVideo?.(prevSeriesEpisode.id);
+          }
+        : null,
+    );
+    setHandler(
+      "nexttrack",
+      nextSeriesEpisode
+        ? () => {
+            onJumpToVideo?.(nextSeriesEpisode.id);
+          }
+        : null,
+    );
+    setHandler("seekbackward", (details) => {
+      const el = videoRef.current;
+      if (!el || !Number.isFinite(el.duration)) return;
+      const off = details.seekOffset ?? 10;
+      el.currentTime = Math.max(0, el.currentTime - off);
+      if (el.duration > 0) setProgress(el.currentTime / el.duration);
+    });
+    setHandler("seekforward", (details) => {
+      const el = videoRef.current;
+      if (!el || !Number.isFinite(el.duration)) return;
+      const off = details.seekOffset ?? 10;
+      el.currentTime = Math.min(el.duration, el.currentTime + off);
+      if (el.duration > 0) setProgress(el.currentTime / el.duration);
+    });
+    setHandler("seekto", (details) => {
+      const el = videoRef.current;
+      if (!el || details.seekTime == null || !Number.isFinite(details.seekTime)) {
+        return;
+      }
+      el.currentTime = details.seekTime;
+      if (el.duration > 0) setProgress(el.currentTime / el.duration);
+    });
+
+    return () => {
+      (
+        [
+          "play",
+          "pause",
+          "previoustrack",
+          "nexttrack",
+          "seekbackward",
+          "seekforward",
+          "seekto",
+        ] as MediaSessionAction[]
+      ).forEach((action) => setHandler(action, null));
+      try {
+        ms.metadata = null;
+      } catch {
+        /* ignore */
+      }
+    };
+  }, [
+    active,
+    nextSeriesEpisode,
+    onJumpToVideo,
+    prevSeriesEpisode,
+    seriesTitle,
+    video.episodeNumber,
+    video.thumbnailUrl,
+  ]);
+
   // Fullscreen: mouse / touch movement brings chrome back (same 10s hide timer).
   useEffect(() => {
     if (!active || !isFullscreen) return;
@@ -1770,25 +1917,69 @@ export function VideoCard({
             className="mt-2 flex items-center gap-2 rounded-2xl border border-white/12 bg-black/50 px-2 py-1.5 backdrop-blur-md sm:px-2.5"
             data-no-swipe
           >
-            {/* Mobile episode sheet — desktop uses the left episode rail */}
-            <button
-              type="button"
-              onClick={() => {
-                revealChrome();
-                setEpisodesOpen(true);
-              }}
-              className="pointer-events-auto inline-flex h-9 max-w-[70%] shrink items-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
-              aria-label="Choose episode"
-            >
-              <Clapperboard className="h-4 w-4 shrink-0 text-[var(--slop-violet)]" />
-              <span className="truncate font-display tracking-tight">
-                Episode {video.episodeNumber}
-                <span className="text-white/40">/{epTotalCount}</span>
-              </span>
-              <span className="text-[var(--slop-lavender)]/70" aria-hidden>
-                ˄
-              </span>
-            </button>
+            {/* Episode controls — mobile always; desktop while PiP (rail may be covered). */}
+            {isPip ? (
+              <div className="pointer-events-auto flex min-w-0 max-w-[75%] shrink items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    revealChrome();
+                    jumpSeriesEpisode(-1);
+                  }}
+                  disabled={!prevSeriesEpisode}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label="Previous episode"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    revealChrome();
+                    setEpisodesOpen(true);
+                  }}
+                  className="inline-flex h-9 min-w-0 shrink items-center gap-1 rounded-xl px-1.5 text-[13px] font-semibold text-white transition hover:bg-white/10"
+                  aria-label="Choose episode"
+                >
+                  <Clapperboard className="h-4 w-4 shrink-0 text-[var(--slop-violet)]" />
+                  <span className="truncate font-display tracking-tight">
+                    Ep {video.episodeNumber}
+                    <span className="text-white/40">/{epTotalCount}</span>
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    revealChrome();
+                    jumpSeriesEpisode(1);
+                  }}
+                  disabled={!nextSeriesEpisode}
+                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35"
+                  aria-label="Next episode"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  revealChrome();
+                  setEpisodesOpen(true);
+                }}
+                className="pointer-events-auto inline-flex h-9 max-w-[70%] shrink items-center gap-1.5 rounded-xl px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
+                aria-label="Choose episode"
+              >
+                <Clapperboard className="h-4 w-4 shrink-0 text-[var(--slop-violet)]" />
+                <span className="truncate font-display tracking-tight">
+                  Episode {video.episodeNumber}
+                  <span className="text-white/40">/{epTotalCount}</span>
+                </span>
+                <span className="text-[var(--slop-lavender)]/70" aria-hidden>
+                  ˄
+                </span>
+              </button>
+            )}
 
             {/* Desktop volume / restart / PiP stay PC-only */}
             {!isScripted ? (
