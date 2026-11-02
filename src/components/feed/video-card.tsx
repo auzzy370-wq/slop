@@ -576,6 +576,18 @@ export function VideoCard({
     return clearChromeHideTimer;
   }, [active, video.id, clearChromeHideTimer, scheduleChromeHide]);
 
+  // Desktop already has the right-rail episode list — never stack a second picker.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      if (mq.matches) setEpisodesOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   useEffect(() => {
     if (!active) return;
     if (
@@ -978,13 +990,13 @@ export function VideoCard({
       if (e.key === "ArrowLeft") {
         if (isScripted) return;
         e.preventDefault();
-        seekBy(-10);
+        seekBy(-5);
         return;
       }
       if (e.key === "ArrowRight") {
         if (isScripted) return;
         e.preventDefault();
-        seekBy(10);
+        seekBy(5);
         return;
       }
       if (isScripted) return;
@@ -1393,9 +1405,9 @@ export function VideoCard({
           >
             <button
               type="button"
-              onClick={() => seekBy(-10)}
+              onClick={() => seekBy(-5)}
               className="slop-transport-btn slop-transport-btn--side"
-              aria-label="Skip back 10 seconds"
+              aria-label="Skip back 5 seconds"
             >
               <SkipBack className="h-5 w-5 fill-white text-white" />
             </button>
@@ -1413,9 +1425,9 @@ export function VideoCard({
             </button>
             <button
               type="button"
-              onClick={() => seekBy(10)}
+              onClick={() => seekBy(5)}
               className="slop-transport-btn slop-transport-btn--side"
-              aria-label="Skip forward 10 seconds"
+              aria-label="Skip forward 5 seconds"
             >
               <SkipForward className="h-5 w-5 fill-white text-white" />
             </button>
