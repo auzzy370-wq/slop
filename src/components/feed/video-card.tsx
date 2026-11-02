@@ -603,6 +603,18 @@ export function VideoCard({
     scheduleChromeHide,
   ]);
 
+  // Desktop already has the right-rail episode list — never stack a second picker.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => {
+      if (mq.matches) setEpisodesOpen(false);
+    };
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
+
   const getFullscreenElement = () =>
     document.fullscreenElement ||
     // Safari / older Chromium (Opera GX)
@@ -1581,8 +1593,8 @@ export function VideoCard({
             </div>
           </div>
 
-          {/* Bottom chrome — episode picker only */}
-          <div className="mt-1 flex items-center gap-2" data-no-swipe>
+          {/* Episode picker — mobile only; desktop uses the right sidebar list */}
+          <div className="mt-1 flex items-center gap-2 lg:hidden" data-no-swipe>
             <button
               type="button"
               onClick={() => {
