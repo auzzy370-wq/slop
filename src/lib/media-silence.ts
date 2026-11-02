@@ -23,4 +23,15 @@ export function hardStopFeedPlayback() {
   if (document.pictureInPictureElement) {
     void document.exitPictureInPicture().catch(() => {});
   }
+
+  try {
+    const dpi = (
+      window as Window & {
+        documentPictureInPicture?: { window: Window | null };
+      }
+    ).documentPictureInPicture;
+    dpi?.window?.close();
+  } catch {
+    /* ignore */
+  }
 }
