@@ -51,6 +51,8 @@ export function VideoFeed({
   // Desktop Chrome/Firefox block unmuted autoplay — start muted so PC plays.
   const [muted, setMuted] = useState(true);
   const [pageH, setPageH] = useState(0);
+  /** Hide live video during swipe so poster track can peek through. */
+  const [peeking, setPeeking] = useState(false);
 
   const viewportRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
@@ -67,6 +69,7 @@ export function VideoFeed({
     axis: "undecided" | "y" | "x";
   } | null>(null);
   const animatingRef = useRef(false);
+  const peekingRef = useRef(false);
   const wheelLockRef = useRef(0);
   const rafDragRef = useRef(0);
   const pendingYRef = useRef<number | null>(null);
@@ -155,15 +158,21 @@ export function VideoFeed({
     return h;
   }, []);
 
-  const applyTransform = useCallback((y: number, animate: boolean) => {
+  // Poster track may use GPU transforms — the live <video> is a sibling layer,
+  // not a descendant, so Chrome desktop still paints frames.
+  const applyOffset = useCallback((y: number, animate: boolean) => {
     const track = trackRef.current;
     if (!track) return;
-    if (animate) {
-      track.style.transition = `transform ${PAGE_MS}ms cubic-bezier(0.2, 0.85, 0.25, 1)`;
-    } else {
-      track.style.transition = "none";
-    }
+    track.style.top = "0px";
+    track.style.transition = animate
+      ? `transform ${PAGE_MS}ms cubic-bezier(0.2, 0.85, 0.25, 1)`
+      : "none";
     track.style.transform = `translate3d(0, ${y}px, 0)`;
+  }, []);
+
+  const endPeek = useCallback(() => {
+    peekingRef.current = false;
+    setPeeking(false);
   }, []);
 
   const goTo = useCallback(
@@ -177,21 +186,25 @@ export function VideoFeed({
         animTimerRef.current = null;
       }
       animatingRef.current = animate;
-      applyTransform(-clamped * h, animate);
+      if (animate) {
+        peekingRef.current = true;
+        setPeeking(true);
+      }
+      applyOffset(-clamped * h, animate);
       if (animate) {
         animTimerRef.current = window.setTimeout(() => {
           animatingRef.current = false;
           animTimerRef.current = null;
-          // Hard-snap after the tween so a mid-drag / mid-ad never sticks
-          // between two slides.
           const nextH = measure();
-          applyTransform(-indexRef.current * nextH, false);
+          applyOffset(-indexRef.current * nextH, false);
+          endPeek();
         }, PAGE_MS + 20);
       } else {
         animatingRef.current = false;
+        endPeek();
       }
     },
-    [applyTransform, measure],
+    [applyOffset, endPeek, measure],
   );
 
   // Remember the episode under the active index so ad inserts can't desync paging.
@@ -288,8 +301,8 @@ export function VideoFeed({
     const y = pendingYRef.current;
     if (y == null) return;
     pendingYRef.current = null;
-    applyTransform(y, false);
-  }, [applyTransform]);
+    applyOffset(y, false);
+  }, [applyOffset]);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.pointerType === "mouse" && e.button !== 0) return;
@@ -339,6 +352,11 @@ export function VideoFeed({
     if (!drag.dragging) return;
     e.preventDefault();
 
+    if (!peekingRef.current) {
+      peekingRef.current = true;
+      setPeeking(true);
+    }
+
     drag.lastY = e.clientY;
     drag.lastT = e.timeStamp;
 
@@ -368,7 +386,10 @@ export function VideoFeed({
       flushDragFrame();
     }
 
-    if (!drag.dragging) return;
+    if (!drag.dragging) {
+      endPeek();
+      return;
+    }
 
     const dy = e.clientY - drag.startY;
     const instantDt = Math.max(12, e.timeStamp - drag.lastT);
@@ -502,6 +523,12 @@ export function VideoFeed({
     categories.map((c) => [c.id, c.name]),
   );
 
+  const activeItem = items[activeIndex];
+  const activeVideo =
+    activeItem?.kind === "video"
+      ? feedVideos.find((v) => v.id === activeItem.videoId)
+      : undefined;
+
   return (
     <div
       ref={viewportRef}
@@ -513,6 +540,31 @@ export function VideoFeed({
       onPointerCancel={finishDrag}
       onWheel={onWheel}
     >
+      {/* Live player — sibling of the transformed track so Chrome paints frames. */}
+      <div
+        className={`slop-feed-live-layer${peeking ? " is-peeking" : ""}`}
+        aria-hidden={peeking}
+      >
+        {activeItem?.kind === "ad" ? (
+          <AdSlot index={activeIndex} />
+        ) : activeVideo ? (
+          <VideoCard
+            key={activeVideo.id}
+            video={activeVideo}
+            active
+            muted={muted}
+            onToggleMute={() => setMuted((m) => !m)}
+            categoryNames={activeVideo.categoryIds
+              .map((id) => categoryNameMap[id])
+              .filter(Boolean)}
+            onJumpToVideo={onJumpToVideo}
+            onEpisodeEnded={onEpisodeEnded}
+            onPlaybackFailed={onPlaybackFailed}
+          />
+        ) : null}
+      </div>
+
+      {/* Poster / ad previews only — never mount <video> here. */}
       <div
         ref={trackRef}
         className="slop-feed-track"
@@ -531,7 +583,9 @@ export function VideoFeed({
                 data-kind="ad"
               >
                 {near ? (
-                  <AdSlot index={index} />
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#111116] text-sm text-white/50">
+                    Ad
+                  </div>
                 ) : (
                   <div className="absolute inset-0 bg-[#111116]" aria-hidden />
                 )}
@@ -546,25 +600,11 @@ export function VideoFeed({
               data-index={index}
               data-kind="video"
             >
-              {near ? (
-                <VideoCard
-                  video={video}
-                  active={index === activeIndex}
-                  muted={muted}
-                  onToggleMute={() => setMuted((m) => !m)}
-                  categoryNames={video.categoryIds
-                    .map((id) => categoryNameMap[id])
-                    .filter(Boolean)}
-                  onJumpToVideo={onJumpToVideo}
-                  onEpisodeEnded={onEpisodeEnded}
-                  onPlaybackFailed={onPlaybackFailed}
-                />
-              ) : (
-                <div
-                  className="h-full w-full bg-cover bg-center"
-                  style={{ backgroundImage: `url(${video.thumbnailUrl})` }}
-                />
-              )}
+              <div
+                className="h-full w-full bg-cover bg-center"
+                style={{ backgroundImage: `url(${video.thumbnailUrl})` }}
+                aria-hidden
+              />
             </section>
           );
         })}
