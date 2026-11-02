@@ -67,6 +67,7 @@ export function VideoFeed({
   const pendingYRef = useRef<number | null>(null);
   const startedRef = useRef(false);
   const lastVideoIdRef = useRef<string | null>(null);
+  const lastStartIdRef = useRef<string | undefined>(undefined);
   const animTimerRef = useRef<number | null>(null);
 
   const savedIds = useMemo(
@@ -194,15 +195,17 @@ export function VideoFeed({
     if (item?.kind === "video") lastVideoIdRef.current = item.videoId;
   }, [items, activeIndex]);
 
-  // Initial measure + start episode (once hydrated / when start id changes).
-  // When ads inject and items.length changes, re-anchor on the last video —
-  // never jump back to startVideoId mid-session (that broke reels after ads).
+  // Measure + keep the active episode in sync.
+  // - First mount / startVideoId change (desktop episode rail) → jump to that EP
+  // - items.length change (ads inject) → stay on the episode already on screen
   useEffect(() => {
     if (!hydrated || items.length === 0) return;
     measure();
     let start = indexRef.current;
+    const startChanged =
+      Boolean(startVideoId) && startVideoId !== lastStartIdRef.current;
 
-    if (!startedRef.current) {
+    if (!startedRef.current || startChanged) {
       start = 0;
       if (startVideoId) {
         const idx = items.findIndex(
@@ -211,6 +214,7 @@ export function VideoFeed({
         if (idx >= 0) start = idx;
       }
       startedRef.current = true;
+      lastStartIdRef.current = startVideoId;
     } else {
       const prefer = lastVideoIdRef.current;
       if (prefer) {
@@ -224,6 +228,10 @@ export function VideoFeed({
 
     indexRef.current = start;
     setActiveIndex(start);
+    const startItem = items[start];
+    if (startItem?.kind === "video") {
+      lastVideoIdRef.current = startItem.videoId;
+    }
     requestAnimationFrame(() => goTo(start, false));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: avoid re-paging on every items rebuild
   }, [hydrated, startVideoId, items.length]);

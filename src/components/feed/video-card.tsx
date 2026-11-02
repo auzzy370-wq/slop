@@ -231,67 +231,7 @@ export function VideoCard({
     if (!el) return;
     el.muted = muted;
 
-    if (!paused) {
-      const tryPlay = () => {
-        const node = videoRef.current;
-        if (!node) return;
-        void node
-          .play()
-          .then(() => {
-            setLoading(false);
-          })
-          .catch(() => {
-            // PC browsers reject unmuted autoplay. Force mute in parent state
-            // so React doesn't flip it back on the next render.
-            if (!muted) onAutoplayBlocked?.();
-            const retry = videoRef.current;
-            if (!retry) return;
-            retry.muted = true;
-            void retry
-              .play()
-              .then(() => {
-                setLoading(false);
-              })
-              .catch(() => {
-                // Still blocked — show the play button so a click (user gesture) works.
-                setPaused(true);
-                setLoading(false);
-              });
-          });
-      };
-      tryPlay();
-      if (!viewed.current) {
-        viewed.current = true;
-        recordView(video.id);
-      }
-      if (!started.current) {
-        started.current = true;
-        void track("video_playback_started", {
-          userId: user?.id,
-          episodeId: video.id,
-          dramaId: video.dramaId,
-          playbackSessionId: playbackId.current,
-          idempotencyKey: `pbstart:${playbackId.current}`,
-          playback: {
-            durationMs: (el.duration || video.durationSeconds) * 1000,
-            currentMs: el.currentTime * 1000,
-            event: "start",
-          },
-        });
-        void track("episode_selected", {
-          userId: user?.id,
-          episodeId: video.id,
-          dramaId: video.dramaId,
-        });
-      } else {
-        void track("video_resumed", {
-          userId: user?.id,
-          episodeId: video.id,
-          dramaId: video.dramaId,
-          playbackSessionId: playbackId.current,
-        });
-      }
-    } else {
+    if (paused) {
       el.pause();
       if (started.current) {
         void track("video_paused", {
@@ -306,7 +246,73 @@ export function VideoCard({
           },
         });
       }
+      return;
     }
+
+    let cancelled = false;
+    const kickPlay = () => {
+      const node = videoRef.current;
+      if (!node || cancelled) return;
+      node.muted = muted || node.muted;
+      void node
+        .play()
+        .then(() => {
+          if (cancelled) return;
+          setLoading(false);
+          if (!viewed.current) {
+            viewed.current = true;
+            recordView(video.id);
+          }
+          if (!started.current) {
+            started.current = true;
+            void track("video_playback_started", {
+              userId: user?.id,
+              episodeId: video.id,
+              dramaId: video.dramaId,
+              playbackSessionId: playbackId.current,
+              idempotencyKey: `pbstart:${playbackId.current}`,
+              playback: {
+                durationMs: (node.duration || video.durationSeconds) * 1000,
+                currentMs: node.currentTime * 1000,
+                event: "start",
+              },
+            });
+            void track("episode_selected", {
+              userId: user?.id,
+              episodeId: video.id,
+              dramaId: video.dramaId,
+            });
+          }
+        })
+        .catch(() => {
+          if (cancelled) return;
+          // PC browsers reject unmuted autoplay — force mute and retry once.
+          if (!muted) onAutoplayBlocked?.();
+          const retry = videoRef.current;
+          if (!retry) return;
+          retry.muted = true;
+          void retry.play().then(() => {
+            if (!cancelled) setLoading(false);
+          }).catch(() => {
+            if (cancelled) return;
+            setPaused(true);
+            setLoading(false);
+          });
+        });
+    };
+
+    if (el.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+      kickPlay();
+    } else {
+      el.addEventListener("canplay", kickPlay);
+      el.addEventListener("loadeddata", kickPlay);
+    }
+
+    return () => {
+      cancelled = true;
+      el.removeEventListener("canplay", kickPlay);
+      el.removeEventListener("loadeddata", kickPlay);
+    };
   }, [
     active,
     muted,
@@ -317,7 +323,6 @@ export function VideoCard({
     video.durationSeconds,
     user?.id,
     isScripted,
-    progress,
     mediaKey,
     onAutoplayBlocked,
   ]);
@@ -516,8 +521,24 @@ export function VideoCard({
   const togglePlay = useCallback(() => {
     setChromeVisible(true);
     scheduleChromeHide();
-    setPaused((p) => !p);
-  }, [scheduleChromeHide]);
+    const el = videoRef.current;
+    setPaused((p) => {
+      if (p) {
+        // Resume inside the click handler so PC browsers treat it as a user gesture.
+        if (el) {
+          el.muted = muted;
+          void el.play().catch(() => {
+            el.muted = true;
+            onAutoplayBlocked?.();
+            void el.play().catch(() => {});
+          });
+        }
+        return false;
+      }
+      el?.pause();
+      return true;
+    });
+  }, [scheduleChromeHide, muted, onAutoplayBlocked]);
 
   const onVideoSurfaceTap = useCallback(() => {
     if (!chromeVisible) {
