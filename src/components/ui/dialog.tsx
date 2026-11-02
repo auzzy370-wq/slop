@@ -11,12 +11,15 @@ export function Dialog({
   title,
   children,
   className,
+  placement = "auto",
 }: {
   open: boolean;
   onClose: () => void;
   title: string;
   children: React.ReactNode;
   className?: string;
+  /** auto: bottom on mobile, centered on desktop. bottom: always a bottom sheet. */
+  placement?: "auto" | "bottom";
 }) {
   useEffect(() => {
     if (!open) return;
@@ -29,8 +32,15 @@ export function Dialog({
 
   if (!open) return null;
 
+  const bottomSheet = placement === "bottom";
+
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
+    <div
+      className={cn(
+        "fixed inset-0 z-[80] flex justify-center",
+        bottomSheet ? "items-end" : "items-end sm:items-center",
+      )}
+    >
       <button
         type="button"
         aria-label="Close dialog backdrop"
@@ -42,7 +52,10 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "relative z-10 w-full max-w-lg rounded-t-3xl border border-white/10 bg-[var(--slop-panel)] p-5 shadow-2xl sm:rounded-3xl",
+          "relative z-10 w-full max-w-lg border border-white/10 bg-[var(--slop-panel)] p-5 shadow-2xl",
+          bottomSheet
+            ? "rounded-t-3xl sm:max-w-md"
+            : "rounded-t-3xl sm:rounded-3xl",
           "animate-in-up",
           className,
         )}

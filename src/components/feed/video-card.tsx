@@ -1504,16 +1504,19 @@ export function VideoCard({
         >
           <Share2 className="fill-transparent" />
         </RailButton>
-        <RailButton
-          onClick={() => {
-            revealChrome();
-            setMoreView("menu");
-            setMoreOpen(true);
-          }}
-          ariaLabel="More"
-        >
-          <MoreHorizontal />
-        </RailButton>
+        {/* More stays on the rail for mobile; desktop uses the bottom control */}
+        <div className="lg:hidden">
+          <RailButton
+            onClick={() => {
+              revealChrome();
+              setMoreView("menu");
+              setMoreOpen(true);
+            }}
+            ariaLabel="More"
+          >
+            <MoreHorizontal />
+          </RailButton>
+        </div>
       </div>
 
       {/* Bottom caption + film scrub — flush to the home indicator */}
@@ -1605,21 +1608,37 @@ export function VideoCard({
             </div>
           </div>
 
-          {/* Episode picker — mobile only; desktop uses the right sidebar list */}
-          <div className="mt-1 flex items-center gap-2 lg:hidden" data-no-swipe>
+          {/* Mobile: episode sheet opener. Desktop: More opens as a bottom sheet. */}
+          <div className="mt-1 flex items-center gap-2" data-no-swipe>
             <button
               type="button"
               onClick={() => {
                 revealChrome();
                 setEpisodesOpen(true);
               }}
-              className="pointer-events-auto inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60"
+              className="pointer-events-auto inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60 lg:hidden"
               aria-label="Choose episode"
             >
               <Clapperboard className="h-3.5 w-3.5 shrink-0 text-[var(--slop-violet)]" />
               <span className="truncate">
                 Episode {video.episodeNumber}/{epTotalCount}
               </span>
+              <span className="ml-auto text-white/45" aria-hidden>
+                ˄
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                revealChrome();
+                setMoreView("menu");
+                setMoreOpen(true);
+              }}
+              className="pointer-events-auto hidden h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+              aria-label="More"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5 shrink-0 text-white/80" />
+              <span className="truncate">More</span>
               <span className="ml-auto text-white/45" aria-hidden>
                 ˄
               </span>
@@ -1685,6 +1704,8 @@ export function VideoCard({
           setMoreView("menu");
         }}
         title={moreView === "report" ? "Report content" : "More"}
+        placement="bottom"
+        className="lg:max-w-sm"
       >
         {moreView === "menu" ? (
           <div className="space-y-1">
