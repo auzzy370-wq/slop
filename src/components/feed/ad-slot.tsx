@@ -42,13 +42,18 @@ export function AdSlot({ index }: { index: number }) {
 
     const fallback = window.setTimeout(() => {
       const host = insRef.current;
+      const status = host?.getAttribute("data-adsbygoogle-status");
       const iframe = host?.querySelector("iframe");
+      const rect = iframe?.getBoundingClientRect();
       const filled =
+        status === "done" &&
         !!iframe &&
-        (iframe.getBoundingClientRect().height > 20 ||
-          Number(iframe.getAttribute("height") || 0) > 20);
+        (rect?.height ?? 0) > 40 &&
+        // Google often leaves a tiny/empty frame on 400 / no-fill.
+        (rect?.width ?? 0) > 40 &&
+        host.getAttribute("data-ad-status") !== "unfilled";
       if (!filled) setMode("house");
-    }, 4500);
+    }, 3500);
 
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
