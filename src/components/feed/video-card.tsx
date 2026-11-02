@@ -94,6 +94,8 @@ export function VideoCard({
   const [scrubbing, setScrubbing] = useState(false);
   const [chromeVisible, setChromeVisible] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  /** Audio plays but videoWidth stays 0 — usually HEVC in Chrome / Opera GX. */
+  const [codecBlocked, setCodecBlocked] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -349,6 +351,7 @@ export function VideoCard({
       setProgress(0);
       setChromeVisible(true);
       setFailed(false);
+      setCodecBlocked(false);
       setLoading(false);
       retryCount.current = 0;
       endedOnce.current = false;
@@ -358,11 +361,30 @@ export function VideoCard({
     setPaused(false);
     setIsPlaying(false);
     setFailed(false);
+    setCodecBlocked(false);
     setLoading(!isScripted);
     retryCount.current = 0;
     endedOnce.current = false;
     setSpeed(loadPlaybackSpeed());
   }, [active, isScripted, video.id]);
+
+  // Chrome / Opera GX: AAC audio can play while HEVC video never decodes
+  // (videoWidth stays 0). Surface that instead of a silent black frame.
+  useEffect(() => {
+    if (!active || isScripted || failed || storageBlocked) return;
+    const id = window.setInterval(() => {
+      const el = videoRef.current;
+      if (!el) return;
+      if (el.videoWidth > 0) {
+        setCodecBlocked(false);
+        return;
+      }
+      if (!el.paused && el.currentTime > 0.4 && el.readyState >= 2) {
+        setCodecBlocked(true);
+      }
+    }, 700);
+    return () => window.clearInterval(id);
+  }, [active, isScripted, failed, storageBlocked, mediaKey, video.id]);
 
   const handleEpisodeEnded = useCallback(() => {
     if (!active || endedOnce.current) return;
@@ -873,6 +895,9 @@ export function VideoCard({
               setPaused(false);
               setLoading(false);
               setFailed(false);
+              if ((videoRef.current?.videoWidth ?? 0) > 0) {
+                setCodecBlocked(false);
+              }
               retryCount.current = 0;
             }}
             onPause={() => {
@@ -984,6 +1009,19 @@ export function VideoCard({
       {loading && active && !failed && (
         <div className="absolute inset-0 z-20 flex items-center justify-center">
           <div className="slop-loader" />
+        </div>
+      )}
+
+      {codecBlocked && active && !failed && (
+        <div className="pointer-events-none absolute inset-x-3 top-[28%] z-30 mx-auto max-w-sm rounded-2xl border border-white/15 bg-black/70 px-4 py-3 text-center backdrop-blur-md">
+          <p className="font-display text-base font-bold text-white">
+            Video codec not supported
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-white/65">
+            This file uses a codec your browser can&apos;t decode (often HEVC).
+            Chrome and Opera GX need H.264 — hard-refresh, or try another
+            browser if it keeps happening.
+          </p>
         </div>
       )}
 
