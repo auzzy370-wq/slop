@@ -480,8 +480,7 @@ main:has(.slop-watch-shell) {
   clip-path: none;
   transition:
     opacity 280ms cubic-bezier(0.22, 1, 0.36, 1),
-    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
-    bottom 300ms ease-out;
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .slop-action-rail.is-hidden {
@@ -636,14 +635,8 @@ main:has(.slop-watch-shell) {
 }
 
 .slop-scrub-track {
-  height: 3px;
-  background:
-    repeating-linear-gradient(
-      90deg,
-      rgba(255, 255, 255, 0.14) 0 1.5px,
-      transparent 1.5px 9px
-    ),
-    rgba(255, 255, 255, 0.12);
+  height: 2px;
+  background: rgba(255, 255, 255, 0.22);
   border-radius: 999px;
   overflow: visible;
   transition: height 160ms ease;
@@ -651,28 +644,28 @@ main:has(.slop-watch-shell) {
 
 .slop-scrub-track.is-scrubbing,
 .slop-scrubbing .slop-scrub-track {
-  height: 5px;
+  height: 4px;
 }
 
 .slop-scrub-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #8f74d4 0%, #b99aff 55%, #e9deff 100%);
+  background: #fff;
 }
 
 .slop-scrub-thumb {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   background: #fff;
   transform: translate(-50%, -50%);
-  box-shadow: 0 0 0 3px rgba(17, 17, 22, 0.75);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   transition: width 140ms ease, height 140ms ease;
 }
 
 .slop-scrub-thumb.is-active {
-  width: 16px;
-  height: 16px;
+  width: 14px;
+  height: 14px;
 }
 
 .slop-loader {

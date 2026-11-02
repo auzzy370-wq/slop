@@ -16,19 +16,15 @@ import {
   MessageCircle,
   Minimize2,
   MoreHorizontal,
-  Pause,
   PictureInPicture2,
   Play,
   RotateCcw,
   Share2,
-  SkipBack,
-  SkipForward,
   Volume1,
   Volume2,
   VolumeX,
   Flag,
 } from "lucide-react";
-import { SlopMarkMini } from "@/components/brand/logo";
 import { toast } from "sonner";
 import type { Video } from "@/lib/types";
 import { formatCount, uid } from "@/lib/utils";
@@ -881,13 +877,6 @@ export function VideoCard({
     }
   };
 
-  const formatTime = (seconds: number) => {
-    if (!Number.isFinite(seconds) || seconds < 0) return "0:00";
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    return `${m}:${s.toString().padStart(2, "0")}`;
-  };
-
   const seekToClientX = useCallback(
     (clientX: number) => {
       const bar = scrubRef.current;
@@ -1348,28 +1337,22 @@ export function VideoCard({
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-vignette" />
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-grain" aria-hidden />
 
-      {/* Top strip — brand + episode chip */}
+      {/* Top strip — Pine-style: series name + episode chip only */}
       <div
-        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]${
+        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
-        <div className="mt-11 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <SlopMarkMini className="h-3.5 w-3.5" />
-            <p className="font-display text-[11px] font-bold tracking-[0.22em] text-white/90">
-              SLOP
-            </p>
-          </div>
-          <p className="mt-1 truncate text-[11px] uppercase tracking-[0.18em] text-white/40">
+        <div className="mt-11 min-w-0 pr-2 lg:mt-3">
+          <p className="truncate text-[13px] font-semibold text-white drop-shadow">
             {drama?.title ?? video.sourceAttribution}
           </p>
         </div>
-        <div className="slop-ep-chip mt-11 shrink-0 px-2.5 py-1.5">
-          <p className="font-display text-sm font-bold tabular-nums leading-none text-white">
+        <div className="slop-ep-chip mt-11 shrink-0 px-2.5 py-1.5 lg:mt-3">
+          <p className="text-[12px] font-bold tabular-nums leading-none text-white">
             {epLabel}
-            {epTotal ? <span className="text-white/30">/{epTotal}</span> : null}
+            {epTotal ? <span className="text-white/35">/{epTotal}</span> : null}
           </p>
         </div>
       </div>
@@ -1393,66 +1376,21 @@ export function VideoCard({
         </div>
       )}
 
-      {active &&
-        !scrubbing &&
-        !loading &&
-        !failed &&
-        chromeVisible &&
-        !isScripted && (
-          <div
-            className="slop-transport absolute left-1/2 top-1/2 z-20 flex -translate-x-1/2 -translate-y-1/2 items-center gap-5"
-            data-no-swipe
-          >
-            <button
-              type="button"
-              onClick={() => seekBy(-5)}
-              className="slop-transport-btn slop-transport-btn--side"
-              aria-label="Skip back 5 seconds"
-            >
-              <SkipBack className="h-5 w-5 fill-white text-white" />
-            </button>
-            <button
-              type="button"
-              onClick={togglePlay}
-              className="slop-transport-btn slop-transport-btn--main slop-pause-ring"
-              aria-label={isPlaying ? "Pause" : "Play"}
-            >
-              {isPlaying ? (
-                <Pause className="h-7 w-7 fill-white text-white" />
-              ) : (
-                <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
-              )}
-            </button>
-            <button
-              type="button"
-              onClick={() => seekBy(5)}
-              className="slop-transport-btn slop-transport-btn--side"
-              aria-label="Skip forward 5 seconds"
-            >
-              <SkipForward className="h-5 w-5 fill-white text-white" />
-            </button>
-          </div>
-        )}
-      {active &&
-        !scrubbing &&
-        !loading &&
-        !failed &&
-        chromeVisible &&
-        isScripted &&
-        !isPlaying && (
-          <button
-            type="button"
-            onClick={togglePlay}
-            className="slop-transport-btn slop-transport-btn--main slop-pause-ring absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
-            aria-label="Play"
-          >
-            <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
-          </button>
-        )}
+      {/* Pine/TikTok-style: play glyph only while paused — no permanent skip cluster */}
+      {active && !scrubbing && !loading && !failed && !isPlaying && (
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="slop-transport-btn slop-transport-btn--main absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2"
+          aria-label="Play"
+        >
+          <Play className="h-7 w-7 translate-x-[1px] fill-white text-white" />
+        </button>
+      )}
 
-      {/* Social rail — vertically centered so the frame doesn’t feel bottom-right heavy */}
+      {/* Social rail — lower-right like Pine Drama / TikTok */}
       <div
-        className={`slop-action-rail absolute right-2.5 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2.5 sm:right-3.5 sm:gap-3${
+        className={`slop-action-rail absolute right-2.5 bottom-[7.5rem] z-40 flex flex-col items-center gap-3 sm:right-3 sm:bottom-[8rem] sm:gap-3.5${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
@@ -1531,47 +1469,30 @@ export function VideoCard({
       >
         <div
           key={active ? video.id : "idle"}
-          className={`slop-caption pointer-events-none relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
+          className={`slop-caption pointer-events-none relative px-3 pr-[4.5rem] sm:px-4 sm:pr-20 ${
             chromeVisible || isFullscreen ? "is-visible" : "is-hidden"
           }`}
           aria-hidden={!chromeVisible && !isFullscreen}
         >
-          <div
-            aria-hidden
-            className="slop-player-ep-ghost pointer-events-none absolute -top-8 left-0 text-[4.5rem] opacity-80 sm:text-[6rem]"
-          >
-            {epLabel}
-          </div>
-
-          <div className="relative flex items-center gap-2">
-            <span className="slop-meta-slash" aria-hidden />
-            <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[var(--slop-violet)]">
-              Ep {video.episodeNumber}
+          <p className="text-[13px] font-semibold text-white">
+            {drama?.title ?? video.sourceAttribution}
+            <span className="font-normal text-white/45">
+              {" "}
+              · Ep {video.episodeNumber}
               {categoryNames[0] ? ` · ${categoryNames[0]}` : ""}
-            </p>
-            {video.viewCount > 0 ? (
-              <span className="text-[10px] uppercase tracking-[0.14em] text-white/30">
-                · {formatCount(video.viewCount)} watched
-              </span>
-            ) : null}
-          </div>
-          <h2 className="relative mt-1 max-w-[100%] font-display text-[1.25rem] font-bold leading-[1.05] tracking-tight text-white sm:text-[1.5rem]">
+            </span>
+          </p>
+          <h2 className="mt-1 max-w-[100%] text-[15px] font-semibold leading-snug text-white sm:text-base">
             {video.title}
           </h2>
-          <p className="relative mt-1 line-clamp-2 text-[12px] leading-snug text-white/70">
+          <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-white/65">
             {video.description}
           </p>
         </div>
 
         <div
-          className={`mt-1 px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${scrubbing ? "slop-scrubbing" : ""}`}
+          className={`mt-2 px-3 pr-[4.5rem] sm:px-4 sm:pr-20 ${scrubbing ? "slop-scrubbing" : ""}`}
         >
-          <div className="mb-0.5 flex items-center justify-between font-display text-[10px] font-semibold tabular-nums tracking-wide text-white/45">
-            <span className="text-[var(--slop-lavender)]">
-              {formatTime(progress * (duration || 0))}
-            </span>
-            <span>{formatTime(duration || video.durationSeconds)}</span>
-          </div>
           <div
             ref={scrubRef}
             role="slider"
@@ -1580,7 +1501,7 @@ export function VideoCard({
             aria-valuemax={100}
             aria-valuenow={Math.round(progress * 100)}
             tabIndex={0}
-            className="relative flex h-5 cursor-pointer touch-none items-center pointer-events-auto"
+            className="relative flex h-4 cursor-pointer touch-none items-center pointer-events-auto"
             data-no-swipe
             onPointerDown={onScrubPointerDown}
             onPointerMove={onScrubPointerMove}
