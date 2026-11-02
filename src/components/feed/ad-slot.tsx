@@ -13,51 +13,82 @@ declare global {
   }
 }
 
+function isAdsenseFilled(host: HTMLModElement | null): boolean {
+  if (!host) return false;
+  const status = host.getAttribute("data-adsbygoogle-status");
+  const iframe = host.querySelector("iframe");
+  const rect = iframe?.getBoundingClientRect();
+  return (
+    status === "done" &&
+    !!iframe &&
+    (rect?.height ?? 0) > 40 &&
+    (rect?.width ?? 0) > 40 &&
+    host.getAttribute("data-ad-status") !== "unfilled"
+  );
+}
+
 /**
  * Full-bleed feed interstitial.
  *
  * When AdSense is configured we mount a fixed-size unit inside overflow:hidden
  * so Google’s iframe can’t resize the reel pager. If the unit doesn’t fill
  * (approval pending / no inventory), we fall back to the Premium house CTA.
+ *
+ * After a filled AdSense unit (or house CTA) has been shown for
+ * `adSkipAfterSeconds`, Skip advances to the next episode.
  */
-export function AdSlot({ index }: { index: number }) {
+export function AdSlot({
+  index,
+  onSkip,
+}: {
+  index: number;
+  onSkip?: () => void;
+}) {
   const settings = useSlopStore((s) => s.settings);
   const ads = getAdsPublicConfig();
   const useAdsense = ads.provider === "adsense" && ads.configured;
+  const skipAfter = Math.max(
+    0,
+    Math.min(30, Math.round(settings.adSkipAfterSeconds ?? 5)),
+  );
   const [mode, setMode] = useState<"adsense" | "house">(
     useAdsense ? "adsense" : "house",
   );
+  /** True once we're showing something skippable (filled AdSense or house). */
+  const [readyToCount, setReadyToCount] = useState(!useAdsense);
+  const [secondsLeft, setSecondsLeft] = useState(skipAfter);
+  const [canSkip, setCanSkip] = useState(skipAfter <= 0);
   const pushed = useRef(false);
   const tracked = useRef(false);
+  const completed = useRef(false);
   const insRef = useRef<HTMLModElement>(null);
 
   useEffect(() => {
     if (!settings.adsEnabled) return;
     if (!useAdsense || !ads.clientId || !ads.feedSlotId) {
       setMode("house");
+      setReadyToCount(true);
       return;
     }
     if (pushed.current) return;
     pushed.current = true;
 
     const fallback = window.setTimeout(() => {
-      const host = insRef.current;
-      if (!host) {
-        setMode("house");
+      if (isAdsenseFilled(insRef.current)) {
+        setReadyToCount(true);
         return;
       }
-      const status = host.getAttribute("data-adsbygoogle-status");
-      const iframe = host.querySelector("iframe");
-      const rect = iframe?.getBoundingClientRect();
-      const filled =
-        status === "done" &&
-        !!iframe &&
-        (rect?.height ?? 0) > 40 &&
-        // Google often leaves a tiny/empty frame on 400 / no-fill.
-        (rect?.width ?? 0) > 40 &&
-        host.getAttribute("data-ad-status") !== "unfilled";
-      if (!filled) setMode("house");
+      setMode("house");
+      setReadyToCount(true);
     }, 3500);
+
+    // Poll briefly so a fast fill starts the skip clock without waiting 3.5s.
+    const poll = window.setInterval(() => {
+      if (!isAdsenseFilled(insRef.current)) return;
+      window.clearInterval(poll);
+      window.clearTimeout(fallback);
+      setReadyToCount(true);
+    }, 400);
 
     try {
       (window.adsbygoogle = window.adsbygoogle || []).push({});
@@ -71,9 +102,13 @@ export function AdSlot({ index }: { index: number }) {
       });
     } catch {
       setMode("house");
+      setReadyToCount(true);
     }
 
-    return () => window.clearTimeout(fallback);
+    return () => {
+      window.clearTimeout(fallback);
+      window.clearInterval(poll);
+    };
   }, [
     settings.adsEnabled,
     useAdsense,
@@ -84,6 +119,7 @@ export function AdSlot({ index }: { index: number }) {
 
   useEffect(() => {
     if (tracked.current) return;
+    if (!readyToCount) return;
     if (mode !== "house" && mode !== "adsense") return;
     tracked.current = true;
     void track("advertisement_displayed", {
@@ -91,9 +127,55 @@ export function AdSlot({ index }: { index: number }) {
         provider: mode === "adsense" ? "adsense" : "house",
         placement: "feed",
         index,
+        filled: mode === "adsense",
       },
     });
-  }, [mode, index]);
+  }, [mode, index, readyToCount]);
+
+  // Countdown → enable Skip (and auto-advance) after N seconds on a filled break.
+  useEffect(() => {
+    if (!settings.adsEnabled || !readyToCount) return;
+    setSecondsLeft(skipAfter);
+    setCanSkip(skipAfter <= 0);
+    if (skipAfter <= 0) return;
+
+    const started = Date.now();
+    const tick = window.setInterval(() => {
+      const left = Math.max(
+        0,
+        skipAfter - Math.floor((Date.now() - started) / 1000),
+      );
+      setSecondsLeft(left);
+      if (left <= 0) {
+        setCanSkip(true);
+        window.clearInterval(tick);
+      }
+    }, 250);
+    return () => window.clearInterval(tick);
+  }, [readyToCount, skipAfter, settings.adsEnabled, mode, index]);
+
+  const skipForward = (reason: "manual" | "auto") => {
+    if (completed.current) return;
+    completed.current = true;
+    void track("advertisement_completed", {
+      properties: {
+        provider: mode === "adsense" ? "adsense" : "house",
+        placement: "feed",
+        index,
+        reason,
+        skipAfter,
+      },
+    });
+    onSkip?.();
+  };
+
+  // Auto-advance once Skip unlocks.
+  useEffect(() => {
+    if (!canSkip || !readyToCount || !onSkip) return;
+    const t = window.setTimeout(() => skipForward("auto"), 600);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- fire once when unlocked
+  }, [canSkip, readyToCount]);
 
   if (!settings.adsEnabled) {
     return (
@@ -102,6 +184,24 @@ export function AdSlot({ index }: { index: number }) {
       </div>
     );
   }
+
+  const skipLabel = canSkip
+    ? "Skip ad"
+    : `Skip in ${secondsLeft}s`;
+
+  const skipButton = (
+    <button
+      type="button"
+      disabled={!canSkip}
+      className="absolute bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.75rem))] left-1/2 z-10 -translate-x-1/2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-xs font-semibold text-white/80 backdrop-blur-md transition enabled:hover:bg-black/70 enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-55"
+      onClick={() => {
+        if (!canSkip) return;
+        skipForward("manual");
+      }}
+    >
+      {skipLabel}
+    </button>
+  );
 
   if (mode === "adsense" && ads.clientId && ads.feedSlotId) {
     return (
@@ -132,13 +232,7 @@ export function AdSlot({ index }: { index: number }) {
             />
           </div>
         </div>
-        <button
-          type="button"
-          className="absolute bottom-[max(1.25rem,calc(env(safe-area-inset-bottom)+0.75rem))] left-1/2 z-10 -translate-x-1/2 rounded-full border border-white/15 bg-black/55 px-4 py-2 text-xs font-semibold text-white/80 backdrop-blur-md"
-          onClick={() => setMode("house")}
-        >
-          Skip ad break
-        </button>
+        {skipButton}
       </div>
     );
   }
@@ -173,6 +267,7 @@ export function AdSlot({ index }: { index: number }) {
       >
         Go ad-free for {settings.premiumPriceLabel}
       </Link>
+      {skipButton}
     </div>
   );
 }

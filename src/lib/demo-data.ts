@@ -143,6 +143,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   commentsEnabled: true,
   adsEnabled: true,
   adPlacementEvery: 4,
+  adSkipAfterSeconds: 5,
   premiumPriceLabel: "$7.99/mo",
   premiumMonthlyPriceCents: 799,
   featuredVideoIds: [

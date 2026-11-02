@@ -36,7 +36,8 @@ export default function SignInPage() {
         <SlopWordmark />
         <h1 className="mt-4 font-display text-3xl font-bold">Welcome back</h1>
         <p className="mt-2 text-sm text-[var(--slop-slate)]">
-          Guests can watch freely. Sign in to like, save, comment, and report.
+          Guests can like and save on this device — sign in to keep them on your
+          account.
         </p>
 
         <form onSubmit={onSubmit} className="mt-6 space-y-3">

@@ -125,6 +125,28 @@ export default function AdminAdsPage() {
               Lower = more ads. Start around 4–6 so the feed still feels
               bingeable.
             </p>
+            <label className="mt-4 block text-xs uppercase tracking-wide text-white/45">
+              Skip after N seconds
+              <Input
+                className="mt-1 max-w-[10rem]"
+                type="number"
+                min={0}
+                max={30}
+                value={settings.adSkipAfterSeconds ?? 5}
+                onChange={(e) =>
+                  updateSettings({
+                    adSkipAfterSeconds: Math.max(
+                      0,
+                      Math.min(30, Number(e.target.value) || 5),
+                    ),
+                  })
+                }
+              />
+            </label>
+            <p className="mt-2 text-xs text-white/40">
+              Countdown starts once AdSense fills (or the house CTA shows).
+              Then Skip unlocks and the feed auto-advances.
+            </p>
           </Step>
 
           <Step
@@ -215,6 +237,7 @@ NEXT_PUBLIC_ADS_SLOT_FEED=##########
             updateSettings({
               adsEnabled: settings.adsEnabled,
               adPlacementEvery: settings.adPlacementEvery,
+              adSkipAfterSeconds: settings.adSkipAfterSeconds ?? 5,
             });
             toast.success("Ad settings saved on this device");
           }}

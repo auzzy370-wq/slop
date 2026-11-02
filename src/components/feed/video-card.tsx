@@ -221,7 +221,10 @@ export function VideoCard({
   const liked =
     !!actorId &&
     likes.some((l) => l.userId === actorId && l.videoId === video.id);
-  const saved = !!user && saves.some((s) => s.userId === user.id && s.videoId === video.id);
+  const socialActorId = actorId ?? user?.id ?? null;
+  const saved =
+    !!socialActorId &&
+    saves.some((s) => s.userId === socialActorId && s.videoId === video.id);
   const videoComments = comments.filter(
     (c) => c.videoId === video.id && c.moderationStatus === "visible",
   );
@@ -1581,11 +1584,12 @@ export function VideoCard({
     });
   };
   const onSave = () => {
-    const res = toggleSave(video.id);
+    const actor = resolveSocialActor(user);
+    const res = toggleSave(video.id, { id: actor.id });
     if (res.needsAuth) requireAuth("save videos");
     else {
       void track("watchlist_addition", {
-        userId: user?.id,
+        userId: user?.id ?? actor.id,
         episodeId: video.id,
         dramaId: video.dramaId,
       });

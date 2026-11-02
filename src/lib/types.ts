@@ -158,6 +158,8 @@ export interface PlatformSettings {
   commentsEnabled: boolean;
   adsEnabled: boolean;
   adPlacementEvery: number;
+  /** Seconds after a filled ad (or house CTA) before Skip advances the feed. */
+  adSkipAfterSeconds: number;
   premiumPriceLabel: string;
   premiumMonthlyPriceCents: number;
   featuredVideoIds: string[];

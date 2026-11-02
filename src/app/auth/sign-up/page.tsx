@@ -85,7 +85,8 @@ export default function SignUpPage() {
       <div className="w-full max-w-md rounded-3xl border border-white/10 bg-[var(--slop-panel)] p-6">
         <h1 className="font-display text-3xl font-bold">Join SLOP</h1>
         <p className="mt-2 text-sm text-white/55">
-          Optional account for likes, saves, comments, reports, and SLOP Rewards.
+          Create an account to keep guest likes and saves, plus comments,
+          reports, and SLOP Rewards.
         </p>
         <form onSubmit={onSubmit} className="mt-6 space-y-3">
           <Input

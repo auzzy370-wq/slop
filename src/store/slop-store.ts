@@ -26,7 +26,49 @@ import type {
   Category,
 } from "@/lib/types";
 import { setBlobPlaybackBlocked as setMediaBlobBlocked } from "@/lib/media-url";
+import { upsertLocalAccount } from "@/lib/social/account-local";
+import { getGuestActorId } from "@/lib/social/guest";
+import { syncMergeGuestEngagement } from "@/lib/social/engagement-client";
 import { uid } from "@/lib/utils";
+
+function claimGuestEngagement(userId: string) {
+  if (typeof window === "undefined") return;
+  const guestId = getGuestActorId();
+  if (!guestId || guestId === userId || guestId === "guest_ssr") return;
+
+  // Remap local saves from the guest device id onto the account.
+  const state = useSlopStore.getState();
+  const nextSaves = state.saves.map((s) =>
+    s.userId === guestId ? { ...s, userId } : s,
+  );
+  const seen = new Set<string>();
+  const deduped: typeof nextSaves = [];
+  for (const s of nextSaves) {
+    const key = `${s.userId}:${s.videoId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    deduped.push(s);
+  }
+  useSlopStore.setState({ saves: deduped });
+
+  void syncMergeGuestEngagement({
+    fromActorId: guestId,
+    toActorId: userId,
+  }).then((remote) => {
+    if (!remote.ok) return;
+    const mergeSharedEngagement =
+      useSlopStore.getState().mergeSharedEngagement;
+    if (remote.likes && remote.comments) {
+      mergeSharedEngagement({
+        likes: remote.likes,
+        comments: remote.comments,
+      });
+    }
+    void import("@/components/social-hydrator").then((m) => {
+      m.requestEngagementRefresh();
+    });
+  });
+}
 
 const FRESH_CATALOG = catalogFromSeed();
 
@@ -59,7 +101,10 @@ interface SlopState {
     videoId: string,
     actor?: { id: string; displayName?: string },
   ) => { ok: boolean; needsAuth?: boolean };
-  toggleSave: (videoId: string) => { ok: boolean; needsAuth?: boolean };
+  toggleSave: (
+    videoId: string,
+    actor?: { id: string },
+  ) => { ok: boolean; needsAuth?: boolean };
   addComment: (
     videoId: string,
     text: string,
@@ -136,11 +181,12 @@ export const useSlopStore = create<SlopState>()(
               }
             : null,
         });
+        claimGuestEngagement(profile.id);
       },
       signInLocal: (email, displayName) => {
-        const profile: Profile = {
+        const profile = upsertLocalAccount({
           id: uid("user"),
-          email,
+          email: email.trim(),
           displayName: displayName || email.split("@")[0],
           avatarUrl: null,
           role: "user",
@@ -149,8 +195,9 @@ export const useSlopStore = create<SlopState>()(
           premiumBadge: false,
           createdAt: new Date().toISOString(),
           preferences: { autoplay: true, defaultMuted: false },
-        };
+        });
         set({ currentUser: profile, subscription: null });
+        claimGuestEngagement(profile.id);
       },
       signOut: () => set({ currentUser: null }),
       updateProfile: (patch) => {
@@ -211,11 +258,16 @@ export const useSlopStore = create<SlopState>()(
         return { ok: true };
       },
 
-      toggleSave: (videoId) => {
+      toggleSave: (videoId, actor) => {
         const user = get().currentUser;
-        if (!user) return { ok: false, needsAuth: true };
+        const actorId =
+          actor?.id || user?.id || (typeof window !== "undefined" ? getGuestActorId() : "");
+        // Guests can save on-device; signup remaps guest saves onto the account.
+        if (!actorId || actorId === "guest_ssr") {
+          return { ok: false, needsAuth: true };
+        }
         const existing = get().saves.find(
-          (s) => s.userId === user.id && s.videoId === videoId,
+          (s) => s.userId === actorId && s.videoId === videoId,
         );
         if (existing) {
           set({
@@ -230,7 +282,7 @@ export const useSlopStore = create<SlopState>()(
           set({
             saves: [
               {
-                userId: user.id,
+                userId: actorId,
                 videoId,
                 createdAt: new Date().toISOString(),
               },
@@ -545,7 +597,7 @@ export const useSlopStore = create<SlopState>()(
           likes,
           saves,
           reports: Array.isArray(p.reports) ? p.reports : [],
-          settings: p.settings ?? DEFAULT_SETTINGS,
+          settings: { ...DEFAULT_SETTINGS, ...(p.settings ?? {}) },
           subscription: p.subscription ?? null,
           categories: p.categories ?? DEMO_CATEGORIES,
         };

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { getFeed } from "@/lib/feed";
 import { hardStopFeedPlayback } from "@/lib/media-silence";
+import { getGuestActorId } from "@/lib/social/guest";
 import type { FeedSection } from "@/lib/types";
 import { useSlopStore } from "@/store/slop-store";
 import { watchHref } from "@/lib/watch-url";
@@ -113,13 +114,12 @@ export function VideoFeed({
   const lastStartIdRef = useRef<string | undefined>(undefined);
   const animTimerRef = useRef<number | null>(null);
 
-  const savedIds = useMemo(
-    () =>
-      user
-        ? saves.filter((s) => s.userId === user.id).map((s) => s.videoId)
-        : [],
-    [saves, user],
-  );
+  const savedIds = useMemo(() => {
+    const actorId = user?.id ?? getGuestActorId();
+    return saves
+      .filter((s) => s.userId === actorId)
+      .map((s) => s.videoId);
+  }, [saves, user]);
 
   const feedVideos = useMemo(() => {
     const effectiveSection =
@@ -640,6 +640,16 @@ export function VideoFeed({
     }
   }, [goTo]);
 
+  const onSkipAd = useCallback(() => {
+    const current = indexRef.current;
+    for (let i = current + 1; i < itemsLenRef.current; i++) {
+      if (itemsRef.current[i]?.kind === "video") {
+        goTo(i, true);
+        return;
+      }
+    }
+  }, [goTo]);
+
   if (!hydrated) {
     return (
       <div className="flex h-[100dvh] items-center justify-center bg-[var(--slop-ink)]">
@@ -697,7 +707,7 @@ export function VideoFeed({
         aria-hidden={peeking}
       >
         {activeItem?.kind === "ad" && !pipActive ? (
-          <AdSlot index={activeIndex} />
+          <AdSlot index={activeIndex} onSkip={onSkipAd} />
         ) : liveVideo ? (
           <VideoCard
             // Stable key so episode advances reuse the same <video> node and

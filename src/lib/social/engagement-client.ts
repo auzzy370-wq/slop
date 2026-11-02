@@ -55,6 +55,48 @@ export async function syncToggleLike(input: {
   }
 }
 
+/** Move guest likes/comments onto a signed-in account id. */
+export async function syncMergeGuestEngagement(input: {
+  fromActorId: string;
+  toActorId: string;
+}): Promise<{
+  ok: boolean;
+  likesMoved?: number;
+  commentsMoved?: number;
+  likes?: Like[];
+  comments?: Comment[];
+  error?: string;
+}> {
+  try {
+    const res = await fetch("/api/social/merge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        fromActorId: input.fromActorId,
+        toActorId: input.toActorId,
+      }),
+    });
+    const data = (await res.json()) as {
+      ok?: boolean;
+      likesMoved?: number;
+      commentsMoved?: number;
+      likes?: Like[];
+      comments?: Comment[];
+      error?: string;
+    };
+    if (!res.ok) return { ok: false, error: data.error ?? "Merge failed" };
+    return {
+      ok: true,
+      likesMoved: data.likesMoved ?? 0,
+      commentsMoved: data.commentsMoved ?? 0,
+      likes: data.likes,
+      comments: data.comments,
+    };
+  } catch {
+    return { ok: false, error: "Network error" };
+  }
+}
+
 export async function syncAddComment(input: {
   videoId: string;
   text: string;
