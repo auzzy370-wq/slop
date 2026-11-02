@@ -28,7 +28,12 @@ export function EpisodeSheet({
       className="max-h-[78dvh] overflow-hidden sm:max-h-[70vh]"
     >
       <p className="mb-3 line-clamp-1 text-sm text-white/50">{title}</p>
-      <ul className="max-h-[min(52dvh,420px)] space-y-1 overflow-y-auto overscroll-contain pr-1">
+      <ul
+        className="max-h-[min(52dvh,420px)] space-y-1 overflow-y-auto overscroll-contain pr-1"
+        data-no-swipe
+        data-sheet-scroll
+        onWheel={(e) => e.stopPropagation()}
+      >
         {episodes.map((ep) => {
           const active = ep.id === currentId;
           return (

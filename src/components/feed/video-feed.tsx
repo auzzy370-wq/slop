@@ -353,7 +353,7 @@ export function VideoFeed({
     const target = e.target as HTMLElement | null;
     if (
       target?.closest(
-        "button, a, input, textarea, [role='slider'], [data-no-swipe]",
+        "button, a, input, textarea, [role='slider'], [role='dialog'], [data-no-swipe], [data-sheet-scroll], .slop-comments-sheet",
       )
     ) {
       return;
@@ -450,6 +450,15 @@ export function VideoFeed({
   };
 
   const onWheel = (e: React.WheelEvent) => {
+    // Let sheets / lists (comments, episodes, etc.) scroll instead of paging.
+    const target = e.target as HTMLElement | null;
+    if (
+      target?.closest(
+        "[data-no-swipe], [data-sheet-scroll], [role='dialog'], .slop-comments-sheet",
+      )
+    ) {
+      return;
+    }
     if (Math.abs(e.deltaY) < 6) return;
     e.preventDefault();
     const now = Date.now();

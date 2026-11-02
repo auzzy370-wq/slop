@@ -187,18 +187,25 @@ export function CommentsSheet({
       : `${formatCount(comments.length)} comment${comments.length === 1 ? "" : "s"}`;
 
   return (
-    <div className="absolute inset-0 z-[70] flex flex-col justify-end">
+    <div
+      className="absolute inset-0 z-[70] flex flex-col justify-end"
+      data-no-swipe
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
+    >
       <button
         type="button"
         aria-label="Close comments"
         className={`slop-comments-scrim absolute inset-0 ${entered ? "is-on" : ""}`}
         onClick={onClose}
+        data-no-swipe
       />
 
       <div
         role="dialog"
         aria-modal="true"
         aria-label={countLabel}
+        data-no-swipe
         className={`slop-comments-sheet relative z-10 flex max-h-[68%] min-h-[48%] w-full flex-col ${
           entered ? "is-open" : ""
         }`}
@@ -206,6 +213,7 @@ export function CommentsSheet({
           transform: offset ? `translateY(${offset}px)` : undefined,
           transition: dragging.current ? "none" : undefined,
         }}
+        onWheel={(e) => e.stopPropagation()}
       >
         <div
           className="flex shrink-0 touch-none flex-col items-center pb-1 pt-2"
@@ -229,7 +237,12 @@ export function CommentsSheet({
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2">
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-2"
+          data-no-swipe
+          data-sheet-scroll
+          onWheel={(e) => e.stopPropagation()}
+        >
           {commentsDisabled ? (
             <p className="px-2 py-10 text-center text-sm text-white/45">
               Comments are turned off for this episode.
