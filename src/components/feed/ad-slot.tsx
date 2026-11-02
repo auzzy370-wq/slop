@@ -42,8 +42,12 @@ export function AdSlot({ index }: { index: number }) {
 
     const fallback = window.setTimeout(() => {
       const host = insRef.current;
-      const status = host?.getAttribute("data-adsbygoogle-status");
-      const iframe = host?.querySelector("iframe");
+      if (!host) {
+        setMode("house");
+        return;
+      }
+      const status = host.getAttribute("data-adsbygoogle-status");
+      const iframe = host.querySelector("iframe");
       const rect = iframe?.getBoundingClientRect();
       const filled =
         status === "done" &&
