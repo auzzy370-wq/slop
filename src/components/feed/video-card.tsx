@@ -1378,9 +1378,9 @@ export function VideoCard({
         </button>
       )}
 
-      {/* Instagram Reels–style right action rail */}
+      {/* Social rail — keep lean; playback tools live in the bottom bar */}
       <div
-        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-3.5 sm:right-3.5 sm:gap-4 ${
+        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-2.5 sm:right-3.5 sm:gap-3 ${
           chromeVisible ? "bottom-[5.75rem]" : "bottom-[3.75rem]"
         }${isFullscreen && !chromeVisible ? " is-hidden" : ""}`}
         aria-hidden={isFullscreen && !chromeVisible}
@@ -1431,78 +1431,6 @@ export function VideoCard({
           ariaLabel="Share"
         >
           <Share2 className="fill-transparent" />
-        </RailButton>
-        {!isScripted ? (
-          <div
-            className="slop-volume-stack flex flex-col items-center gap-1.5"
-            data-no-swipe
-          >
-            <label
-              className="slop-volume-slider-wrap"
-              style={
-                {
-                  ["--slop-vol"]: `${Math.round((muted ? 0 : volume) * 100)}%`,
-                } as CSSProperties
-              }
-            >
-              <span className="sr-only">Volume</span>
-              <input
-                type="range"
-                className="slop-volume-slider"
-                min={0}
-                max={100}
-                step={1}
-                value={Math.round((muted ? 0 : volume) * 100)}
-                aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)} percent`}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  revealChrome();
-                  onVolumeChange?.(Number(e.target.value) / 100);
-                }}
-              />
-            </label>
-            <RailButton
-              onClick={() => {
-                revealChrome();
-                onToggleMute();
-              }}
-              ariaLabel={muted || volume <= 0 ? "Unmute" : "Mute"}
-              label={`${Math.round((muted ? 0 : volume) * 100)}`}
-            >
-              {muted || volume <= 0 ? (
-                <VolumeX className="fill-transparent" />
-              ) : volume < 0.45 ? (
-                <Volume1 className="fill-transparent" />
-              ) : (
-                <Volume2 className="fill-transparent" />
-              )}
-            </RailButton>
-          </div>
-        ) : null}
-        {!isScripted ? (
-          <RailButton
-            active={isPip}
-            onClick={() => {
-              void togglePip();
-            }}
-            ariaLabel={isPip ? "Exit picture-in-picture" : "Picture-in-picture"}
-          >
-            <PictureInPicture2 className="fill-transparent" />
-          </RailButton>
-        ) : null}
-        <RailButton
-          active={isFullscreen}
-          onClick={() => {
-            void toggleFullscreen();
-          }}
-          ariaLabel={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
-        >
-          {isFullscreen ? (
-            <Minimize2 className="fill-transparent" />
-          ) : (
-            <Maximize2 className="fill-transparent" />
-          )}
         </RailButton>
         <RailButton
           onClick={() => {
@@ -1628,6 +1556,50 @@ export function VideoCard({
             </button>
             {!isScripted ? (
               <>
+                <label
+                  className="slop-volume-bar inline-flex h-8 w-[5.5rem] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-2.5 backdrop-blur-md sm:w-[7rem]"
+                  data-no-swipe
+                  style={
+                    {
+                      ["--slop-vol"]: `${Math.round((muted ? 0 : volume) * 100)}%`,
+                    } as CSSProperties
+                  }
+                >
+                  <button
+                    type="button"
+                    className="inline-flex h-5 w-5 shrink-0 items-center justify-center text-white"
+                    aria-label={muted || volume <= 0 ? "Unmute" : "Mute"}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      revealChrome();
+                      onToggleMute();
+                    }}
+                  >
+                    {muted || volume <= 0 ? (
+                      <VolumeX className="h-3.5 w-3.5" />
+                    ) : volume < 0.45 ? (
+                      <Volume1 className="h-3.5 w-3.5" />
+                    ) : (
+                      <Volume2 className="h-3.5 w-3.5" />
+                    )}
+                  </button>
+                  <span className="sr-only">Volume</span>
+                  <input
+                    type="range"
+                    className="slop-volume-slider-h"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round((muted ? 0 : volume) * 100)}
+                    aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)} percent`}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => {
+                      revealChrome();
+                      onVolumeChange?.(Number(e.target.value) / 100);
+                    }}
+                  />
+                </label>
                 <button
                   type="button"
                   onClick={() => seekBy(-10)}
@@ -1672,10 +1644,24 @@ export function VideoCard({
                       duration: 1200,
                     });
                   }}
-                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-3 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-2.5 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60"
                   aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
                 >
                   {formatSpeed(speed)}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    void togglePip();
+                  }}
+                  className={`hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 sm:inline-flex ${
+                    isPip ? "border-[var(--slop-violet)]/50 text-[var(--slop-lavender)]" : ""
+                  }`}
+                  aria-label={
+                    isPip ? "Exit picture-in-picture" : "Picture-in-picture"
+                  }
+                >
+                  <PictureInPicture2 className="h-3.5 w-3.5" />
                 </button>
               </>
             ) : null}
