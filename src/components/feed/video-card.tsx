@@ -1560,7 +1560,9 @@ export function VideoCard({
           </p>
         </div>
 
-        <div className={`mt-1 px-3 sm:px-4 ${scrubbing ? "slop-scrubbing" : ""}`}>
+        <div
+          className={`mt-1 px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${scrubbing ? "slop-scrubbing" : ""}`}
+        >
           <div className="mb-0.5 flex items-center justify-between font-display text-[10px] font-semibold tabular-nums tracking-wide text-white/45">
             <span className="text-[var(--slop-lavender)]">
               {formatTime(progress * (duration || 0))}
