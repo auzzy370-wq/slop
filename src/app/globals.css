@@ -98,12 +98,42 @@ body:has(.slop-watch-shell) {
   height: 100%;
   max-height: 100dvh;
   overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html:has(.slop-watch-shell)::-webkit-scrollbar,
+body:has(.slop-watch-shell)::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
 }
 
 main:has(.slop-watch-shell) {
   height: 100%;
   max-height: 100dvh;
   overflow: hidden;
+}
+
+/* Keep rail lists scrollable, but never show a visible scrollbar. */
+.slop-watch-shell .scrollbar-none,
+.slop-watch-episodes,
+.slop-watch-comments,
+.slop-watch-episodes *,
+.slop-watch-comments * {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.slop-watch-shell .scrollbar-none::-webkit-scrollbar,
+.slop-watch-episodes::-webkit-scrollbar,
+.slop-watch-comments::-webkit-scrollbar,
+.slop-watch-episodes *::-webkit-scrollbar,
+.slop-watch-comments *::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+  background: transparent;
 }
 
 @media (min-width: 1024px) {
