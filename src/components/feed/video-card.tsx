@@ -10,6 +10,7 @@ import {
 } from "react";
 import {
   Bookmark,
+  ChevronLeft,
   Clapperboard,
   Heart,
   Maximize2,
@@ -18,6 +19,7 @@ import {
   MoreHorizontal,
   PictureInPicture2,
   Play,
+  Plus,
   RotateCcw,
   Share2,
   Volume1,
@@ -79,7 +81,7 @@ export function VideoCard({
   volume = 1,
   onToggleMute,
   onVolumeChange,
-  categoryNames,
+  categoryNames: _categoryNames,
   onJumpToVideo,
   onEpisodeEnded,
   onPlaybackFailed,
@@ -145,12 +147,10 @@ export function VideoCard({
   const seriesEpisodes = allVideos
     .filter((v) => v.dramaId === video.dramaId && v.status === "published")
     .sort((a, b) => a.episodeNumber - b.episodeNumber);
-  const epLabel = String(video.episodeNumber).padStart(2, "0");
   const epTotalCount =
     drama?.episodeCount && drama.episodeCount > seriesEpisodes.length
       ? drama.episodeCount
       : seriesEpisodes.length || video.episodeNumber;
-  const epTotal = String(epTotalCount).padStart(2, "0");
   const viewed = useRef(false);
   const playbackId = useRef(uid("pb"));
   const lastProgressSent = useRef(0);
@@ -204,6 +204,14 @@ export function VideoCard({
     videoComments.length,
     video.commentCount ?? 0,
   );
+  const saveCount = Math.max(
+    liveVideo?.saveCount ?? 0,
+    saves.filter((s) => s.videoId === video.id).length,
+    video.saveCount ?? 0,
+  );
+  const seriesTitle = drama?.title ?? video.sourceAttribution;
+  const dramaHref = drama ? `/drama/${drama.slug}` : "/";
+  const [followingSeries, setFollowingSeries] = useState(false);
 
   useEffect(() => {
     if (!active) {
@@ -1337,24 +1345,37 @@ export function VideoCard({
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-vignette" />
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-grain" aria-hidden />
 
-      {/* Top strip — Pine-style: series name + episode chip only */}
+      {/* Top strip — Pine: ← Episode N …… ⋮ */}
       <div
-        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))]${
+        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-2.5 pt-[max(0.55rem,env(safe-area-inset-top))]${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
-        <div className="mt-11 min-w-0 pr-2 lg:mt-3">
-          <p className="truncate text-[13px] font-semibold text-white drop-shadow">
-            {drama?.title ?? video.sourceAttribution}
-          </p>
-        </div>
-        <div className="slop-ep-chip mt-11 shrink-0 px-2.5 py-1.5 lg:mt-3">
-          <p className="text-[12px] font-bold tabular-nums leading-none text-white">
-            {epLabel}
-            {epTotal ? <span className="text-white/35">/{epTotal}</span> : null}
-          </p>
-        </div>
+        <Link
+          href={dramaHref}
+          className="pointer-events-auto inline-flex min-w-0 items-center gap-0.5 rounded-md py-1.5 pl-0.5 pr-2 text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)] lg:pointer-events-none lg:invisible"
+          aria-label={`Back to ${seriesTitle}`}
+          data-no-swipe
+        >
+          <ChevronLeft className="h-6 w-6 shrink-0" strokeWidth={2.25} />
+          <span className="truncate text-[17px] font-semibold leading-none tracking-tight">
+            Episode {video.episodeNumber}
+          </span>
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            revealChrome();
+            setMoreView("menu");
+            setMoreOpen(true);
+          }}
+          className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.75)]"
+          aria-label="More"
+          data-no-swipe
+        >
+          <MoreHorizontal className="h-6 w-6" strokeWidth={2.25} />
+        </button>
       </div>
 
       {loading && active && !failed && (
@@ -1388,13 +1409,49 @@ export function VideoCard({
         </button>
       )}
 
-      {/* Social rail — lower-right like Pine Drama / TikTok */}
+      {/* Social rail — Pine / TikTok lower-right: avatar · like · comment · save · share */}
       <div
-        className={`slop-action-rail absolute right-2.5 bottom-[7.5rem] z-40 flex flex-col items-center gap-3 sm:right-3 sm:bottom-[8rem] sm:gap-3.5${
+        className={`slop-action-rail absolute right-2 bottom-[6.75rem] z-40 flex flex-col items-center gap-3.5 sm:right-2.5 sm:bottom-[7.25rem] sm:gap-4${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
+        <button
+          type="button"
+          onClick={() => {
+            revealChrome();
+            setFollowingSeries((v) => {
+              const next = !v;
+              toast.message(next ? "Following series" : "Unfollowed", {
+                duration: 1400,
+              });
+              return next;
+            });
+          }}
+          className="slop-rail-btn relative mb-0.5 flex h-11 w-11 items-center justify-center"
+          aria-label={followingSeries ? "Unfollow series" : "Follow series"}
+          aria-pressed={followingSeries}
+          data-no-swipe
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={drama?.posterUrl || video.thumbnailUrl}
+            alt=""
+            className="h-11 w-11 rounded-full object-cover ring-2 ring-white/90"
+            draggable={false}
+          />
+          <span
+            className={`absolute -bottom-1 left-1/2 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full ${
+              followingSeries ? "bg-white text-black" : "bg-[#fe2c55] text-white"
+            }`}
+          >
+            {followingSeries ? (
+              <span className="text-[10px] font-bold leading-none">✓</span>
+            ) : (
+              <Plus className="h-3 w-3" strokeWidth={3} />
+            )}
+          </span>
+        </button>
         <RailButton
           active={liked}
           onClick={() => {
@@ -1410,7 +1467,7 @@ export function VideoCard({
             }
           />
         </RailButton>
-        {/* Comments stay on the rail for mobile; desktop has a side comments panel. */}
+        {/* Comments on rail for mobile; desktop has the side comments panel. */}
         <div className="lg:hidden">
           <RailButton
             onClick={() => {
@@ -1431,6 +1488,7 @@ export function VideoCard({
             onSave();
           }}
           ariaLabel="Save"
+          label={formatCount(saveCount)}
         >
           <Bookmark
             className={saved ? "fill-white text-white" : "fill-transparent"}
@@ -1442,56 +1500,36 @@ export function VideoCard({
             setShareOpen(true);
           }}
           ariaLabel="Share"
+          label={formatCount(Math.max(1, Math.round(likeCount * 0.02)))}
         >
           <Share2 className="fill-transparent" />
         </RailButton>
-        {/* More stays on the rail for mobile; desktop uses the bottom control */}
-        <div className="lg:hidden">
-          <RailButton
-            onClick={() => {
-              revealChrome();
-              setMoreView("menu");
-              setMoreOpen(true);
-            }}
-            ariaLabel="More"
-          >
-            <MoreHorizontal />
-          </RailButton>
-        </div>
       </div>
 
-      {/* Bottom caption + film scrub — flush to the home indicator */}
+      {/* Bottom: series title · thin scrub · Episode | speed | expand */}
       <div
-        className={`slop-player-bottom absolute inset-x-0 bottom-0 z-30 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))]${
+        className={`slop-player-bottom absolute inset-x-0 bottom-0 z-30 pb-[max(0.35rem,env(safe-area-inset-bottom,0px))]${
           isFullscreen && !chromeVisible ? " is-hidden" : ""
         }`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
         <div
           key={active ? video.id : "idle"}
-          className={`slop-caption pointer-events-none relative px-3 pr-[4.5rem] sm:px-4 sm:pr-20 ${
+          className={`slop-caption pointer-events-none relative px-3 pr-[4.25rem] sm:px-3.5 sm:pr-[4.5rem] ${
             chromeVisible || isFullscreen ? "is-visible" : "is-hidden"
           }`}
           aria-hidden={!chromeVisible && !isFullscreen}
         >
-          <p className="text-[13px] font-semibold text-white">
-            {drama?.title ?? video.sourceAttribution}
-            <span className="font-normal text-white/45">
-              {" "}
-              · Ep {video.episodeNumber}
-              {categoryNames[0] ? ` · ${categoryNames[0]}` : ""}
-            </span>
+          <p className="truncate text-[14px] font-bold uppercase tracking-[0.02em] text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
+            {seriesTitle}
           </p>
-          <h2 className="mt-1 max-w-[100%] text-[15px] font-semibold leading-snug text-white sm:text-base">
-            {video.title}
-          </h2>
-          <p className="mt-1 line-clamp-2 text-[12px] leading-snug text-white/65">
-            {video.description}
+          <p className="mt-0.5 text-[13px] font-semibold tabular-nums text-white drop-shadow-[0_1px_3px_rgba(0,0,0,0.7)]">
+            {video.episodeNumber}
           </p>
         </div>
 
         <div
-          className={`mt-2 px-3 pr-[4.5rem] sm:px-4 sm:pr-20 ${scrubbing ? "slop-scrubbing" : ""}`}
+          className={`mt-1.5 px-3 sm:px-3.5 ${scrubbing ? "slop-scrubbing" : ""}`}
         >
           <div
             ref={scrubRef}
@@ -1501,7 +1539,7 @@ export function VideoCard({
             aria-valuemax={100}
             aria-valuenow={Math.round(progress * 100)}
             tabIndex={0}
-            className="relative flex h-4 cursor-pointer touch-none items-center pointer-events-auto"
+            className="relative flex h-3.5 cursor-pointer touch-none items-center pointer-events-auto"
             data-no-swipe
             onPointerDown={onScrubPointerDown}
             onPointerMove={onScrubPointerMove}
@@ -1534,31 +1572,34 @@ export function VideoCard({
             </div>
           </div>
 
-          <div className="mt-1 flex items-center gap-2" data-no-swipe>
-            {/* Mobile episode sheet opener */}
+          <div
+            className="mt-2 flex items-center gap-2 rounded-xl bg-black/55 px-2 py-1.5 backdrop-blur-md sm:px-2.5"
+            data-no-swipe
+          >
+            {/* Mobile episode sheet — desktop uses the left episode rail */}
             <button
               type="button"
               onClick={() => {
                 revealChrome();
                 setEpisodesOpen(true);
               }}
-              className="pointer-events-auto inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60 lg:hidden"
+              className="pointer-events-auto inline-flex h-9 min-w-0 flex-1 items-center gap-2 rounded-lg px-2 text-[13px] font-semibold text-white transition hover:bg-white/10 lg:hidden"
               aria-label="Choose episode"
             >
-              <Clapperboard className="h-3.5 w-3.5 shrink-0 text-[var(--slop-violet)]" />
+              <Clapperboard className="h-4 w-4 shrink-0 text-white/90" />
               <span className="truncate">
                 Episode {video.episodeNumber}/{epTotalCount}
               </span>
-              <span className="ml-auto text-white/45" aria-hidden>
+              <span className="ml-auto text-white/55" aria-hidden>
                 ˄
               </span>
             </button>
 
-            {/* Desktop: playback controls back on the bottom bar */}
+            {/* Desktop volume / restart / PiP stay PC-only */}
             {!isScripted ? (
               <>
                 <label
-                  className="slop-volume-bar pointer-events-auto hidden h-8 w-[7rem] shrink-0 items-center gap-1.5 rounded-full border border-white/15 bg-black/45 px-2.5 backdrop-blur-md lg:inline-flex"
+                  className="slop-volume-bar pointer-events-auto hidden h-9 w-[7rem] shrink-0 items-center gap-1.5 rounded-lg px-2 backdrop-blur-md lg:inline-flex"
                   style={
                     {
                       ["--slop-vol"]: `${Math.round((muted ? 0 : volume) * 100)}%`,
@@ -1611,71 +1652,62 @@ export function VideoCard({
                     void el.play().catch(() => {});
                     revealChrome();
                   }}
-                  className="pointer-events-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+                  className="pointer-events-auto hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition hover:bg-white/10 lg:inline-flex"
                   aria-label="Restart episode"
                 >
                   <RotateCcw className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    revealChrome();
-                    const next = nextPlaybackSpeed(speed);
-                    setSpeed(next);
-                    savePlaybackSpeed(next);
-                    if (videoRef.current) videoRef.current.playbackRate = next;
-                    toast.message(`Speed ${formatSpeed(next)}`, {
-                      duration: 1200,
-                    });
-                  }}
-                  className="pointer-events-auto hidden h-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 px-2.5 text-xs font-bold tabular-nums text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
-                  aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
-                >
-                  {formatSpeed(speed)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    void togglePip();
-                  }}
-                  className={`pointer-events-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex ${
-                    isPip
-                      ? "border-[var(--slop-violet)]/50 text-[var(--slop-lavender)]"
-                      : ""
-                  }`}
-                  aria-label={
-                    isPip ? "Exit picture-in-picture" : "Picture-in-picture"
-                  }
-                >
-                  <PictureInPicture2 className="h-3.5 w-3.5" />
-                </button>
               </>
             ) : null}
+
+            <button
+              type="button"
+              onClick={() => {
+                revealChrome();
+                const next = nextPlaybackSpeed(speed);
+                setSpeed(next);
+                savePlaybackSpeed(next);
+                if (videoRef.current) videoRef.current.playbackRate = next;
+                toast.message(`Speed ${formatSpeed(next)}`, {
+                  duration: 1200,
+                });
+              }}
+              className="pointer-events-auto ml-auto inline-flex h-9 shrink-0 items-center justify-center rounded-lg px-2.5 text-[13px] font-bold tabular-nums text-white transition hover:bg-white/10"
+              aria-label={`Playback speed ${formatSpeed(speed)}. Tap to change.`}
+            >
+              {formatSpeed(speed)}
+            </button>
+
+            {!isScripted ? (
+              <button
+                type="button"
+                onClick={() => {
+                  void togglePip();
+                }}
+                className={`pointer-events-auto hidden h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition hover:bg-white/10 lg:inline-flex ${
+                  isPip ? "text-[var(--slop-lavender)]" : ""
+                }`}
+                aria-label={
+                  isPip ? "Exit picture-in-picture" : "Picture-in-picture"
+                }
+              >
+                <PictureInPicture2 className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+
             <button
               type="button"
               onClick={() => {
                 void toggleFullscreen();
               }}
-              className="pointer-events-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
+              className="pointer-events-auto inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white transition hover:bg-white/10"
               aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
             >
               {isFullscreen ? (
-                <Minimize2 className="h-3.5 w-3.5" />
+                <Minimize2 className="h-4 w-4" />
               ) : (
-                <Maximize2 className="h-3.5 w-3.5" />
+                <Maximize2 className="h-4 w-4" />
               )}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                revealChrome();
-                setMoreView("menu");
-                setMoreOpen(true);
-              }}
-              className="pointer-events-auto ml-auto hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60 lg:inline-flex"
-              aria-label="More"
-            >
-              <MoreHorizontal className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -1933,11 +1965,11 @@ function RailButton({
       className="slop-rail-btn group flex flex-col items-center gap-1 text-white"
     >
       <span
-        className={`slop-rail-orb flex h-11 w-11 items-center justify-center ${
+        className={`slop-rail-orb flex h-10 w-10 items-center justify-center ${
           active ? "is-active" : ""
         }`}
       >
-        <span className="[&>svg]:h-[28px] [&>svg]:w-[28px] [&>svg]:stroke-[1.75]">
+        <span className="[&>svg]:h-[30px] [&>svg]:w-[30px] [&>svg]:stroke-[1.6]">
           {children}
         </span>
       </span>

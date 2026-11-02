@@ -96,15 +96,7 @@ function WatchInner() {
 
   return (
     <div className="slop-watch-shell">
-      {/* Mobile back control */}
-      <Link
-        href={backHref}
-        className="fixed left-4 z-50 inline-flex items-center gap-2 rounded-full bg-black/55 px-3 py-2 text-xs font-semibold text-white backdrop-blur top-[max(1rem,env(safe-area-inset-top))] lg:hidden"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back
-      </Link>
-
-      {/* Desktop top title — moved up from the left rail */}
+      {/* Desktop top title — mobile back lives in the player chrome (Pine-style) */}
       <header className="slop-watch-header hidden animate-fade lg:block">
         <Link
           href={backHref}
