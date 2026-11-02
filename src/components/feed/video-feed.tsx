@@ -65,14 +65,16 @@ export function VideoFeed({
   }, []);
 
   // Leaving /watch must kill any in-flight audio (incl. PiP leftovers).
+  // Query the document — viewportRef is often already null in this cleanup.
   useEffect(() => {
     return () => {
-      viewportRef.current?.querySelectorAll("video").forEach((node) => {
+      document.querySelectorAll("video.slop-feed-video").forEach((node) => {
         try {
-          node.pause();
-          node.muted = true;
-          node.removeAttribute("src");
-          node.load();
+          const el = node as HTMLVideoElement;
+          el.pause();
+          el.muted = true;
+          el.removeAttribute("src");
+          el.load();
         } catch {
           /* ignore */
         }

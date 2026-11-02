@@ -306,6 +306,8 @@ export function VideoCard({
     if (paused) {
       el.pause();
       setIsPlaying(false);
+      // Kill any orphaned feed videos so pause can't leave another series audible.
+      silenceFeedVideos(el);
       persistContinue(true);
       if (started.current) {
         void track("video_paused", {
@@ -325,6 +327,7 @@ export function VideoCard({
 
     let cancelled = false;
     const markStarted = (node: HTMLVideoElement) => {
+      if (cancelled) return;
       setIsPlaying(true);
       setLoading(false);
       if (!viewed.current) {
@@ -363,12 +366,22 @@ export function VideoCard({
       // Always start muted so desktop autoplay is allowed, then restore
       // the user's unmute preference if they already turned sound on.
       // Do NOT flip React mute state here — that was cutting audio on scroll.
+      // Mute preference is read at kick time (not an effect dep) so toggling
+      // mute doesn't tear down / restart playback.
       const wantSound = !muted;
       node.muted = true;
       void node
         .play()
         .then(() => {
-          if (cancelled) return;
+          if (cancelled || videoRef.current !== node) {
+            try {
+              node.pause();
+              node.muted = true;
+            } catch {
+              /* ignore */
+            }
+            return;
+          }
           if (wantSound) {
             node.muted = false;
           }
@@ -416,7 +429,13 @@ export function VideoCard({
       } catch {
         /* ignore */
       }
-      el.pause();
+      try {
+        el.pause();
+        el.muted = true;
+      } catch {
+        /* ignore */
+      }
+      silenceFeedVideos(el);
     };
   }, [
     active,
@@ -429,7 +448,6 @@ export function VideoCard({
     user?.id,
     isScripted,
     mediaKey,
-    muted,
     persistContinue,
   ]);
 
@@ -797,9 +815,8 @@ export function VideoCard({
 
   // Stop media when leaving the player entirely (homepage / other routes).
   useEffect(() => {
-    const el = videoRef.current;
     return () => {
-      const node = videoRef.current ?? el;
+      const node = videoRef.current;
       if (node) {
         try {
           // Capture progress before tearing the element down.
@@ -830,10 +847,10 @@ export function VideoCard({
           /* ignore */
         }
       }
+      silenceFeedVideos(node);
       if (
         document.pictureInPictureElement &&
-        (document.pictureInPictureElement === node ||
-          document.pictureInPictureElement === el)
+        (!node || document.pictureInPictureElement === node)
       ) {
         void document.exitPictureInPicture().catch(() => {});
       }
@@ -946,16 +963,31 @@ export function VideoCard({
         if (el) {
           el.muted = muted;
           void el.play().then(() => {
+            if (videoRef.current !== el) {
+              try {
+                el.pause();
+                el.muted = true;
+              } catch {
+                /* ignore */
+              }
+              return;
+            }
             setIsPlaying(true);
           }).catch(() => {
+            if (videoRef.current !== el) return;
             el.muted = true;
             void el.play().then(() => setIsPlaying(true)).catch(() => {});
           });
         }
         return false;
       }
-      el?.pause();
+      try {
+        el?.pause();
+      } catch {
+        /* ignore */
+      }
       setIsPlaying(false);
+      silenceFeedVideos(el);
       return true;
     });
   }, [scheduleChromeHide, muted]);
@@ -1250,8 +1282,14 @@ export function VideoCard({
             }}
             onWaiting={() => setLoading(true)}
             onPlaying={() => {
+              // Never flip React `paused` here — an in-flight play() can fire
+              // after the user paused and would restart the wrong episode's audio.
+              if (paused) {
+                const node = videoRef.current;
+                node?.pause();
+                return;
+              }
               setIsPlaying(true);
-              setPaused(false);
               setLoading(false);
               setFailed(false);
               if ((videoRef.current?.videoWidth ?? 0) > 0) {
@@ -1927,6 +1965,28 @@ export function VideoCard({
       </Dialog>
     </article>
   );
+}
+
+/** Pause/mute every feed <video>, optionally keeping one instance. */
+function silenceFeedVideos(keep?: HTMLVideoElement | null) {
+  if (typeof document === "undefined") return;
+  document.querySelectorAll("video.slop-feed-video").forEach((node) => {
+    if (keep && node === keep) {
+      try {
+        keep.pause();
+      } catch {
+        /* ignore */
+      }
+      return;
+    }
+    try {
+      const el = node as HTMLVideoElement;
+      el.pause();
+      el.muted = true;
+    } catch {
+      /* ignore */
+    }
+  });
 }
 
 function RailButton({
