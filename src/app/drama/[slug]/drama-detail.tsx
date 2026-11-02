@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { Play } from "lucide-react";
 import { SlopWordmark } from "@/components/brand/logo";
+import { useContinueWatching } from "@/hooks/use-continue-watching";
+import {
+  continueProgressRatio,
+  formatRemaining,
+} from "@/lib/continue-watching";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
 import { track } from "@/lib/analytics/client";
@@ -15,6 +20,7 @@ export function DramaDetail({ slug }: { slug: string }) {
   const categories = useSlopStore((s) => s.categories);
   const hydrated = useSlopStore((s) => s.hydrated);
   const user = useSlopStore((s) => s.currentUser);
+  const { entries } = useContinueWatching();
   const drama = dramas.find((d) => d.slug === slug && d.status === "published");
 
   useEffect(() => {
@@ -50,6 +56,18 @@ export function DramaDetail({ slug }: { slug: string }) {
     .sort((a, b) => a.episodeNumber - b.episodeNumber);
   const genres = categories.filter((c) => drama.genreIds.includes(c.id));
   const first = episodes[0];
+  const continueEntry = entries.find((e) => e.dramaId === drama.id) ?? null;
+  const continueEpisode = continueEntry
+    ? episodes.find((e) => e.id === continueEntry.episodeId)
+    : null;
+  const playEpisode = continueEpisode ?? first;
+  const playHref = playEpisode
+    ? watchHref({
+        episodeId: playEpisode.id,
+        dramaId: drama.id,
+        dramaSlug: drama.slug,
+      })
+    : null;
 
   return (
     <div className="slop-cinematic min-h-[100dvh] pb-28 lg:pb-16">
@@ -90,17 +108,23 @@ export function DramaDetail({ slug }: { slug: string }) {
                 ? ` · ${formatCount(drama.viewCount)} views`
                 : ""}
             </p>
-            {first && (
-              <Link
-                href={watchHref({
-                  episodeId: first.id,
-                  dramaId: drama.id,
-                  dramaSlug: drama.slug,
-                })}
-                className="mt-6 inline-flex h-12 w-fit items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)]"
-              >
-                <Play className="h-4 w-4 fill-current" /> Play Episode 1
-              </Link>
+            {playHref && (
+              <div className="mt-6 flex flex-wrap items-center gap-3">
+                <Link
+                  href={playHref}
+                  className="inline-flex h-12 w-fit items-center gap-2 rounded-xl bg-[var(--slop-violet)] px-6 text-sm font-semibold text-[var(--slop-black)]"
+                >
+                  <Play className="h-4 w-4 fill-current" />
+                  {continueEpisode && continueEntry
+                    ? `Continue Ep ${continueEntry.episodeNumber}`
+                    : "Play Episode 1"}
+                </Link>
+                {continueEpisode && continueEntry ? (
+                  <p className="text-xs text-white/55">
+                    {formatRemaining(continueEntry)}
+                  </p>
+                ) : null}
+              </div>
             )}
           </div>
         </div>
@@ -114,40 +138,62 @@ export function DramaDetail({ slug }: { slug: string }) {
               Episodes coming soon.
             </p>
           )}
-          {episodes.map((ep) => (
-            <Link
-              key={ep.id}
-              href={watchHref({
-                episodeId: ep.id,
-                dramaId: drama.id,
-                dramaSlug: drama.slug,
-              })}
-              className="flex gap-3 overflow-hidden rounded-2xl border border-white/10 bg-[var(--slop-panel)] transition hover:border-[var(--slop-violet)]/40"
-            >
-              <div className="relative h-24 w-16 shrink-0 sm:w-20">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={ep.thumbnailUrl}
-                  alt=""
-                  className="h-full w-full object-cover"
-                />
-                <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 text-[10px] font-bold">
-                  EP {ep.episodeNumber}
-                </span>
-              </div>
-              <div className="min-w-0 py-3 pr-3">
-                <p className="truncate font-semibold">{ep.title}</p>
-                <p className="mt-1 line-clamp-2 text-xs text-white/55">
-                  {ep.description}
-                </p>
-                {ep.viewCount > 0 ? (
-                  <p className="mt-2 text-[11px] text-[var(--slop-slate)]">
-                    {formatCount(ep.viewCount)} views
+          {episodes.map((ep) => {
+            const isContinue = continueEntry?.episodeId === ep.id;
+            const ratio = isContinue
+              ? continueProgressRatio(continueEntry)
+              : 0;
+            return (
+              <Link
+                key={ep.id}
+                href={watchHref({
+                  episodeId: ep.id,
+                  dramaId: drama.id,
+                  dramaSlug: drama.slug,
+                })}
+                className={`flex gap-3 overflow-hidden rounded-2xl border bg-[var(--slop-panel)] transition hover:border-[var(--slop-violet)]/40 ${
+                  isContinue
+                    ? "border-[var(--slop-violet)]/45"
+                    : "border-white/10"
+                }`}
+              >
+                <div className="relative h-24 w-16 shrink-0 sm:w-20">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={ep.thumbnailUrl}
+                    alt=""
+                    className="h-full w-full object-cover"
+                  />
+                  <span className="absolute bottom-1 left-1 rounded bg-black/70 px-1.5 text-[10px] font-bold">
+                    EP {ep.episodeNumber}
+                  </span>
+                </div>
+                <div className="min-w-0 flex-1 py-3 pr-3">
+                  <p className="truncate font-semibold">{ep.title}</p>
+                  <p className="mt-1 line-clamp-2 text-xs text-white/55">
+                    {ep.description}
                   </p>
-                ) : null}
-              </div>
-            </Link>
-          ))}
+                  {isContinue ? (
+                    <div className="mt-2">
+                      <p className="text-[11px] text-[var(--slop-lavender)]">
+                        Continue · {formatRemaining(continueEntry)}
+                      </p>
+                      <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/15">
+                        <div
+                          className="h-full rounded-full bg-[var(--slop-violet)]"
+                          style={{ width: `${Math.round(ratio * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : ep.viewCount > 0 ? (
+                    <p className="mt-2 text-[11px] text-[var(--slop-slate)]">
+                      {formatCount(ep.viewCount)} views
+                    </p>
+                  ) : null}
+                </div>
+              </Link>
+            );
+          })}
         </div>
       </section>
     </div>

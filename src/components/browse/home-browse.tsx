@@ -150,7 +150,8 @@ export function HomeBrowse() {
         </section>
       )}
 
-      <div className="mx-auto max-w-[1400px] space-y-10 px-4 pt-8 sm:px-6 lg:space-y-14 lg:px-12 lg:pt-12">
+      <div className="mx-auto max-w-[1400px] space-y-10 px-4 pt-6 sm:px-6 lg:space-y-14 lg:px-12 lg:pt-12">
+        {/* Same Continue Watching rail on mobile + desktop */}
         <ContinueWatchingRow />
 
         <section>

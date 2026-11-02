@@ -11,8 +11,8 @@ export type ContinueWatchEntry = {
 
 const STORAGE_KEY = "slop-continue-watching-v1";
 const CHANGE_EVENT = "slop:continue-watching";
-/** Don't clutter the row for a 2-second peek. */
-export const CONTINUE_MIN_SECONDS = 3;
+/** Don't clutter the row for a quick peek (mobile + desktop). */
+export const CONTINUE_MIN_SECONDS = 2;
 /** Treat as finished — drop from continue watching. */
 export const CONTINUE_COMPLETE_RATIO = 0.92;
 const MAX_ENTRIES = 24;

@@ -169,7 +169,7 @@ export function VideoCard({
       const durationSec = el.duration;
       if (!force && positionSec < CONTINUE_MIN_SECONDS) return;
       const now = Date.now();
-      if (!force && now - lastContinueSaved.current < 4000) return;
+      if (!force && now - lastContinueSaved.current < 2000) return;
       lastContinueSaved.current = now;
       if (positionSec / durationSec >= CONTINUE_COMPLETE_RATIO) {
         removeContinueWatching(video.dramaId);
