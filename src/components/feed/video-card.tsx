@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type CSSProperties,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
@@ -1425,10 +1426,10 @@ export function VideoCard({
           </button>
         )}
 
-      {/* Social rail — keep lean; playback tools live in the bottom bar */}
+      {/* Social rail — above bottom chrome so More stays clickable */}
       <div
-        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-2.5 sm:right-3.5 sm:gap-3 ${
-          chromeVisible ? "bottom-[5.75rem]" : "bottom-[3.75rem]"
+        className={`slop-action-rail absolute right-2.5 z-40 flex flex-col items-center gap-2.5 sm:right-3.5 sm:gap-3 ${
+          chromeVisible ? "bottom-[4.5rem]" : "bottom-[3.25rem]"
         }${isFullscreen && !chromeVisible ? " is-hidden" : ""}`}
         aria-hidden={isFullscreen && !chromeVisible}
       >
@@ -1500,7 +1501,7 @@ export function VideoCard({
       >
         <div
           key={active ? video.id : "idle"}
-          className={`slop-caption relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
+          className={`slop-caption pointer-events-none relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
             chromeVisible || isFullscreen ? "is-visible" : "is-hidden"
           }`}
           aria-hidden={!chromeVisible && !isFullscreen}
@@ -1547,7 +1548,7 @@ export function VideoCard({
             aria-valuemax={100}
             aria-valuenow={Math.round(progress * 100)}
             tabIndex={0}
-            className="relative flex h-5 cursor-pointer touch-none items-center"
+            className="relative flex h-5 cursor-pointer touch-none items-center pointer-events-auto"
             data-no-swipe
             onPointerDown={onScrubPointerDown}
             onPointerMove={onScrubPointerMove}
@@ -1580,7 +1581,7 @@ export function VideoCard({
             </div>
           </div>
 
-          {/* Bottom chrome — episode, mute, fullscreen only */}
+          {/* Bottom chrome — episode picker only */}
           <div className="mt-1 flex items-center gap-2" data-no-swipe>
             <button
               type="button"
@@ -1588,7 +1589,7 @@ export function VideoCard({
                 revealChrome();
                 setEpisodesOpen(true);
               }}
-              className="inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60"
+              className="pointer-events-auto inline-flex h-8 min-w-0 flex-1 items-center gap-2 rounded-full border border-white/15 bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/60"
               aria-label="Choose episode"
             >
               <Clapperboard className="h-3.5 w-3.5 shrink-0 text-[var(--slop-violet)]" />
@@ -1598,39 +1599,6 @@ export function VideoCard({
               <span className="ml-auto text-white/45" aria-hidden>
                 ˄
               </span>
-            </button>
-            {!isScripted ? (
-              <button
-                type="button"
-                onClick={() => {
-                  revealChrome();
-                  onToggleMute();
-                }}
-                className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
-                aria-label={muted || volume <= 0 ? "Unmute" : "Mute"}
-              >
-                {muted || volume <= 0 ? (
-                  <VolumeX className="h-3.5 w-3.5" />
-                ) : volume < 0.45 ? (
-                  <Volume1 className="h-3.5 w-3.5" />
-                ) : (
-                  <Volume2 className="h-3.5 w-3.5" />
-                )}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => {
-                void toggleFullscreen();
-              }}
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/15 bg-black/45 text-white backdrop-blur-md transition hover:bg-black/60"
-              aria-label={isFullscreen ? "Exit fullscreen" : "Enter fullscreen"}
-            >
-              {isFullscreen ? (
-                <Minimize2 className="h-3.5 w-3.5" />
-              ) : (
-                <Maximize2 className="h-3.5 w-3.5" />
-              )}
             </button>
           </div>
         </div>
@@ -1698,6 +1666,46 @@ export function VideoCard({
           <div className="space-y-1">
             {!isScripted ? (
               <>
+                <div
+                  className="rounded-xl px-3 py-3"
+                  style={
+                    {
+                      ["--slop-vol"]: `${Math.round((muted ? 0 : volume) * 100)}%`,
+                    } as CSSProperties
+                  }
+                >
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <span className="text-sm font-semibold text-white">Volume</span>
+                    <button
+                      type="button"
+                      className="inline-flex h-8 items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-2.5 text-xs font-semibold text-white transition hover:bg-white/10"
+                      onClick={() => onToggleMute()}
+                      aria-label={muted || volume <= 0 ? "Unmute" : "Mute"}
+                    >
+                      {muted || volume <= 0 ? (
+                        <VolumeX className="h-3.5 w-3.5" />
+                      ) : volume < 0.45 ? (
+                        <Volume1 className="h-3.5 w-3.5" />
+                      ) : (
+                        <Volume2 className="h-3.5 w-3.5" />
+                      )}
+                      {Math.round((muted ? 0 : volume) * 100)}%
+                    </button>
+                  </div>
+                  <input
+                    type="range"
+                    className="slop-volume-slider-h w-full"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={Math.round((muted ? 0 : volume) * 100)}
+                    aria-label="Volume"
+                    aria-valuetext={`${Math.round((muted ? 0 : volume) * 100)} percent`}
+                    onChange={(e) => {
+                      onVolumeChange?.(Number(e.target.value) / 100);
+                    }}
+                  />
+                </div>
                 <button
                   type="button"
                   className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
@@ -1746,6 +1754,21 @@ export function VideoCard({
                 </button>
               </>
             ) : null}
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
+              onClick={() => {
+                setMoreOpen(false);
+                void toggleFullscreen();
+              }}
+            >
+              {isFullscreen ? (
+                <Minimize2 className="h-4 w-4 text-white/60" />
+              ) : (
+                <Maximize2 className="h-4 w-4 text-white/60" />
+              )}
+              {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            </button>
             <button
               type="button"
               className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
