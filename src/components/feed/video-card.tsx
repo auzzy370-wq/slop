@@ -732,6 +732,15 @@ export function VideoCard({
     }
   }, []);
 
+  const exitPipSafe = useCallback(async () => {
+    if (!document.pictureInPictureElement) return;
+    try {
+      await document.exitPictureInPicture();
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
   const toggleFullscreen = useCallback(async () => {
     revealChrome();
     const target = getFullscreenTarget();
@@ -756,13 +765,35 @@ export function VideoCard({
         }
       ).webkitRequestFullScreen?.bind(target);
 
+    // PiP and element fullscreen can't coexist. Start both exits/requests in
+    // the same user-gesture turn — awaiting PiP alone first often burns the
+    // transient activation and Chrome silently rejects fullscreen.
+    const wasPip = !!document.pictureInPictureElement;
+    const pipExit = wasPip
+      ? document.exitPictureInPicture().catch(() => {})
+      : Promise.resolve();
+
     if (req) {
       try {
-        await req();
-        return;
+        const fsAttempt = Promise.resolve(req()).catch(() => null);
+        await Promise.allSettled([pipExit, fsAttempt]);
+        if (getFullscreenElement()) return;
+
+        // Retry once after PiP has fully detached.
+        if (wasPip) {
+          await exitPipSafe();
+          try {
+            await Promise.resolve(req());
+          } catch {
+            /* ignore */
+          }
+          if (getFullscreenElement()) return;
+        }
       } catch {
         /* fall through to iOS video fullscreen */
       }
+    } else if (wasPip) {
+      await pipExit;
     }
 
     // iOS Safari: element fullscreen is limited — use the video control.
@@ -771,6 +802,7 @@ export function VideoCard({
       | null;
     if (media?.webkitEnterFullscreen) {
       try {
+        await exitPipSafe();
         media.webkitEnterFullscreen();
         return;
       } catch {
@@ -778,10 +810,17 @@ export function VideoCard({
       }
     }
 
+    // Leaving PiP already puts the episode back in the page player — treat
+    // that as success when a true fullscreen request was blocked.
+    if (wasPip && !document.pictureInPictureElement) {
+      setIsPip(false);
+      return;
+    }
+
     toast.message("Fullscreen isn’t available in this browser", {
       duration: 1800,
     });
-  }, [exitFullscreenSafe, getFullscreenTarget, revealChrome]);
+  }, [exitFullscreenSafe, exitPipSafe, getFullscreenTarget, revealChrome]);
 
   useEffect(() => {
     const sync = () => setIsFullscreen(Boolean(getFullscreenElement()));
@@ -818,6 +857,10 @@ export function VideoCard({
         await document.exitPictureInPicture();
         return;
       }
+      // Leave fullscreen before entering PiP — same mutual exclusion as above.
+      if (getFullscreenElement()) {
+        await exitFullscreenSafe();
+      }
       if (document.pictureInPictureElement) {
         await document.exitPictureInPicture();
       }
@@ -829,7 +872,7 @@ export function VideoCard({
       /* fall through */
     }
     toast.message("Picture-in-picture isn’t available here", { duration: 1600 });
-  }, [revealChrome]);
+  }, [exitFullscreenSafe, revealChrome]);
 
   const openAirPlay = useCallback(() => {
     revealChrome();
