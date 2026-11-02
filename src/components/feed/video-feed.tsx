@@ -43,7 +43,8 @@ export function VideoFeed({
   const blobPlaybackBlocked = useSlopStore((s) => s.blobPlaybackBlocked);
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [muted, setMuted] = useState(false);
+  // Desktop Chrome/Firefox block unmuted autoplay — start muted so PC plays.
+  const [muted, setMuted] = useState(true);
   const [pageH, setPageH] = useState(0);
 
   const viewportRef = useRef<HTMLDivElement>(null);
@@ -517,6 +518,7 @@ export function VideoFeed({
                   active={index === activeIndex}
                   muted={muted}
                   onToggleMute={() => setMuted((m) => !m)}
+                  onAutoplayBlocked={() => setMuted(true)}
                   categoryNames={video.categoryIds
                     .map((id) => categoryNameMap[id])
                     .filter(Boolean)}

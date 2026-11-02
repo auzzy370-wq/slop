@@ -52,6 +52,8 @@ interface VideoCardProps {
   active: boolean;
   muted: boolean;
   onToggleMute: () => void;
+  /** Desktop autoplay policy — force mute without toggling. */
+  onAutoplayBlocked?: () => void;
   categoryNames: string[];
   onJumpToVideo?: (videoId: string) => void;
   onEpisodeEnded?: () => void;
@@ -63,6 +65,7 @@ export function VideoCard({
   active,
   muted,
   onToggleMute,
+  onAutoplayBlocked,
   categoryNames,
   onJumpToVideo,
   onEpisodeEnded,
@@ -232,20 +235,29 @@ export function VideoCard({
       const tryPlay = () => {
         const node = videoRef.current;
         if (!node) return;
-        void node.play().catch(() => {
-          // Some browsers block unmuted autoplay — retry briefly, then
-          // start muted only as a last resort so playback still begins.
-          window.setTimeout(() => {
+        void node
+          .play()
+          .then(() => {
+            setLoading(false);
+          })
+          .catch(() => {
+            // PC browsers reject unmuted autoplay. Force mute in parent state
+            // so React doesn't flip it back on the next render.
+            if (!muted) onAutoplayBlocked?.();
             const retry = videoRef.current;
             if (!retry) return;
-            void retry.play().catch(() => {
-              if (!retry.muted) {
-                retry.muted = true;
-                void retry.play().catch(() => {});
-              }
-            });
-          }, 200);
-        });
+            retry.muted = true;
+            void retry
+              .play()
+              .then(() => {
+                setLoading(false);
+              })
+              .catch(() => {
+                // Still blocked — show the play button so a click (user gesture) works.
+                setPaused(true);
+                setLoading(false);
+              });
+          });
       };
       tryPlay();
       if (!viewed.current) {
@@ -295,7 +307,20 @@ export function VideoCard({
         });
       }
     }
-  }, [active, muted, paused, recordView, video.id, video.dramaId, video.durationSeconds, user?.id, isScripted, progress, mediaKey]);
+  }, [
+    active,
+    muted,
+    paused,
+    recordView,
+    video.id,
+    video.dramaId,
+    video.durationSeconds,
+    user?.id,
+    isScripted,
+    progress,
+    mediaKey,
+    onAutoplayBlocked,
+  ]);
 
   useEffect(() => {
     if (!active) {
@@ -673,7 +698,9 @@ export function VideoCard({
           src={resolvePlaybackUrl(video.videoUrl)}
           poster={video.thumbnailUrl}
           playsInline
+          // Desktop autoplay requires muted; keep attribute in sync with state.
           muted={muted}
+          autoPlay={active && !paused}
           preload="auto"
           onTimeUpdate={onTimeUpdate}
           onLoadedMetadata={(e) => {
@@ -688,23 +715,48 @@ export function VideoCard({
           }}
           onLoadedData={() => {
             setLoading(false);
-            if (!paused) void videoRef.current?.play().catch(() => {});
+            if (!paused) {
+              const node = videoRef.current;
+              if (!node) return;
+              node.muted = muted;
+              void node.play().catch(() => {
+                if (!muted) onAutoplayBlocked?.();
+              });
+            }
           }}
           onCanPlay={() => {
-            if (!paused) void videoRef.current?.play().catch(() => {});
+            if (!paused) {
+              const node = videoRef.current;
+              if (!node) return;
+              node.muted = muted;
+              void node.play().catch(() => {
+                if (!muted) onAutoplayBlocked?.();
+              });
+            }
           }}
           onEnded={handleEpisodeEnded}
-          onError={() => {
+          onError={(e) => {
+            const mediaErr = e.currentTarget.error;
+            // Remounts / source swaps abort the previous element — not a real failure.
+            if (
+              !e.currentTarget.currentSrc ||
+              mediaErr?.code === MediaError.MEDIA_ERR_ABORTED
+            ) {
+              return;
+            }
             // Auto-recover on Safari transient decode / network errors.
-            if (!storageBlocked && retryCount.current < 3) {
+            if (!storageBlocked && retryCount.current < 2) {
               retryCount.current += 1;
               setLoading(true);
-              window.setTimeout(() => setMediaKey((k) => k + 1), 160);
+              window.setTimeout(() => setMediaKey((k) => k + 1), 220);
               return;
             }
             setFailed(true);
             setLoading(false);
-            if (!notifiedFail.current) {
+            setPaused(true);
+            // Don't auto-skip the whole series on a single PC load glitch —
+            // only Blob-blocked episodes should advance the feed.
+            if (storageBlocked && !notifiedFail.current) {
               notifiedFail.current = true;
               onPlaybackFailed?.();
             }
