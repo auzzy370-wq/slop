@@ -154,7 +154,7 @@ function WatchInner() {
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">
               Episodes
             </p>
-            <ul className="mt-3 max-h-[min(60vh,480px)] space-y-0.5 overflow-y-auto overscroll-contain pr-1">
+            <ul className="scrollbar-none mt-3 max-h-[min(60vh,480px)] space-y-0.5 overflow-y-auto overscroll-contain">
               {episodeList.map((ep) => {
                 const active = activeEpisodeId === ep.id;
                 return (
