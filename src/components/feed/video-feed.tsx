@@ -397,13 +397,27 @@ export function VideoFeed({
       const idx = items.findIndex(
         (item) => item.kind === "video" && item.videoId === videoId,
       );
+      const target = videos.find((v) => v.id === videoId);
+      const drama = target
+        ? dramas.find((d) => d.id === target.dramaId)
+        : undefined;
       if (idx >= 0) {
+        lastStartIdRef.current = videoId;
+        lastVideoIdRef.current = videoId;
         goTo(idx, true);
+        if (target) {
+          router.replace(
+            watchHref({
+              episodeId: target.id,
+              dramaId: target.dramaId,
+              dramaSlug: drama?.slug,
+            }),
+            { scroll: false },
+          );
+        }
         return;
       }
-      const target = videos.find((v) => v.id === videoId);
       if (!target) return;
-      const drama = dramas.find((d) => d.id === target.dramaId);
       router.push(
         watchHref({
           episodeId: target.id,
@@ -414,6 +428,40 @@ export function VideoFeed({
     },
     [items, goTo, videos, dramas, router],
   );
+
+  // Keep the URL + desktop episode rail in sync while scrolling a series.
+  useEffect(() => {
+    if (!hydrated) return;
+    const item = items[activeIndex];
+    if (item?.kind !== "video") return;
+    const seriesLocked =
+      section === "drama" ||
+      searchParams.has("drama") ||
+      searchParams.has("dramaSlug");
+    if (!seriesLocked) return;
+    if (searchParams.get("start") === item.videoId) return;
+    const target = videos.find((v) => v.id === item.videoId);
+    if (!target) return;
+    const drama = dramas.find((d) => d.id === target.dramaId);
+    lastStartIdRef.current = target.id;
+    router.replace(
+      watchHref({
+        episodeId: target.id,
+        dramaId: target.dramaId,
+        dramaSlug: drama?.slug,
+      }),
+      { scroll: false },
+    );
+  }, [
+    activeIndex,
+    hydrated,
+    items,
+    videos,
+    dramas,
+    section,
+    searchParams,
+    router,
+  ]);
 
   const onEpisodeEnded = useCallback(() => {
     const current = indexRef.current;

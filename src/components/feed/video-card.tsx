@@ -80,6 +80,8 @@ export function VideoCard({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const [paused, setPaused] = useState(false);
+  /** Actual element playing state — PC can load a frame while stay paused. */
+  const [isPlaying, setIsPlaying] = useState(false);
   const blobPlaybackBlocked = useSlopStore((s) => s.blobPlaybackBlocked);
   const storageBlocked =
     isVercelBlobUrl(video.videoUrl) && blobPlaybackBlocked;
@@ -229,10 +231,10 @@ export function VideoCard({
 
     const el = videoRef.current;
     if (!el) return;
-    el.muted = muted;
 
     if (paused) {
       el.pause();
+      setIsPlaying(false);
       if (started.current) {
         void track("video_paused", {
           userId: user?.id,
@@ -253,11 +255,20 @@ export function VideoCard({
     const kickPlay = () => {
       const node = videoRef.current;
       if (!node || cancelled) return;
-      node.muted = muted || node.muted;
+      // Already rolling — don't remute / restart (would fight the unmute button).
+      if (!node.paused && !node.ended) {
+        setIsPlaying(true);
+        setLoading(false);
+        return;
+      }
+      // First start: force muted so desktop autoplay is allowed.
+      if (!muted) onAutoplayBlocked?.();
+      node.muted = true;
       void node
         .play()
         .then(() => {
           if (cancelled) return;
+          setIsPlaying(true);
           setLoading(false);
           if (!viewed.current) {
             viewed.current = true;
@@ -286,18 +297,10 @@ export function VideoCard({
         })
         .catch(() => {
           if (cancelled) return;
-          // PC browsers reject unmuted autoplay — force mute and retry once.
-          if (!muted) onAutoplayBlocked?.();
-          const retry = videoRef.current;
-          if (!retry) return;
-          retry.muted = true;
-          void retry.play().then(() => {
-            if (!cancelled) setLoading(false);
-          }).catch(() => {
-            if (cancelled) return;
-            setPaused(true);
-            setLoading(false);
-          });
+          // Show the big play button — loaded frame with no playback.
+          setIsPlaying(false);
+          setPaused(true);
+          setLoading(false);
         });
     };
 
@@ -315,7 +318,6 @@ export function VideoCard({
     };
   }, [
     active,
-    muted,
     paused,
     recordView,
     video.id,
@@ -324,8 +326,16 @@ export function VideoCard({
     user?.id,
     isScripted,
     mediaKey,
+    muted,
     onAutoplayBlocked,
   ]);
+
+  // Keep mute attribute in sync without restarting playback.
+  useEffect(() => {
+    const el = videoRef.current;
+    if (!el || !active) return;
+    el.muted = muted;
+  }, [muted, active, mediaKey]);
 
   useEffect(() => {
     if (!active) {
@@ -340,6 +350,7 @@ export function VideoCard({
     }
     // Episode picks / feed advances should always start playing.
     setPaused(false);
+    setIsPlaying(false);
     setFailed(false);
     setLoading(!isScripted);
     retryCount.current = 0;
@@ -730,18 +741,26 @@ export function VideoCard({
           }}
           onWaiting={() => setLoading(true)}
           onPlaying={() => {
+            setIsPlaying(true);
+            setPaused(false);
             setLoading(false);
             setFailed(false);
             retryCount.current = 0;
+          }}
+          onPause={() => {
+            setIsPlaying(false);
           }}
           onLoadedData={() => {
             setLoading(false);
             if (!paused) {
               const node = videoRef.current;
               if (!node) return;
-              node.muted = muted;
+              // Always kick muted first — desktop autoplay requires it.
+              node.muted = true;
               void node.play().catch(() => {
-                if (!muted) onAutoplayBlocked?.();
+                onAutoplayBlocked?.();
+                setIsPlaying(false);
+                setPaused(true);
               });
             }
           }}
@@ -749,9 +768,15 @@ export function VideoCard({
             if (!paused) {
               const node = videoRef.current;
               if (!node) return;
-              node.muted = muted;
+              if (!node.paused && !node.ended) {
+                setIsPlaying(true);
+                return;
+              }
+              node.muted = true;
               void node.play().catch(() => {
-                if (!muted) onAutoplayBlocked?.();
+                onAutoplayBlocked?.();
+                setIsPlaying(false);
+                setPaused(true);
               });
             }
           }}
@@ -774,6 +799,7 @@ export function VideoCard({
             }
             setFailed(true);
             setLoading(false);
+            setIsPlaying(false);
             setPaused(true);
             // Don't auto-skip the whole series on a single PC load glitch —
             // only Blob-blocked episodes should advance the feed.
@@ -859,7 +885,7 @@ export function VideoCard({
         </div>
       )}
 
-      {paused && active && !scrubbing && (
+      {active && !scrubbing && !loading && !failed && !isPlaying && (
         <button
           type="button"
           onClick={togglePlay}
