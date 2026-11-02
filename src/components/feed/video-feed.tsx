@@ -24,11 +24,16 @@ export function VideoFeed({
   categoryId,
   query,
   startVideoId,
+  focusVideoId,
+  onActiveVideoChange,
 }: {
   section?: FeedSection;
   categoryId?: string;
   query?: string;
   startVideoId?: string;
+  /** Jump to this episode without a route change (desktop episode rail). */
+  focusVideoId?: string | null;
+  onActiveVideoChange?: (videoId: string) => void;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -397,27 +402,15 @@ export function VideoFeed({
       const idx = items.findIndex(
         (item) => item.kind === "video" && item.videoId === videoId,
       );
-      const target = videos.find((v) => v.id === videoId);
-      const drama = target
-        ? dramas.find((d) => d.id === target.dramaId)
-        : undefined;
       if (idx >= 0) {
-        lastStartIdRef.current = videoId;
         lastVideoIdRef.current = videoId;
         goTo(idx, true);
-        if (target) {
-          router.replace(
-            watchHref({
-              episodeId: target.id,
-              dramaId: target.dramaId,
-              dramaSlug: drama?.slug,
-            }),
-            { scroll: false },
-          );
-        }
+        onActiveVideoChange?.(videoId);
         return;
       }
+      const target = videos.find((v) => v.id === videoId);
       if (!target) return;
+      const drama = dramas.find((d) => d.id === target.dramaId);
       router.push(
         watchHref({
           episodeId: target.id,
@@ -426,42 +419,27 @@ export function VideoFeed({
         }),
       );
     },
-    [items, goTo, videos, dramas, router],
+    [items, goTo, videos, dramas, router, onActiveVideoChange],
   );
 
-  // Keep the URL + desktop episode rail in sync while scrolling a series.
+  // Desktop episode rail — jump in-place, no route replace (that remounted the player).
+  const lastFocusRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
-    if (!hydrated) return;
-    const item = items[activeIndex];
-    if (item?.kind !== "video") return;
-    const seriesLocked =
-      section === "drama" ||
-      searchParams.has("drama") ||
-      searchParams.has("dramaSlug");
-    if (!seriesLocked) return;
-    if (searchParams.get("start") === item.videoId) return;
-    const target = videos.find((v) => v.id === item.videoId);
-    if (!target) return;
-    const drama = dramas.find((d) => d.id === target.dramaId);
-    lastStartIdRef.current = target.id;
-    router.replace(
-      watchHref({
-        episodeId: target.id,
-        dramaId: target.dramaId,
-        dramaSlug: drama?.slug,
-      }),
-      { scroll: false },
+    if (!focusVideoId || focusVideoId === lastFocusRef.current) return;
+    lastFocusRef.current = focusVideoId;
+    const idx = items.findIndex(
+      (item) => item.kind === "video" && item.videoId === focusVideoId,
     );
-  }, [
-    activeIndex,
-    hydrated,
-    items,
-    videos,
-    dramas,
-    section,
-    searchParams,
-    router,
-  ]);
+    if (idx < 0) return;
+    lastVideoIdRef.current = focusVideoId;
+    goTo(idx, true);
+  }, [focusVideoId, items, goTo]);
+
+  // Notify parent of the active episode for desktop rail highlighting.
+  useEffect(() => {
+    const item = items[activeIndex];
+    if (item?.kind === "video") onActiveVideoChange?.(item.videoId);
+  }, [activeIndex, items, onActiveVideoChange]);
 
   const onEpisodeEnded = useCallback(() => {
     const current = indexRef.current;
@@ -574,7 +552,6 @@ export function VideoFeed({
                   active={index === activeIndex}
                   muted={muted}
                   onToggleMute={() => setMuted((m) => !m)}
-                  onAutoplayBlocked={() => setMuted(true)}
                   categoryNames={video.categoryIds
                     .map((id) => categoryNameMap[id])
                     .filter(Boolean)}

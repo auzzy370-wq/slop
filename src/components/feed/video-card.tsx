@@ -52,8 +52,6 @@ interface VideoCardProps {
   active: boolean;
   muted: boolean;
   onToggleMute: () => void;
-  /** Desktop autoplay policy — force mute without toggling. */
-  onAutoplayBlocked?: () => void;
   categoryNames: string[];
   onJumpToVideo?: (videoId: string) => void;
   onEpisodeEnded?: () => void;
@@ -65,7 +63,6 @@ export function VideoCard({
   active,
   muted,
   onToggleMute,
-  onAutoplayBlocked,
   categoryNames,
   onJumpToVideo,
   onEpisodeEnded,
@@ -252,52 +249,58 @@ export function VideoCard({
     }
 
     let cancelled = false;
+    const markStarted = (node: HTMLVideoElement) => {
+      setIsPlaying(true);
+      setLoading(false);
+      if (!viewed.current) {
+        viewed.current = true;
+        recordView(video.id);
+      }
+      if (!started.current) {
+        started.current = true;
+        void track("video_playback_started", {
+          userId: user?.id,
+          episodeId: video.id,
+          dramaId: video.dramaId,
+          playbackSessionId: playbackId.current,
+          idempotencyKey: `pbstart:${playbackId.current}`,
+          playback: {
+            durationMs: (node.duration || video.durationSeconds) * 1000,
+            currentMs: node.currentTime * 1000,
+            event: "start",
+          },
+        });
+        void track("episode_selected", {
+          userId: user?.id,
+          episodeId: video.id,
+          dramaId: video.dramaId,
+        });
+      }
+    };
+
     const kickPlay = () => {
       const node = videoRef.current;
       if (!node || cancelled) return;
-      // Already rolling — don't remute / restart (would fight the unmute button).
       if (!node.paused && !node.ended) {
-        setIsPlaying(true);
-        setLoading(false);
+        markStarted(node);
         return;
       }
-      // First start: force muted so desktop autoplay is allowed.
-      if (!muted) onAutoplayBlocked?.();
+      // Always start muted so desktop autoplay is allowed, then restore
+      // the user's unmute preference if they already turned sound on.
+      // Do NOT flip React mute state here — that was cutting audio on scroll.
+      const wantSound = !muted;
       node.muted = true;
       void node
         .play()
         .then(() => {
           if (cancelled) return;
-          setIsPlaying(true);
-          setLoading(false);
-          if (!viewed.current) {
-            viewed.current = true;
-            recordView(video.id);
+          if (wantSound) {
+            node.muted = false;
           }
-          if (!started.current) {
-            started.current = true;
-            void track("video_playback_started", {
-              userId: user?.id,
-              episodeId: video.id,
-              dramaId: video.dramaId,
-              playbackSessionId: playbackId.current,
-              idempotencyKey: `pbstart:${playbackId.current}`,
-              playback: {
-                durationMs: (node.duration || video.durationSeconds) * 1000,
-                currentMs: node.currentTime * 1000,
-                event: "start",
-              },
-            });
-            void track("episode_selected", {
-              userId: user?.id,
-              episodeId: video.id,
-              dramaId: video.dramaId,
-            });
-          }
+          markStarted(node);
         })
         .catch(() => {
           if (cancelled) return;
-          // Show the big play button — loaded frame with no playback.
           setIsPlaying(false);
           setPaused(true);
           setLoading(false);
@@ -327,7 +330,6 @@ export function VideoCard({
     isScripted,
     mediaKey,
     muted,
-    onAutoplayBlocked,
   ]);
 
   // Keep mute attribute in sync without restarting playback.
@@ -538,18 +540,20 @@ export function VideoCard({
         // Resume inside the click handler so PC browsers treat it as a user gesture.
         if (el) {
           el.muted = muted;
-          void el.play().catch(() => {
+          void el.play().then(() => {
+            setIsPlaying(true);
+          }).catch(() => {
             el.muted = true;
-            onAutoplayBlocked?.();
-            void el.play().catch(() => {});
+            void el.play().then(() => setIsPlaying(true)).catch(() => {});
           });
         }
         return false;
       }
       el?.pause();
+      setIsPlaying(false);
       return true;
     });
-  }, [scheduleChromeHide, muted, onAutoplayBlocked]);
+  }, [scheduleChromeHide, muted]);
 
   const onVideoSurfaceTap = useCallback(() => {
     if (!chromeVisible) {
@@ -723,93 +727,77 @@ export function VideoCard({
           onEnded={handleEpisodeEnded}
         />
       ) : active && !failed && !storageBlocked ? (
-        <video
-          key={`${video.id}-${mediaKey}`}
-          ref={videoRef}
-          className="slop-feed-video"
-          src={resolvePlaybackUrl(video.videoUrl)}
-          poster={video.thumbnailUrl}
-          playsInline
-          // Desktop autoplay requires muted; keep attribute in sync with state.
-          muted={muted}
-          autoPlay={active && !paused}
-          preload="auto"
-          onTimeUpdate={onTimeUpdate}
-          onLoadedMetadata={(e) => {
-            const d = e.currentTarget.duration;
-            if (Number.isFinite(d)) setDuration(d);
-          }}
-          onWaiting={() => setLoading(true)}
-          onPlaying={() => {
-            setIsPlaying(true);
-            setPaused(false);
-            setLoading(false);
-            setFailed(false);
-            retryCount.current = 0;
-          }}
-          onPause={() => {
-            setIsPlaying(false);
-          }}
-          onLoadedData={() => {
-            setLoading(false);
-            if (!paused) {
+        <>
+          {/* Poster behind the video — never use the HTML poster attr on PC;
+              Chrome can keep showing it forever while audio still plays. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={video.thumbnailUrl}
+            alt=""
+            className={`absolute inset-0 z-0 h-full w-full object-cover transition-opacity duration-200 ${
+              isPlaying ? "opacity-0" : "opacity-100"
+            }`}
+            draggable={false}
+          />
+          <video
+            key={`${video.id}-${mediaKey}`}
+            ref={videoRef}
+            className="slop-feed-video"
+            src={resolvePlaybackUrl(video.videoUrl)}
+            playsInline
+            muted={muted}
+            autoPlay={active && !paused}
+            preload="auto"
+            onTimeUpdate={onTimeUpdate}
+            onLoadedMetadata={(e) => {
+              const d = e.currentTarget.duration;
+              if (Number.isFinite(d)) setDuration(d);
+            }}
+            onWaiting={() => setLoading(true)}
+            onPlaying={() => {
+              setIsPlaying(true);
+              setPaused(false);
+              setLoading(false);
+              setFailed(false);
+              retryCount.current = 0;
+            }}
+            onPause={() => {
+              setIsPlaying(false);
+            }}
+            onLoadedData={() => {
+              setLoading(false);
+            }}
+            onCanPlay={() => {
               const node = videoRef.current;
-              if (!node) return;
-              // Always kick muted first — desktop autoplay requires it.
-              node.muted = true;
-              void node.play().catch(() => {
-                onAutoplayBlocked?.();
-                setIsPlaying(false);
-                setPaused(true);
-              });
-            }
-          }}
-          onCanPlay={() => {
-            if (!paused) {
-              const node = videoRef.current;
-              if (!node) return;
-              if (!node.paused && !node.ended) {
-                setIsPlaying(true);
+              if (node && !node.paused && !node.ended) setIsPlaying(true);
+            }}
+            onEnded={handleEpisodeEnded}
+            onError={(e) => {
+              const mediaErr = e.currentTarget.error;
+              if (
+                !e.currentTarget.currentSrc ||
+                mediaErr?.code === MediaError.MEDIA_ERR_ABORTED
+              ) {
                 return;
               }
-              node.muted = true;
-              void node.play().catch(() => {
-                onAutoplayBlocked?.();
-                setIsPlaying(false);
-                setPaused(true);
-              });
-            }
-          }}
-          onEnded={handleEpisodeEnded}
-          onError={(e) => {
-            const mediaErr = e.currentTarget.error;
-            // Remounts / source swaps abort the previous element — not a real failure.
-            if (
-              !e.currentTarget.currentSrc ||
-              mediaErr?.code === MediaError.MEDIA_ERR_ABORTED
-            ) {
-              return;
-            }
-            // Auto-recover on Safari transient decode / network errors.
-            if (!storageBlocked && retryCount.current < 2) {
-              retryCount.current += 1;
-              setLoading(true);
-              window.setTimeout(() => setMediaKey((k) => k + 1), 220);
-              return;
-            }
-            setFailed(true);
-            setLoading(false);
-            setIsPlaying(false);
-            setPaused(true);
-            // Don't auto-skip the whole series on a single PC load glitch —
-            // only Blob-blocked episodes should advance the feed.
-            if (storageBlocked && !notifiedFail.current) {
-              notifiedFail.current = true;
-              onPlaybackFailed?.();
-            }
-          }}
-          onClick={onVideoSurfaceTap}
-        />
+              if (!storageBlocked && retryCount.current < 2) {
+                retryCount.current += 1;
+                setLoading(true);
+                window.setTimeout(() => setMediaKey((k) => k + 1), 220);
+                return;
+              }
+              setFailed(true);
+              setLoading(false);
+              setIsPlaying(false);
+              setPaused(true);
+              if (storageBlocked && !notifiedFail.current) {
+                notifiedFail.current = true;
+                onPlaybackFailed?.();
+              }
+            }}
+            onClick={onVideoSurfaceTap}
+          />
+        </>
       ) : failed && active ? (
         <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[#121212] px-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -855,8 +843,8 @@ export function VideoCard({
         />
       )}
 
-      <div className="pointer-events-none absolute inset-0 slop-player-vignette" />
-      <div className="pointer-events-none absolute inset-0 slop-player-grain" aria-hidden />
+      <div className="pointer-events-none absolute inset-0 z-[2] slop-player-vignette" />
+      <div className="pointer-events-none absolute inset-0 z-[2] slop-player-grain" aria-hidden />
 
       {/* Top strip — brand + episode chip */}
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">

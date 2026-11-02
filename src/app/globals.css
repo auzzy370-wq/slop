@@ -134,10 +134,9 @@ a {
 
 .slop-feed-track {
   width: 100%;
-  will-change: transform;
+  /* Avoid will-change:transform here — it promotes a layer that can stop
+     descendant <video> frames from painting on Chrome desktop. */
   backface-visibility: hidden;
-  transform: translateZ(0);
-  -webkit-transform: translateZ(0);
 }
 
 .slop-feed-slide {
@@ -149,9 +148,9 @@ a {
   max-height: var(--slop-feed-page, 100%);
   overflow: hidden;
   background: #000;
-  /* Lock layout so third-party iframes can't stretch a slide and desync paging.
-     Avoid size containment — children use height:100%. */
-  contain: layout style paint;
+  /* Do NOT use contain:paint — Chrome desktop then plays audio but never
+     paints video frames when the slide sits under a transformed track. */
+  contain: layout style;
   flex: none;
   flex-shrink: 0;
 }
@@ -159,11 +158,17 @@ a {
 .slop-feed-video {
   position: absolute;
   inset: 0;
+  z-index: 1;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center center;
   background: #000;
+  /* Own compositor layer so frames still paint under translate3d parents. */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 
 .animate-in-up {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useMemo } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -13,7 +13,6 @@ import {
 import { VideoFeed } from "@/components/feed/video-feed";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
-import { watchHref } from "@/lib/watch-url";
 
 function WatchInner() {
   const params = useSearchParams();
@@ -26,8 +25,12 @@ function WatchInner() {
   const dramas = useSlopStore((s) => s.dramas);
   const hydrated = useSlopStore((s) => s.hydrated);
 
+  const [activeEpisodeId, setActiveEpisodeId] = useState<string | undefined>(
+    start,
+  );
+  const [focusEpisodeId, setFocusEpisodeId] = useState<string | null>(null);
+
   // Prefer explicit drama id, then slug, then the start episode's series.
-  // Desktop episode rail used to omit `drama=` and fell into For You — wrong EPs.
   const resolvedDramaId = useMemo(() => {
     if (!hydrated) return undefined;
     if (dramaParam) return dramaParam;
@@ -60,6 +63,11 @@ function WatchInner() {
     return videos.find((v) => v.status === "published");
   }, [hydrated, videos, start, resolvedDramaId]);
 
+  useEffect(() => {
+    if (start) setActiveEpisodeId(start);
+    else if (startVideo?.id) setActiveEpisodeId(startVideo.id);
+  }, [start, startVideo?.id]);
+
   const drama = useMemo(() => {
     if (resolvedDramaId) {
       return dramas.find((d) => d.id === resolvedDramaId);
@@ -81,6 +89,10 @@ function WatchInner() {
     : dramaSlug
       ? `/drama/${dramaSlug}`
       : "/";
+
+  const onActiveVideoChange = useCallback((videoId: string) => {
+    setActiveEpisodeId(videoId);
+  }, []);
 
   return (
     <div className="slop-watch-shell">
@@ -154,6 +166,8 @@ function WatchInner() {
           }
           categoryId={resolvedDramaId}
           startVideoId={start ?? startVideo?.id}
+          focusVideoId={focusEpisodeId}
+          onActiveVideoChange={onActiveVideoChange}
         />
       </div>
 
@@ -166,16 +180,16 @@ function WatchInner() {
             </p>
             <ul className="mt-3 max-h-[min(52vh,420px)] space-y-1 overflow-y-auto overscroll-contain pr-1">
               {episodeList.map((ep) => {
-                const active = startVideo?.id === ep.id;
+                const active = activeEpisodeId === ep.id;
                 return (
                   <li key={ep.id}>
-                    <Link
-                      href={watchHref({
-                        episodeId: ep.id,
-                        dramaId: drama.id,
-                        dramaSlug: drama.slug,
-                      })}
-                      className={`flex items-center gap-3 rounded-xl px-2.5 py-2 text-sm transition ${
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveEpisodeId(ep.id);
+                        setFocusEpisodeId(ep.id);
+                      }}
+                      className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left text-sm transition ${
                         active
                           ? "bg-[var(--slop-violet)]/20 text-white"
                           : "text-white/60 hover:bg-white/5 hover:text-white"
@@ -197,7 +211,7 @@ function WatchInner() {
                       <span className="min-w-0 flex-1 truncate font-medium">
                         {ep.title || `Episode ${ep.episodeNumber}`}
                       </span>
-                    </Link>
+                    </button>
                   </li>
                 );
               })}
@@ -224,7 +238,7 @@ function WatchInner() {
               </span>
               Scroll or drag to change episodes
             </li>
-            <li>Click the player to pause · mute from the rail</li>
+            <li>Click the player to play/pause · unmute from the speaker icon</li>
           </ul>
         </div>
       </aside>
