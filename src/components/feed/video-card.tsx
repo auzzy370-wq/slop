@@ -563,6 +563,28 @@ export function VideoCard({
     return () => window.removeEventListener("keydown", onKey);
   }, [active, toggleFullscreen]);
 
+  // Fullscreen: mouse / touch movement brings chrome back (same 10s hide timer).
+  useEffect(() => {
+    if (!active || !isFullscreen) return;
+    const root = rootRef.current;
+    const target = getFullscreenTarget() || root;
+    if (!target) return;
+    let last = 0;
+    const onMove = () => {
+      const now = Date.now();
+      if (now - last < 80) return;
+      last = now;
+      revealChrome();
+    };
+    target.addEventListener("mousemove", onMove, { passive: true });
+    target.addEventListener("pointerdown", onMove, { passive: true });
+    revealChrome();
+    return () => {
+      target.removeEventListener("mousemove", onMove);
+      target.removeEventListener("pointerdown", onMove);
+    };
+  }, [active, isFullscreen, getFullscreenTarget, revealChrome]);
+
   const onTimeUpdate = () => {
     const el = videoRef.current;
     if (!el || !el.duration) return;
@@ -988,7 +1010,12 @@ export function VideoCard({
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-grain" aria-hidden />
 
       {/* Top strip — brand + episode chip */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div
+        className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between px-3 pt-[max(0.75rem,env(safe-area-inset-top))]${
+          isFullscreen && !chromeVisible ? " is-hidden" : ""
+        }`}
+        aria-hidden={isFullscreen && !chromeVisible}
+      >
         <div className="mt-11 min-w-0">
           <div className="flex items-center gap-1.5">
             <SlopMarkMini className="h-3.5 w-3.5" />
@@ -1040,9 +1067,10 @@ export function VideoCard({
 
       {/* Instagram Reels–style right action rail */}
       <div
-        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-3.5 transition-[bottom] duration-300 ease-out sm:right-3.5 sm:gap-4 ${
+        className={`slop-action-rail absolute right-2.5 z-30 flex flex-col items-center gap-3.5 sm:right-3.5 sm:gap-4 ${
           chromeVisible ? "bottom-[5.75rem]" : "bottom-[3.75rem]"
-        }`}
+        }${isFullscreen && !chromeVisible ? " is-hidden" : ""}`}
+        aria-hidden={isFullscreen && !chromeVisible}
       >
         <RailButton
           active={liked}
@@ -1131,13 +1159,18 @@ export function VideoCard({
       </div>
 
       {/* Bottom caption + film scrub — flush to the home indicator */}
-      <div className="absolute inset-x-0 bottom-0 z-30 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))]">
+      <div
+        className={`slop-player-bottom absolute inset-x-0 bottom-0 z-30 pb-[max(0.15rem,env(safe-area-inset-bottom,0px))]${
+          isFullscreen && !chromeVisible ? " is-hidden" : ""
+        }`}
+        aria-hidden={isFullscreen && !chromeVisible}
+      >
         <div
           key={active ? video.id : "idle"}
           className={`slop-caption relative px-3 pr-[4.75rem] sm:px-4 sm:pr-24 ${
-            chromeVisible ? "is-visible" : "is-hidden"
+            chromeVisible || isFullscreen ? "is-visible" : "is-hidden"
           }`}
-          aria-hidden={!chromeVisible}
+          aria-hidden={!chromeVisible && !isFullscreen}
         >
           <div
             aria-hidden
