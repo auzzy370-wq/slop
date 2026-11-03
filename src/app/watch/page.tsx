@@ -126,7 +126,8 @@ function WatchInner() {
               For you
             </h1>
             <p className="mt-1 text-sm text-white/45">
-              Scroll for the next episode
+              Scroll for the next episode — filter by mood below or on the
+              player.
             </p>
             <MoodFilters className="mt-3" />
           </div>

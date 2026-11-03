@@ -743,8 +743,8 @@ export function VideoFeed({
       onWheel={onWheel}
     >
       {showMoodChips ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[max(0.35rem,env(safe-area-inset-top))] z-40 flex justify-center px-3 lg:hidden">
-          <div className="pointer-events-auto max-w-full rounded-full border border-white/10 bg-black/45 px-2 py-1.5 backdrop-blur-md">
+        <div className="pointer-events-none absolute inset-x-0 top-[max(3.6rem,calc(env(safe-area-inset-top,0px)+2.85rem))] z-40 flex justify-center px-3 lg:top-3">
+          <div className="pointer-events-auto max-w-full rounded-full border border-white/15 bg-black/55 px-2.5 py-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md">
             <MoodFilters />
           </div>
         </div>
