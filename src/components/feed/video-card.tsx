@@ -27,6 +27,8 @@ import {
   Volume2,
   VolumeX,
   Flag,
+  Users,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { Video } from "@/lib/types";
@@ -68,6 +70,21 @@ import {
   openDocPipPlayer,
   type DocPipSession,
 } from "@/lib/doc-pip-player";
+import { hideDrama } from "@/lib/hidden-series";
+import {
+  readReactionsEnabled,
+  setReactionsEnabled,
+  subscribeViewerPrefs,
+} from "@/lib/viewer-prefs";
+import {
+  createWatchParty,
+  fetchWatchParty,
+  newPartyHostId,
+  updateWatchParty,
+  watchPartyHref,
+} from "@/lib/watch-party";
+
+const REACTION_EMOJIS = ["🔥", "😂", "😭"] as const;
 
 interface VideoCardProps {
   video: Video;
@@ -82,6 +99,8 @@ interface VideoCardProps {
   onPlaybackFailed?: () => void;
   /** Fired when classic or Document PiP opens/closes (feed skips ads while active). */
   onPictureInPictureChange?: (active: boolean) => void;
+  /** Watch-together room id from ?party= */
+  partyRoomId?: string | null;
 }
 
 export function VideoCard({
@@ -96,6 +115,7 @@ export function VideoCard({
   onEpisodeEnded,
   onPlaybackFailed,
   onPictureInPictureChange,
+  partyRoomId = null,
 }: VideoCardProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const rootRef = useRef<HTMLElement>(null);
@@ -125,6 +145,16 @@ export function VideoCard({
   /** Document PiP session (Chrome/Edge) — owns its own video + episode buttons. */
   const docPipRef = useRef<DocPipSession | null>(null);
   const [docPipActive, setDocPipActive] = useState(false);
+  const [reactionsEnabled, setReactionsEnabledState] = useState(true);
+  const [floats, setFloats] = useState<
+    { id: string; emoji: string; x: number; y: number }[]
+  >([]);
+  const partyHostIdRef = useRef(newPartyHostId());
+  const [partyHosting, setPartyHosting] = useState<{
+    roomId: string;
+    hostId: string;
+  } | null>(null);
+  const partyGuestRef = useRef(!!partyRoomId);
   /** Audio plays but videoWidth stays 0 — usually HEVC in Chrome / Opera GX. */
   const [codecBlocked, setCodecBlocked] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -274,6 +304,102 @@ export function VideoCard({
   jumpSeriesEpisodeRef.current = jumpSeriesEpisode;
   const onEpisodeEndedRef = useRef(onEpisodeEnded);
   onEpisodeEndedRef.current = onEpisodeEnded;
+
+  useEffect(() => {
+    const sync = () => setReactionsEnabledState(readReactionsEnabled());
+    sync();
+    return subscribeViewerPrefs(sync);
+  }, []);
+
+  const spawnReaction = useCallback((emoji: string) => {
+    if (!readReactionsEnabled()) return;
+    const id = uid("rx");
+    const x = 18 + Math.random() * 64;
+    const y = 28 + Math.random() * 40;
+    setFloats((prev) => [...prev.slice(-12), { id, emoji, x, y }]);
+    window.setTimeout(() => {
+      setFloats((prev) => prev.filter((f) => f.id !== id));
+    }, 1600);
+    void track("share_clicked", {
+      userId: user?.id,
+      episodeId: video.id,
+      dramaId: video.dramaId,
+      properties: { method: "reaction", emoji },
+    });
+  }, [user?.id, video.dramaId, video.id]);
+
+  // Watch-together: guests follow the host; host posts progress.
+  useEffect(() => {
+    if (!active || !partyRoomId || partyHosting) return;
+    partyGuestRef.current = true;
+    let cancelled = false;
+    const poll = async () => {
+      const party = await fetchWatchParty(partyRoomId);
+      if (cancelled || !party) return;
+      if (party.episodeId !== video.id) {
+        onJumpToVideo?.(party.episodeId);
+        return;
+      }
+      const el = videoRef.current;
+      if (!el) return;
+      if (Math.abs(el.currentTime - party.positionSec) > 2.5) {
+        try {
+          el.currentTime = party.positionSec;
+        } catch {
+          /* ignore */
+        }
+      }
+      if (party.paused && !el.paused) {
+        el.pause();
+        setPaused(true);
+      } else if (!party.paused && el.paused && !paused) {
+        void el.play().catch(() => {});
+      }
+    };
+    void poll();
+    const id = window.setInterval(() => {
+      void poll();
+    }, 2500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [
+    active,
+    onJumpToVideo,
+    partyHosting,
+    partyRoomId,
+    paused,
+    video.id,
+  ]);
+
+  useEffect(() => {
+    if (!active || !partyHosting || isScripted) return;
+    const hostId = partyHosting.hostId;
+    const roomId = partyHosting.roomId;
+    const tick = () => {
+      const el = videoRef.current;
+      if (!el) return;
+      void updateWatchParty({
+        roomId,
+        hostId,
+        episodeId: video.id,
+        dramaId: video.dramaId,
+        positionSec: el.currentTime || 0,
+        paused: el.paused || paused,
+      });
+    };
+    tick();
+    const id = window.setInterval(tick, 2000);
+    return () => window.clearInterval(id);
+  }, [
+    active,
+    isScripted,
+    partyHosting,
+    paused,
+    video.dramaId,
+    video.id,
+  ]);
 
   useEffect(() => {
     if (!active) {
@@ -1849,6 +1975,21 @@ export function VideoCard({
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-vignette" />
       <div className="pointer-events-none absolute inset-0 z-[2] slop-player-grain" aria-hidden />
 
+      {/* Floating episode reactions — can be disabled in More / Account */}
+      {reactionsEnabled && floats.length > 0 ? (
+        <div className="pointer-events-none absolute inset-0 z-[25] overflow-hidden" aria-hidden>
+          {floats.map((f) => (
+            <span
+              key={f.id}
+              className="slop-reaction-float absolute text-3xl"
+              style={{ left: `${f.x}%`, bottom: `${f.y}%` }}
+            >
+              {f.emoji}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
       {/* Top strip — Pine layout, SLOP chrome */}
       <div
         className={`slop-player-top pointer-events-none absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-2.5 pt-[max(3.25rem,calc(env(safe-area-inset-top,0px)+0.65rem))] lg:pt-[max(0.85rem,calc(env(safe-area-inset-top,0px)+0.5rem))]${
@@ -2020,6 +2161,25 @@ export function VideoCard({
         >
           <Share2 className="fill-transparent" />
         </RailButton>
+        {reactionsEnabled ? (
+          <div className="pointer-events-auto mt-1 flex flex-col items-center gap-1">
+            {REACTION_EMOJIS.map((emoji) => (
+              <button
+                key={emoji}
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-black/35 text-lg backdrop-blur-md transition hover:bg-black/55"
+                aria-label={`React ${emoji}`}
+                data-no-swipe
+                onClick={() => {
+                  revealChrome();
+                  spawnReaction(emoji);
+                }}
+              >
+                {emoji}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {/* Bottom: series title · thin scrub · Episode | speed | expand */}
@@ -2456,6 +2616,75 @@ export function VideoCard({
                 <Maximize2 className="h-4 w-4 text-white/60" />
               )}
               {isFullscreen ? "Exit fullscreen" : "Fullscreen"}
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
+              onClick={() => {
+                void (async () => {
+                  const hostId = partyHostIdRef.current;
+                  const party = await createWatchParty({
+                    episodeId: video.id,
+                    dramaId: video.dramaId,
+                    positionSec: videoRef.current?.currentTime ?? 0,
+                    hostId,
+                  });
+                  if (!party) {
+                    toast.error("Couldn’t start a watch party");
+                    return;
+                  }
+                  setPartyHosting({ roomId: party.roomId, hostId });
+                  const href = watchPartyHref({
+                    roomId: party.roomId,
+                    episodeId: video.id,
+                    dramaId: video.dramaId,
+                  });
+                  const url =
+                    typeof window !== "undefined"
+                      ? `${window.location.origin}${href}`
+                      : href;
+                  try {
+                    await navigator.clipboard.writeText(url);
+                    toast.success("Watch-together link copied");
+                  } catch {
+                    toast.message("Share this link", { description: url });
+                  }
+                  setMoreOpen(false);
+                })();
+              }}
+            >
+              <Users className="h-4 w-4 text-white/60" />
+              Watch with friends
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
+              onClick={() => {
+                hideDrama(video.dramaId);
+                toast.message("Hidden from For You", {
+                  description: "You can restore series in Account.",
+                });
+                setMoreOpen(false);
+                onPlaybackFailed?.();
+              }}
+            >
+              <EyeOff className="h-4 w-4 text-white/60" />
+              Not interested in this series
+            </button>
+            <button
+              type="button"
+              className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold text-white transition hover:bg-white/5"
+              onClick={() => {
+                const next = !reactionsEnabled;
+                setReactionsEnabled(next);
+                setReactionsEnabledState(next);
+                toast.message(
+                  next ? "Floating reactions on" : "Floating reactions off",
+                );
+              }}
+            >
+              <span>Floating reactions</span>
+              <span className="text-white/45">{reactionsEnabled ? "On" : "Off"}</span>
             </button>
             <button
               type="button"

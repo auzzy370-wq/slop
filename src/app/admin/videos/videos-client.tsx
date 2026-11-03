@@ -250,6 +250,64 @@ export default function VideosClient() {
     [],
   );
 
+  const scheduleSeriesTonight = useCallback(
+    async (dramaId: string) => {
+      const drama = dramas.find((d) => d.id === dramaId);
+      if (!drama) return;
+      const eps = videos.filter((v) => v.dramaId === dramaId);
+      if (eps.length === 0) {
+        toast.error("This series has no episodes yet");
+        return;
+      }
+      const when = new Date();
+      when.setHours(20, 0, 0, 0);
+      if (when.getTime() <= Date.now()) {
+        when.setDate(when.getDate() + 1);
+      }
+      const scheduledAt = when.toISOString();
+      const label = when.toLocaleString(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      });
+      const confirmed = window.confirm(
+        `Schedule all ${eps.length} episode${eps.length === 1 ? "" : "s"} of “${drama.title}” to publish tonight (${label})? A cron job promotes due scheduled episodes every 15 minutes.`,
+      );
+      if (!confirmed) return;
+
+      setSeriesBusyId(dramaId);
+      const toastId = toast.loading("Scheduling series for tonight…");
+      const nextDrama = {
+        ...drama,
+        status: "scheduled" as PublicationStatus,
+      };
+      const nextVideos = eps.map((v) => ({
+        ...v,
+        status: "scheduled" as PublicationStatus,
+        scheduledAt,
+      }));
+      try {
+        upsertDrama(nextDrama);
+        for (const v of nextVideos) upsertVideo(v);
+        await persistCatalogOverlay({
+          dramas: [nextDrama],
+          videos: nextVideos,
+        });
+        toast.success(`Scheduled for ${label}`, { id: toastId });
+      } catch (err) {
+        toast.error(
+          err instanceof Error ? err.message : "Couldn’t schedule series",
+          { id: toastId },
+        );
+      } finally {
+        setSeriesBusyId(null);
+      }
+    },
+    [dramas, videos, upsertDrama, upsertVideo, persistCatalogOverlay],
+  );
+
   const setSeriesPublication = useCallback(
     async (dramaId: string, nextStatus: PublicationStatus) => {
       const drama = dramas.find((d) => d.id === dramaId);
@@ -1368,6 +1426,14 @@ export default function VideosClient() {
                         }
                       >
                         {busy ? "Working…" : "Publish series"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={busy || episodeCount === 0}
+                        onClick={() => void scheduleSeriesTonight(drama.id)}
+                      >
+                        {busy ? "Working…" : "Publish tonight"}
                       </Button>
                       <Button
                         size="sm"

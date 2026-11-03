@@ -2,22 +2,54 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useSlopStore } from "@/store/slop-store";
 import { toast } from "sonner";
+import {
+  clearHiddenDramas,
+  readHiddenDramaIds,
+  subscribeHiddenDramas,
+  unhideDrama,
+} from "@/lib/hidden-series";
+import {
+  readDailyDropReminder,
+  readReactionsEnabled,
+  setDailyDropReminder,
+  setReactionsEnabled,
+  subscribeViewerPrefs,
+} from "@/lib/viewer-prefs";
 
 export default function AccountPage() {
   const router = useRouter();
   const user = useSlopStore((s) => s.currentUser);
   const subscription = useSlopStore((s) => s.subscription);
   const saves = useSlopStore((s) => s.saves);
+  const dramas = useSlopStore((s) => s.dramas);
   const updateProfile = useSlopStore((s) => s.updateProfile);
   const signOut = useSlopStore((s) => s.signOut);
   const requestDeletion = useSlopStore((s) => s.requestDeletion);
   const cancelPremiumDemo = useSlopStore((s) => s.cancelPremiumDemo);
   const [name, setName] = useState(user?.displayName ?? "");
+  const [reactionsOn, setReactionsOn] = useState(true);
+  const [reminderOn, setReminderOn] = useState(false);
+  const [hiddenIds, setHiddenIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    const sync = () => {
+      setReactionsOn(readReactionsEnabled());
+      setReminderOn(readDailyDropReminder());
+    };
+    sync();
+    return subscribeViewerPrefs(sync);
+  }, []);
+
+  useEffect(() => {
+    const sync = () => setHiddenIds(readHiddenDramaIds());
+    sync();
+    return subscribeHiddenDramas(sync);
+  }, []);
 
   if (!user) {
     return (
@@ -98,6 +130,88 @@ export default function AccountPage() {
               Save
             </Button>
           </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-3">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-white/45">
+            Preferences
+          </h2>
+          <label className="flex items-center justify-between gap-3 text-sm text-white/80">
+            <span>Floating reactions</span>
+            <input
+              type="checkbox"
+              checked={reactionsOn}
+              onChange={(e) => {
+                const on = e.target.checked;
+                setReactionsEnabled(on);
+                setReactionsOn(on);
+              }}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-3 text-sm text-white/80">
+            <span>Daily drop reminder</span>
+            <input
+              type="checkbox"
+              checked={reminderOn}
+              onChange={async (e) => {
+                const on = e.target.checked;
+                if (on && typeof Notification !== "undefined") {
+                  const perm = await Notification.requestPermission();
+                  if (perm !== "granted") {
+                    toast.error("Notifications blocked in this browser");
+                    return;
+                  }
+                }
+                setDailyDropReminder(on);
+                setReminderOn(on);
+                toast.message(
+                  on
+                    ? "We’ll nudge you about series you’re mid-way through"
+                    : "Daily reminders off",
+                );
+              }}
+            />
+          </label>
+          {hiddenIds.length > 0 ? (
+            <div className="space-y-2 border-t border-white/10 pt-3">
+              <p className="text-xs uppercase tracking-wide text-white/45">
+                Hidden series ({hiddenIds.length})
+              </p>
+              {hiddenIds.map((id) => {
+                const drama = dramas.find((d) => d.id === id);
+                return (
+                  <div
+                    key={id}
+                    className="flex items-center justify-between gap-2 text-sm"
+                  >
+                    <span className="truncate text-white/70">
+                      {drama?.title ?? id}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-xs font-semibold text-[var(--slop-lavender)]"
+                      onClick={() => {
+                        unhideDrama(id);
+                        toast.success("Series restored to For You");
+                      }}
+                    >
+                      Undo
+                    </button>
+                  </div>
+                );
+              })}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  clearHiddenDramas();
+                  toast.message("Cleared hidden series");
+                }}
+              >
+                Clear all
+              </Button>
+            </div>
+          ) : null}
         </section>
 
         <section className="grid grid-cols-2 gap-3">

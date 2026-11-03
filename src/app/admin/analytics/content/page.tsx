@@ -34,6 +34,13 @@ export default function ContentAnalyticsPage() {
       watchlistAdds: number;
     }[]
   >([]);
+  const [selectedEpisodeId, setSelectedEpisodeId] = useState<string | null>(
+    null,
+  );
+  const [retention, setRetention] = useState<{
+    totalStarts: number;
+    buckets: { pct: number; viewers: number }[];
+  } | null>(null);
 
   const load = useCallback(async () => {
     const qs = new URLSearchParams({
@@ -50,6 +57,24 @@ export default function ContentAnalyticsPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!selectedEpisodeId) {
+      setRetention(null);
+      return;
+    }
+    const qs = new URLSearchParams({
+      range,
+      section: "retention",
+      episodeId: selectedEpisodeId,
+      ...(range === "custom" && from ? { from } : {}),
+      ...(range === "custom" && to ? { to } : {}),
+    });
+    void fetch(`/api/analytics/summary?${qs}`)
+      .then((r) => r.json())
+      .then((json) => setRetention(json.retention ?? null))
+      .catch(() => setRetention(null));
+  }, [selectedEpisodeId, range, from, to]);
 
   const titleFor = (id: string) =>
     videos.find((v) => v.id === id)?.title ?? id;
@@ -176,6 +201,42 @@ export default function ContentAnalyticsPage() {
         </section>
       </div>
 
+      {selectedEpisodeId && retention ? (
+        <section className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-semibold">
+                Drop-off heatmap · {titleFor(selectedEpisodeId)}
+              </h2>
+              <p className="text-xs text-white/45">
+                Viewers still watching at each milestone ·{" "}
+                {retention.totalStarts} starts
+              </p>
+            </div>
+            <button
+              type="button"
+              className="text-xs font-semibold text-[var(--slop-lavender)]"
+              onClick={() => setSelectedEpisodeId(null)}
+            >
+              Close
+            </button>
+          </div>
+          <SimpleBars
+            labelWidth={56}
+            data={retention.buckets.map((b) => ({
+              label: `${b.pct}%`,
+              value: b.viewers,
+              color:
+                b.pct >= 75
+                  ? "var(--slop-violet)"
+                  : b.pct >= 50
+                    ? "rgba(185, 154, 255, 0.7)"
+                    : "rgba(185, 154, 255, 0.35)",
+            }))}
+          />
+        </section>
+      ) : null}
+
       <div className="overflow-x-auto rounded-2xl border border-white/10">
         <table className="w-full min-w-[900px] text-left text-sm">
           <thead className="bg-white/[0.03] text-xs uppercase text-[var(--slop-slate)]">
@@ -195,7 +256,15 @@ export default function ContentAnalyticsPage() {
           </thead>
           <tbody>
             {episodes.map((e) => (
-              <tr key={e.episodeId} className="border-t border-white/5">
+              <tr
+                key={e.episodeId}
+                className={`border-t border-white/5 cursor-pointer transition hover:bg-white/[0.03] ${
+                  selectedEpisodeId === e.episodeId
+                    ? "bg-[var(--slop-violet)]/10"
+                    : ""
+                }`}
+                onClick={() => setSelectedEpisodeId(e.episodeId)}
+              >
                 <td className="p-3 font-medium">{titleFor(e.episodeId)}</td>
                 <td className="p-3">{dramaFor(e.dramaId)}</td>
                 <td className="p-3">{e.plays}</td>
@@ -222,6 +291,9 @@ export default function ContentAnalyticsPage() {
           </tbody>
         </table>
       </div>
+      <p className="text-xs text-white/40">
+        Click an episode row to open its drop-off heatmap.
+      </p>
     </div>
   );
 }

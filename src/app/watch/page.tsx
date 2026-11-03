@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Play } from "lucide-react";
 import { VideoFeed } from "@/components/feed/video-feed";
 import { DesktopCommentsRail } from "@/components/feed/desktop-comments-rail";
+import { MoodFilters } from "@/components/feed/mood-filters";
 import { useSlopStore } from "@/store/slop-store";
 import { formatCount } from "@/lib/utils";
 import { hardStopFeedPlayback } from "@/lib/media-silence";
@@ -127,6 +128,7 @@ function WatchInner() {
             <p className="mt-1 text-sm text-white/45">
               Scroll for the next episode
             </p>
+            <MoodFilters className="mt-3" />
           </div>
         )}
       </header>

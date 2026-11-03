@@ -5,6 +5,7 @@ import {
   acquisitionBreakdown,
   contentPerformance,
   dailySeries,
+  retentionBuckets,
   revenueSummary,
   trafficSummary,
 } from "@/lib/analytics/aggregations";
@@ -46,6 +47,21 @@ export async function GET(request: Request) {
     return NextResponse.json({
       range: { key: range, label, from: from.toISOString(), to: to.toISOString() },
       episodes: contentPerformance(store, from, to),
+    });
+  }
+
+  if (section === "retention") {
+    const episodeId = searchParams.get("episodeId")?.trim();
+    if (!episodeId) {
+      return NextResponse.json(
+        { error: "episodeId required" },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json({
+      range: { key: range, label, from: from.toISOString(), to: to.toISOString() },
+      episodeId,
+      retention: retentionBuckets(store, episodeId, from, to),
     });
   }
 
