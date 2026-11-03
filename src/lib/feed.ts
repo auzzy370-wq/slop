@@ -41,8 +41,6 @@ export function getFeed(
     hideUnplayableBlob?: boolean;
     /** Hide dramas the viewer marked “Not interested”. */
     hiddenDramaIds?: string[];
-    /** Category ids that match active mood filters (For You). */
-    moodCategoryIds?: string[];
   },
 ): Video[] {
   let list = publishedVideos(videos);
@@ -55,18 +53,6 @@ export function getFeed(
   ) {
     const hidden = new Set(opts.hiddenDramaIds);
     const filtered = list.filter((v) => !hidden.has(v.dramaId));
-    if (filtered.length > 0) list = filtered;
-  }
-
-  if (
-    opts?.moodCategoryIds &&
-    opts.moodCategoryIds.length > 0 &&
-    (section === "for-you" || section === "trending")
-  ) {
-    const moods = new Set(opts.moodCategoryIds);
-    const filtered = list.filter((v) =>
-      v.categoryIds.some((id) => moods.has(id)),
-    );
     if (filtered.length > 0) list = filtered;
   }
 

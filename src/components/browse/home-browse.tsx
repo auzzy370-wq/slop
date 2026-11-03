@@ -10,7 +10,6 @@ import {
   genreCount,
   genreCover,
 } from "@/components/browse/genre-tile";
-import { MoodFilters } from "@/components/feed/mood-filters";
 import { sortDramasByChart } from "@/lib/engagement";
 import { useSlopStore } from "@/store/slop-store";
 import { getContinueForDrama } from "@/lib/continue-watching";
@@ -154,27 +153,6 @@ export function HomeBrowse() {
       <div className="mx-auto max-w-[1400px] space-y-10 px-4 pt-6 sm:px-6 lg:space-y-14 lg:px-12 lg:pt-12">
         {/* Same Continue Watching rail on mobile + desktop */}
         <ContinueWatchingRow />
-
-        <section className="rounded-2xl border border-white/8 bg-white/[0.03] px-4 py-4 sm:px-5">
-          <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
-            <div>
-              <h2 className="font-display text-lg font-bold lg:text-xl">
-                For You moods
-              </h2>
-              <p className="mt-1 text-xs text-white/45 sm:text-sm">
-                Pick Romance, Thriller, or Dark — then open Watch.
-              </p>
-            </div>
-            <Link
-              href="/watch"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--slop-violet)] hover:brightness-110"
-            >
-              Open For You
-              <ArrowUpRight className="h-3.5 w-3.5" />
-            </Link>
-          </div>
-          <MoodFilters />
-        </section>
 
         <section>
           <div className="mb-3 flex items-end justify-between lg:mb-5">

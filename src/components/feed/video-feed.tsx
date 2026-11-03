@@ -10,15 +10,9 @@ import {
 import { hardStopFeedPlayback } from "@/lib/media-silence";
 import { getGuestActorId } from "@/lib/social/guest";
 import type { FeedSection } from "@/lib/types";
-import {
-  MOOD_OPTIONS,
-  readMoodFilters,
-  subscribeViewerPrefs,
-} from "@/lib/viewer-prefs";
 import { useSlopStore } from "@/store/slop-store";
 import { watchHref } from "@/lib/watch-url";
 import { AdSlot } from "./ad-slot";
-import { MoodFilters } from "./mood-filters";
 import { VideoCard } from "./video-card";
 
 type FeedItem =
@@ -51,12 +45,6 @@ export function VideoFeed({
   const searchParams = useSearchParams();
   const feedParam = (searchParams.get("feed") as FeedSection | null) ?? section;
   const partyRoom = searchParams.get("party");
-  const dramaLocked = Boolean(
-    searchParams.get("drama") || searchParams.get("dramaSlug"),
-  );
-  const showMoodChips =
-    !dramaLocked &&
-    (section === "for-you" || feedParam === "for-you" || !feedParam);
   const videos = useSlopStore((s) => s.videos);
   const categories = useSlopStore((s) => s.categories);
   const dramas = useSlopStore((s) => s.dramas);
@@ -139,24 +127,11 @@ export function VideoFeed({
   }, [saves, user]);
 
   const [hiddenDramaIds, setHiddenDramaIds] = useState<string[]>([]);
-  const [moodTick, setMoodTick] = useState(0);
   useEffect(() => {
     const syncHidden = () => setHiddenDramaIds(readHiddenDramaIds());
     syncHidden();
     return subscribeHiddenDramas(syncHidden);
   }, []);
-  useEffect(() => {
-    return subscribeViewerPrefs(() => setMoodTick((n) => n + 1));
-  }, []);
-
-  const moodCategoryIds = useMemo(() => {
-    void moodTick;
-    const moods = readMoodFilters();
-    if (moods.length === 0) return [];
-    return MOOD_OPTIONS.filter((m) => moods.includes(m.id)).flatMap(
-      (m) => m.categoryIds,
-    );
-  }, [moodTick]);
 
   const feedVideos = useMemo(() => {
     const effectiveSection =
@@ -167,7 +142,6 @@ export function VideoFeed({
       savedIds,
       hideUnplayableBlob: blobPlaybackBlocked,
       hiddenDramaIds,
-      moodCategoryIds,
     });
   }, [
     videos,
@@ -178,7 +152,6 @@ export function VideoFeed({
     savedIds,
     blobPlaybackBlocked,
     hiddenDramaIds,
-    moodCategoryIds,
   ]);
 
   const showAds =
@@ -742,14 +715,6 @@ export function VideoFeed({
       onPointerCancel={finishDrag}
       onWheel={onWheel}
     >
-      {showMoodChips ? (
-        <div className="pointer-events-none absolute inset-x-0 top-[max(3.6rem,calc(env(safe-area-inset-top,0px)+2.85rem))] z-40 flex justify-center px-3 lg:top-3">
-          <div className="pointer-events-auto max-w-full rounded-full border border-white/15 bg-black/55 px-2.5 py-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.45)] backdrop-blur-md">
-            <MoodFilters />
-          </div>
-        </div>
-      ) : null}
-
       {/* Live player — sibling of the transformed track so Chrome paints frames. */}
       <div
         className={`slop-feed-live-layer${peeking ? " is-peeking" : ""}`}

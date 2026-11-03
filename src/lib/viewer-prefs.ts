@@ -1,7 +1,6 @@
 /** Device-local viewer preferences (works for guests + signed-in). */
 
 const REACTIONS_KEY = "slop-reactions-enabled";
-const MOOD_KEY = "slop-for-you-moods";
 const REMINDER_KEY = "slop-daily-drop-reminder";
 const CHANGE = "slop:viewer-prefs";
 
@@ -25,50 +24,6 @@ export function setReactionsEnabled(on: boolean) {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(REACTIONS_KEY, on ? "1" : "0");
-    emit();
-  } catch {
-    /* ignore */
-  }
-}
-
-/** Mood ids: romance | thriller | dark */
-export type MoodId = "romance" | "thriller" | "dark";
-
-export const MOOD_OPTIONS: {
-  id: MoodId;
-  label: string;
-  /** Category ids that count as this mood */
-  categoryIds: string[];
-}[] = [
-  { id: "romance", label: "Romance", categoryIds: ["gen_romance"] },
-  { id: "thriller", label: "Thriller", categoryIds: ["gen_thriller"] },
-  {
-    id: "dark",
-    label: "Dark",
-    categoryIds: ["gen_suspense", "gen_revenge"],
-  },
-];
-
-export function readMoodFilters(): MoodId[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = localStorage.getItem(MOOD_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw) as unknown;
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter(
-      (m): m is MoodId =>
-        m === "romance" || m === "thriller" || m === "dark",
-    );
-  } catch {
-    return [];
-  }
-}
-
-export function setMoodFilters(moods: MoodId[]) {
-  if (typeof window === "undefined") return;
-  try {
-    localStorage.setItem(MOOD_KEY, JSON.stringify(moods));
     emit();
   } catch {
     /* ignore */
