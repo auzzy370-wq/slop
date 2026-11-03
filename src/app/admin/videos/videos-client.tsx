@@ -273,7 +273,7 @@ export default function VideosClient() {
         minute: "2-digit",
       });
       const confirmed = window.confirm(
-        `Schedule all ${eps.length} episode${eps.length === 1 ? "" : "s"} of “${drama.title}” to publish tonight (${label})? A cron job promotes due scheduled episodes every 15 minutes.`,
+        `Schedule all ${eps.length} episode${eps.length === 1 ? "" : "s"} of “${drama.title}” to publish tonight (${label})? A daily cron promotes due scheduled episodes shortly after midnight UTC.`,
       );
       if (!confirmed) return;
 

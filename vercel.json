@@ -9,7 +9,7 @@
     },
     {
       "path": "/api/cron/publish-scheduled",
-      "schedule": "*/15 * * * *"
+      "schedule": "5 0 * * *"
     }
   ]
 }
