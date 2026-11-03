@@ -83,6 +83,10 @@ import {
   updateWatchParty,
   watchPartyHref,
 } from "@/lib/watch-party";
+import {
+  fetchLiveReactions,
+  publishLiveReaction,
+} from "@/lib/social/live-reactions";
 
 const REACTION_EMOJIS = ["🔥", "😂", "😭"] as const;
 
@@ -149,6 +153,8 @@ export function VideoCard({
   const [floats, setFloats] = useState<
     { id: string; emoji: string; x: number; y: number }[]
   >([]);
+  /** Reaction ids already shown — avoids double-playing own + polled events. */
+  const seenReactionIdsRef = useRef<Set<string>>(new Set());
   const partyHostIdRef = useRef(newPartyHostId());
   const [partyHosting, setPartyHosting] = useState<{
     roomId: string;
@@ -311,22 +317,106 @@ export function VideoCard({
     return subscribeViewerPrefs(sync);
   }, []);
 
-  const spawnReaction = useCallback((emoji: string) => {
-    if (!readReactionsEnabled()) return;
-    const id = uid("rx");
-    const x = 18 + Math.random() * 64;
-    const y = 28 + Math.random() * 40;
-    setFloats((prev) => [...prev.slice(-12), { id, emoji, x, y }]);
-    window.setTimeout(() => {
-      setFloats((prev) => prev.filter((f) => f.id !== id));
-    }, 1600);
-    void track("share_clicked", {
-      userId: user?.id,
-      episodeId: video.id,
-      dramaId: video.dramaId,
-      properties: { method: "reaction", emoji },
-    });
-  }, [user?.id, video.dramaId, video.id]);
+  const playReactionFloat = useCallback(
+    (input: { id: string; emoji: string; x: number; y: number }) => {
+      if (!readReactionsEnabled()) return;
+      if (seenReactionIdsRef.current.has(input.id)) return;
+      seenReactionIdsRef.current.add(input.id);
+      // Cap the dedupe set so long sessions don't grow forever.
+      if (seenReactionIdsRef.current.size > 200) {
+        const keep = [...seenReactionIdsRef.current].slice(-120);
+        seenReactionIdsRef.current = new Set(keep);
+      }
+      setFloats((prev) => [...prev.slice(-12), input]);
+      window.setTimeout(() => {
+        setFloats((prev) => prev.filter((f) => f.id !== input.id));
+      }, 1600);
+    },
+    [],
+  );
+
+  const spawnReaction = useCallback(
+    (emoji: string) => {
+      if (!readReactionsEnabled()) return;
+      const id = uid("rx");
+      const x = 18 + Math.random() * 64;
+      const y = 28 + Math.random() * 40;
+      playReactionFloat({ id, emoji, x, y });
+      // Broadcast so every viewer on this episode sees the same float.
+      void publishLiveReaction({
+        id,
+        episodeId: video.id,
+        emoji,
+        x,
+        y,
+        actorId: actorId ?? user?.id ?? null,
+      });
+      void track("share_clicked", {
+        userId: user?.id,
+        episodeId: video.id,
+        dramaId: video.dramaId,
+        properties: { method: "reaction", emoji },
+      });
+    },
+    [actorId, playReactionFloat, user?.id, video.dramaId, video.id],
+  );
+
+  // Reset floats when the episode under this card changes.
+  useEffect(() => {
+    setFloats([]);
+    seenReactionIdsRef.current = new Set();
+  }, [video.id]);
+
+  // Pull other viewers' reactions while this episode is on screen.
+  useEffect(() => {
+    if (!active) return;
+    let cancelled = false;
+    let since = Date.now() - 2_000;
+    let inFlight = false;
+
+    const pull = async () => {
+      if (cancelled || inFlight || !readReactionsEnabled()) return;
+      inFlight = true;
+      try {
+        const remote = await fetchLiveReactions({
+          episodeId: video.id,
+          since,
+        });
+        if (cancelled || !remote.length) return;
+        let newest = since;
+        for (const r of remote) {
+          if (r.at > newest) newest = r.at;
+          playReactionFloat({
+            id: r.id,
+            emoji: r.emoji,
+            x: r.x,
+            y: r.y,
+          });
+        }
+        // Advance cursor just behind the newest event so we don't miss peers.
+        since = Math.max(since, newest - 250);
+      } finally {
+        inFlight = false;
+      }
+    };
+
+    void pull();
+    const timer = window.setInterval(() => {
+      void pull();
+    }, 1_100);
+    const onFocus = () => {
+      void pull();
+    };
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+    };
+  }, [active, playReactionFloat, video.id]);
 
   // Watch-together: guests follow the host; host posts progress.
   useEffect(() => {
