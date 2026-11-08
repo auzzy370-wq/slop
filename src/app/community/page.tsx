@@ -23,7 +23,8 @@ export default function CommunityGuidelinesPage() {
       <h2>Enforcement</h2>
       <p>
         Moderators may remove comments, disable commenting, suspend accounts, or
-        unpublish content. Appeals: moderation@slop.example.
+        unpublish content. Appeal from Account → request help, or email the
+        address listed in site settings when configured.
       </p>
     </LegalShell>
   );

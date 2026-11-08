@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     template: "%s · SLOP",
   },
   description:
-    "Discover original AI-powered short dramas across romance, thriller, revenge, fantasy, and more. Watch anywhere. Get hooked.",
+    "Short-form dramas across romance, thriller, revenge, fantasy, and more. Watch anywhere.",
   applicationName: "SLOP",
   manifest: "/manifest.webmanifest",
   icons: {
@@ -59,8 +59,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "SLOP — Stories That Keep You Watching",
-    description:
-      "Premium short-form dramas. Find your next obsession.",
+    description: "Short-form dramas. Watch the next episode.",
     type: "website",
     siteName: "SLOP",
   },
@@ -75,8 +74,8 @@ export const viewport: Viewport = {
   themeColor: "#111116",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
   viewportFit: "cover",
+  colorScheme: "dark",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -86,6 +85,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${display.variable} ${body.variable} h-full antialiased`}
     >
       <body className="min-h-full bg-[var(--slop-black)] text-white">
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:rounded-xl focus:bg-[var(--slop-violet)] focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-[var(--slop-black)]"
+        >
+          Skip to content
+        </a>
         <Suspense fallback={null}>
           <StoreHygiene />
           <UploadsHydrator />
@@ -95,7 +100,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
               <MediaKillOnLeave />
               <DailyDropReminder />
               <DesktopNav />
-              <main className="min-h-full flex-1">{children}</main>
+              <main id="main-content" className="min-h-full flex-1 scroll-mt-4">
+                {children}
+              </main>
               <BottomNav />
               <UploadProgressDock />
             </AnalyticsProvider>

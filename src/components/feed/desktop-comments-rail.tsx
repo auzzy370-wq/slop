@@ -290,7 +290,8 @@ export function DesktopCommentsRail({
               }
               disabled={!videoId || sending}
               maxLength={500}
-              className="h-9 min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/35 disabled:opacity-50"
+              aria-label={replyTo ? "Reply to comment" : "Add a comment"}
+              className="h-9 min-w-0 flex-1 bg-transparent text-[13px] text-white outline-none placeholder:text-white/35 focus-visible:ring-2 focus-visible:ring-[var(--slop-violet)]/50 disabled:opacity-50"
             />
             <button
               type="button"

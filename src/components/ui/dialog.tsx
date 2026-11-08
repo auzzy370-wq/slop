@@ -52,7 +52,7 @@ export function Dialog({
         aria-modal="true"
         aria-label={title}
         className={cn(
-          "relative z-10 w-full max-w-lg border border-white/10 bg-[var(--slop-panel)] p-5 shadow-2xl",
+          "relative z-10 w-full max-w-lg overscroll-contain border border-white/10 bg-[var(--slop-panel)] p-5 shadow-2xl",
           bottomSheet
             ? "rounded-t-3xl sm:max-w-md"
             : "rounded-t-3xl sm:rounded-3xl",

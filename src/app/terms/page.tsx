@@ -29,7 +29,10 @@ export default function TermsPage() {
         <li>No impersonation or deceptive misuse of the platform.</li>
       </ul>
       <h2>Contact</h2>
-      <p>support@slop.example</p>
+      <p>
+        Questions about these terms: contact support from your Account page, or
+        use the address configured for this deployment.
+      </p>
     </LegalShell>
   );
 }

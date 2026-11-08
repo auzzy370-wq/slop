@@ -27,7 +27,12 @@ export function HomeBrowse() {
 
   if (!hydrated) {
     return (
-      <div className="flex min-h-[100dvh] items-center justify-center slop-cinematic">
+      <div
+        className="flex min-h-[100dvh] items-center justify-center slop-cinematic"
+        role="status"
+        aria-live="polite"
+      >
+        <span className="sr-only">Loading…</span>
         <div className="h-10 w-10 animate-spin rounded-full border-2 border-white/15 border-t-[var(--slop-violet)]" />
       </div>
     );
@@ -91,21 +96,25 @@ export function HomeBrowse() {
           <img
             src={featured.bannerUrl}
             alt=""
+            width={1920}
+            height={1080}
             className="absolute inset-0 h-full w-full object-cover animate-fade"
           />
           <div className="slop-hero-mask absolute inset-0" />
           <div className="relative z-10 mx-auto flex h-full min-h-[72vw] w-full max-w-[1400px] flex-col justify-end px-4 pb-10 pt-24 sm:min-h-[420px] sm:px-8 lg:min-h-[min(72vh,640px)] lg:justify-center lg:px-12 lg:pb-16 lg:pt-20">
             <div className="max-w-2xl">
+              <p className="mb-3 font-display text-4xl font-bold tracking-tight text-[var(--slop-lavender)] sm:text-5xl lg:text-6xl">
+                SLOP
+              </p>
               <p className="mb-2 text-xs font-bold uppercase tracking-[0.22em] text-[var(--slop-violet)]">
                 {settings.tagline}
               </p>
-              <h1 className="font-display text-4xl font-bold leading-[1.05] tracking-tight text-white sm:text-5xl lg:text-6xl xl:text-7xl">
-                Find Your Next Obsession.
+              <h1 className="font-display text-2xl font-bold leading-snug tracking-tight text-white text-pretty sm:text-3xl lg:text-4xl">
+                {featured.title}
               </h1>
-              <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75 sm:text-base lg:text-lg">
-                Discover original AI-powered dramas across romance, thriller,
-                revenge, fantasy, and more. Watch anywhere. Discover something
-                new. Get hooked.
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-white/75 text-pretty sm:text-base lg:text-lg">
+                Short-form dramas across romance, thriller, revenge, and fantasy.
+                Pick an episode and keep watching.
               </p>
               <div className="mt-6 flex flex-wrap items-center gap-3">
                 <Link
@@ -266,6 +275,8 @@ function RankRow({ drama, rank }: { drama: Drama; rank: number }) {
           <img
             src={drama.posterUrl}
             alt=""
+            width={88}
+            height={128}
             className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
         </div>

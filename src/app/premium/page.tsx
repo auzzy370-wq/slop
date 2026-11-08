@@ -9,11 +9,10 @@ import { track } from "@/lib/analytics/client";
 import { toast } from "sonner";
 
 const BENEFITS = [
-  "No advertisements between episodes",
-  "Unlimited watching with the same platform protections",
-  "Premium badge on your account",
-  "Priority access to new features when they ship",
-  "Manage or cancel anytime through billing",
+  "No ads between episodes",
+  "Premium badge on your profile",
+  "Early access to new player features",
+  "Cancel anytime in Account billing",
 ];
 
 export default function PremiumPage() {

@@ -25,6 +25,10 @@
   box-sizing: border-box;
 }
 
+html {
+  color-scheme: dark;
+}
+
 html,
 body {
   height: 100%;
@@ -36,7 +40,25 @@ body {
   background: var(--slop-black);
   color: var(--foreground);
   font-family: var(--font-body), ui-sans-serif, system-ui, sans-serif;
-  overscroll-behavior: none;
+}
+
+/* Fine pointers (mouse/trackpad): suppress page rubber-banding.
+   Keep coarse-pointer defaults so pull-to-refresh still works. */
+@media (pointer: fine) {
+  body {
+    overscroll-behavior: none;
+  }
+}
+
+.slop-grid-bg {
+  background-color: var(--slop-black);
+  background-image:
+    radial-gradient(ellipse 90% 55% at 50% -15%, rgba(185, 154, 255, 0.14), transparent 55%),
+    linear-gradient(180deg, #111116 0%, #0c0c10 100%),
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: auto, auto, 48px 48px, 48px 48px;
+  background-position: center, center, 0 0, 0 0;
 }
 
 a {
@@ -904,4 +926,37 @@ main:has(.slop-watch-shell) {
   min-height: 2.25rem;
   padding-inline: 0.85rem;
   font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in-up,
+  .animate-fade,
+  .slop-reaction-float,
+  .slop-comment-row,
+  .slop-player-meta,
+  .slop-player-grain,
+  .slop-live-pip,
+  .slop-loader,
+  .slop-transport,
+  .slop-pause-ring::before,
+  .slop-rail-orb.is-active {
+    animation: none !important;
+  }
+
+  .slop-caption,
+  .slop-action-rail,
+  .slop-player-bottom,
+  .slop-player-top,
+  .slop-comments-scrim,
+  .slop-comments-sheet,
+  .slop-rail-orb,
+  .slop-transport-btn,
+  .slop-scrub-track,
+  .slop-scrub-thumb {
+    transition: none !important;
+  }
+
+  .animate-spin {
+    animation: none !important;
+  }
 }

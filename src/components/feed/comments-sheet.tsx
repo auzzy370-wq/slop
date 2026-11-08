@@ -206,7 +206,7 @@ export function CommentsSheet({
         aria-modal="true"
         aria-label={countLabel}
         data-no-swipe
-        className={`slop-comments-sheet relative z-10 flex max-h-[68%] min-h-[48%] w-full flex-col ${
+        className={`slop-comments-sheet relative z-10 flex max-h-[68%] min-h-[48%] w-full flex-col overscroll-contain ${
           entered ? "is-open" : ""
         }`}
         style={{
@@ -374,7 +374,8 @@ export function CommentsSheet({
                         : "Comments are turned off"
                   }
                   maxLength={500}
-                  className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-white/35"
+                  aria-label={replyTo ? "Reply to comment" : "Add a comment"}
+                  className="h-9 min-w-0 flex-1 bg-transparent text-[14px] text-white outline-none placeholder:text-white/35 focus-visible:ring-2 focus-visible:ring-[var(--slop-violet)]/50"
                 />
                 <button
                   type="button"
