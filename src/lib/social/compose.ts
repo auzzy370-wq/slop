@@ -33,7 +33,7 @@ export function composeCaption(payload: SocialAutoPostPayload) {
   if (blurb) lines.push(blurb);
   lines.push("");
   lines.push(`Watch free → ${watch}`);
-  lines.push("#SLOP #AIDrama #ShortDrama");
+  lines.push("#SLOP #ShortDrama");
   return lines.join("\n");
 }
 

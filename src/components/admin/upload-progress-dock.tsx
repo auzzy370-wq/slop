@@ -96,7 +96,7 @@ export function UploadProgressDock() {
 
         <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-full rounded-full bg-[var(--slop-violet)] transition-all"
+            className="h-full rounded-full bg-[var(--slop-violet)] transition-[width] duration-200"
             style={{ width: `${Math.min(100, pct)}%` }}
           />
         </div>

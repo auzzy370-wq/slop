@@ -46,9 +46,8 @@ function ExploreInner() {
         <h1 className="mb-2 font-display text-4xl font-bold tracking-tight lg:text-5xl">
           Genres & trending dramas
         </h1>
-        <p className="mb-8 max-w-xl text-[var(--slop-slate)] lg:mb-10 lg:text-base">
-          Browse romance, thriller, revenge, fantasy, and more — then dive into
-          the next episode.
+        <p className="mb-8 max-w-xl text-[var(--slop-slate)] text-pretty lg:mb-10 lg:text-base">
+          Browse by genre, then open the next episode.
         </p>
 
         <section className="mb-10 lg:mb-14">

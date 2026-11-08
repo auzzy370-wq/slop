@@ -34,6 +34,8 @@ export function DramaCard({
         <img
           src={drama.posterUrl}
           alt={drama.title}
+          width={320}
+          height={480}
           className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
         />
         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 to-transparent p-2.5 pt-8">

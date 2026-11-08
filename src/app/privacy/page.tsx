@@ -30,7 +30,10 @@ export default function PrivacyPage() {
         deletion from your account page.
       </p>
       <h2>Contact</h2>
-      <p>privacy@slop.example</p>
+      <p>
+        Contact privacy requests from your Account page, or use the support
+        address configured for this deployment.
+      </p>
     </LegalShell>
   );
 }

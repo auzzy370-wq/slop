@@ -115,10 +115,17 @@ export default function AccountPage() {
             Profile
           </h2>
           <div className="flex gap-2">
+            <label htmlFor="account-display-name" className="sr-only">
+              Display name
+            </label>
             <Input
+              id="account-display-name"
+              name="displayName"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Display name"
+              placeholder="Display name…"
+              autoComplete="nickname"
+              spellCheck={false}
             />
             <Button
               onClick={() => {

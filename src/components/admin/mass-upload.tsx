@@ -762,7 +762,7 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
                   {row.status === "uploading" && (
                     <div className="mt-1 h-1 overflow-hidden rounded-full bg-white/10">
                       <div
-                        className="h-full bg-[var(--slop-violet)] transition-all"
+                        className="h-full bg-[var(--slop-violet)] transition-[width] duration-200"
                         style={{ width: `${row.progress}%` }}
                       />
                     </div>
