@@ -75,18 +75,6 @@ export default function SignInPage() {
           >
             Continue as demo viewer
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full"
-            onClick={() => {
-              signInDemo(true);
-              toast.success("Signed in as admin");
-              router.push("/admin");
-            }}
-          >
-            Continue as demo admin
-          </Button>
         </div>
 
         <p className="mt-6 text-center text-sm text-[var(--slop-slate)]">
