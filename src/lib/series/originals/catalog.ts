@@ -1,3 +1,4 @@
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import type { Video } from "@/lib/types";
 import {
   ORIGINAL_SERIES as BATCH1_SERIES,
@@ -233,10 +234,14 @@ function videosForSeries(s: OriginalSeriesDef): Omit<
         script.hook === script.cliffhanger
           ? script.hook
           : `${script.hook} ${script.cliffhanger}`,
-      videoUrl: rendered ? `/videos/${s.id}-ep${n}.mp4` : "",
-      thumbnailUrl: rendered
-        ? `/thumbnails/${s.id}-ep${n}.jpg`
-        : `/posters/${s.id}.jpg`,
+      videoUrl: rendered
+        ? resolvePublicMediaUrl(`/videos/${s.id}-ep${n}.mp4`)
+        : "",
+      thumbnailUrl: resolvePublicMediaUrl(
+        rendered
+          ? `/thumbnails/${s.id}-ep${n}.jpg`
+          : `/posters/${s.id}.jpg`,
+      ),
       durationSeconds: rendered ? renderedSec : scriptDurationSec(script),
       categoryIds: s.genreIds,
       tags: [...s.tags, "generated video", `episode ${n}`],

@@ -1,3 +1,4 @@
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import type { Drama, Video } from "@/lib/types";
 
 export const UPLOADS_BLOB_PATH = "slop/catalog/uploads.json";
@@ -27,6 +28,23 @@ export function emptyUploadsCatalog(): UploadsCatalog {
   };
 }
 
+function withPublicMedia(videos: Video[], dramas: Drama[]) {
+  return {
+    videos: videos.map((video) => ({
+      ...video,
+      videoUrl: resolvePublicMediaUrl(video.videoUrl),
+      thumbnailUrl: resolvePublicMediaUrl(video.thumbnailUrl),
+    })),
+    dramas: dramas.map((drama) => ({
+      ...drama,
+      posterUrl: resolvePublicMediaUrl(drama.posterUrl),
+      bannerUrl: drama.bannerUrl
+        ? resolvePublicMediaUrl(drama.bannerUrl)
+        : drama.bannerUrl,
+    })),
+  };
+}
+
 /** Merge seed catalog with admin-uploaded dramas/episodes. Uploads win on conflicts. */
 export function mergeSeedWithUploads(
   seedVideos: Video[],
@@ -38,16 +56,16 @@ export function mergeSeedWithUploads(
 
   if (!uploads || (uploads.videos.length === 0 && uploads.dramas.length === 0)) {
     if (deletedKeys.size === 0 && deletedIds.size === 0) {
-      return { videos: seedVideos, dramas: seedDramas };
+      return withPublicMedia(seedVideos, seedDramas);
     }
-    return {
-      videos: seedVideos.filter(
+    return withPublicMedia(
+      seedVideos.filter(
         (v) =>
           !deletedIds.has(v.id) &&
           !deletedKeys.has(episodeKey(v.dramaId, v.episodeNumber)),
       ),
-      dramas: seedDramas,
-    };
+      seedDramas,
+    );
   }
 
   const uploadEpKeys = new Set(
@@ -83,7 +101,7 @@ export function mergeSeedWithUploads(
     }
   }
 
-  return { videos, dramas: [...dramaMap.values()] };
+  return withPublicMedia(videos, [...dramaMap.values()]);
 }
 
 export function upsertUploadsCatalog(

@@ -1,0 +1,6 @@
+# Even if a local checkout still has the seed library, do not upload it.
+# Playback comes from R2 (R2_PUBLIC_BASE_URL). See scripts/upload-public-media-to-r2.mjs.
+public/videos/**
+public/thumbnails/**
+public/posters/**
+public/banners/**

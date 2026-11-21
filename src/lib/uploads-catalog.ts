@@ -14,6 +14,7 @@ import {
   r2GetObjectText,
   r2PutObject,
 } from "@/lib/r2";
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import { slugify, uid } from "@/lib/utils";
 
 const UPLOADS_R2_KEY = UPLOADS_BLOB_PATH;
@@ -256,7 +257,9 @@ export async function rebuildUploadsCatalogFromBlobs(): Promise<{
       title: `Episode ${hit.episodeNumber}`,
       description: `${title} · Episode ${hit.episodeNumber}`,
       videoUrl: hit.url,
-      thumbnailUrl: drama?.posterUrl || "/thumbnails/unsent-ep1.jpg",
+      thumbnailUrl: resolvePublicMediaUrl(
+        drama?.posterUrl || "/thumbnails/unsent-ep1.jpg",
+      ),
       durationSeconds: 15,
       aspectRatio: "9:16",
       categoryIds: drama?.genreIds ?? [],

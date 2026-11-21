@@ -1,3 +1,4 @@
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import type { SocialAutoPostPayload } from "./types";
 
 export function siteBaseUrl() {
@@ -18,8 +19,9 @@ export function dramaUrlFor(payload: SocialAutoPostPayload) {
 
 export function absoluteAssetUrl(maybeRelative?: string | null) {
   if (!maybeRelative) return null;
-  if (/^https?:\/\//i.test(maybeRelative)) return maybeRelative;
-  return `${siteBaseUrl()}${maybeRelative.startsWith("/") ? "" : "/"}${maybeRelative}`;
+  const resolved = resolvePublicMediaUrl(maybeRelative);
+  if (/^https?:\/\//i.test(resolved)) return resolved;
+  return `${siteBaseUrl()}${resolved.startsWith("/") ? "" : "/"}${resolved}`;
 }
 
 /** Short caption for X / Telegram / Discord embeds. */

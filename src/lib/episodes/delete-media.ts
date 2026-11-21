@@ -1,5 +1,6 @@
 import { unlink } from "fs/promises";
 import path from "path";
+import { isSeedLibraryMediaUrl } from "@/lib/media-url";
 
 export type DeleteMediaResult = {
   deletedUrls: string[];
@@ -30,7 +31,8 @@ function isLocalUploadUrl(url: string) {
  * - delete every Blob object under slop/{dramaId}/ep-{NN}* (re-uploads)
  * - delete local public/uploads/{dramaId}/ep-{NN}.mp4 when present
  *
- * Seed/demo files under /videos/ are left alone (repo assets).
+ * Seed library objects under videos/, thumbnails/, posters/, and banners/
+ * stay in place (shared R2 or local public files, not per-upload copies).
  */
 export async function deleteEpisodeMedia(input: {
   videoUrl?: string | null;
@@ -69,7 +71,7 @@ export async function deleteEpisodeMedia(input: {
   };
 
   const tryDelR2Url = async (url: string) => {
-    if (!url || seen.has(url)) return;
+    if (!url || seen.has(url) || isSeedLibraryMediaUrl(url)) return;
     try {
       const { isR2PublicUrl, r2DeleteByUrl } = await import("@/lib/r2");
       if (!isR2PublicUrl(url)) return;

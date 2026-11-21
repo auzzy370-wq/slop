@@ -13,6 +13,7 @@ import {
 import { useSlopStore } from "@/store/slop-store";
 import type { PublicationStatus, Video } from "@/lib/types";
 import { triggerEpisodeAutoPost } from "@/lib/social/client";
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import { formatBytes, slugify, uid } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -731,7 +732,9 @@ export default function VideosClient() {
       title: form.title.trim(),
       description: form.description.trim(),
       videoUrl: form.videoUrl.trim(),
-      thumbnailUrl: form.thumbnailUrl.trim() || "/thumbnails/unsent-ep1.jpg",
+      thumbnailUrl: resolvePublicMediaUrl(
+        form.thumbnailUrl.trim() || "/thumbnails/unsent-ep1.jpg",
+      ),
       durationSeconds: existing?.durationSeconds ?? 15,
       aspectRatio: "9:16",
       categoryIds:

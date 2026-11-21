@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getBlobHealth } from "@/lib/admin/blob-health";
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import { isR2Configured } from "@/lib/r2";
 import { isSupabaseStorageConfigured } from "@/lib/supabase/storage";
 import { loadUploadsCatalog } from "@/lib/uploads-catalog";
@@ -36,6 +37,18 @@ export async function GET() {
     return NextResponse.json(
       {
         ...catalog,
+        videos: catalog.videos.map((video) => ({
+          ...video,
+          videoUrl: resolvePublicMediaUrl(video.videoUrl),
+          thumbnailUrl: resolvePublicMediaUrl(video.thumbnailUrl),
+        })),
+        dramas: catalog.dramas.map((drama) => ({
+          ...drama,
+          posterUrl: resolvePublicMediaUrl(drama.posterUrl),
+          bannerUrl: drama.bannerUrl
+            ? resolvePublicMediaUrl(drama.bannerUrl)
+            : drama.bannerUrl,
+        })),
         storage: {
           blobConfigured: blobHealth.configured,
           blobSuspended,

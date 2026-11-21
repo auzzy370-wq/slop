@@ -27,6 +27,7 @@ import {
   type UploadBatch,
 } from "@/lib/admin-upload-queue";
 import type { Drama, PublicationStatus } from "@/lib/types";
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import { slugify, uid } from "@/lib/utils";
 import { useSlopStore } from "@/store/slop-store";
 import { toast } from "sonner";
@@ -319,7 +320,9 @@ export function MassUpload({ dramas }: { dramas: Drama[] }) {
         : activeCats[0]
           ? [activeCats[0].id]
           : [];
-    const poster = newPosterUrl.trim() || "/posters/blood-contract.jpg";
+    const poster = resolvePublicMediaUrl(
+      newPosterUrl.trim() || "/posters/blood-contract.jpg",
+    );
 
     const drama: Drama = {
       id: uid("drama"),

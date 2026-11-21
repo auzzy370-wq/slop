@@ -1,4 +1,5 @@
 import type { EpisodeScript, ScriptBeat } from "@/lib/series/forgotten-wife/types";
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import type { Drama } from "@/lib/types";
 
 const a = (speaker: string, text: string, ms = 2400): ScriptBeat => ({
@@ -550,8 +551,8 @@ export function dramaFromOriginal(s: OriginalSeriesDef): Drama {
     slug: s.slug,
     title: s.title,
     synopsis: s.synopsis,
-    posterUrl: `/posters/${s.id}.jpg`,
-    bannerUrl: `/banners/${s.id}.jpg`,
+    posterUrl: resolvePublicMediaUrl(`/posters/${s.id}.jpg`),
+    bannerUrl: resolvePublicMediaUrl(`/banners/${s.id}.jpg`),
     genreIds: s.genreIds,
     tags: s.tags,
     status: "published",
