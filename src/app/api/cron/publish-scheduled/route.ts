@@ -6,6 +6,7 @@ import {
   r2GetObjectText,
   r2PutObject,
 } from "@/lib/r2";
+import { isHostedRuntime } from "@/lib/runtime";
 
 const CATALOG_KEY = "slop/catalog/uploads.json";
 
@@ -27,10 +28,16 @@ type Catalog = {
 };
 
 function authorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return process.env.NODE_ENV !== "production";
-  const header = req.headers.get("authorization");
-  return header === `Bearer ${secret}`;
+  const secret = process.env.CRON_SECRET?.trim();
+  const header = req.headers.get("authorization") || "";
+  if (secret && header === `Bearer ${secret}`) return true;
+
+  const adminKey = process.env.SLOP_ADMIN_KEY?.trim();
+  const headerKey = req.headers.get("x-slop-admin-key")?.trim();
+  if (adminKey && headerKey && headerKey === adminKey) return true;
+
+  if (!secret && !adminKey && !isHostedRuntime()) return true;
+  return false;
 }
 
 async function readCatalog(): Promise<Catalog> {

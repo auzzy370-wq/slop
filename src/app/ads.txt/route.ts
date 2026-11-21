@@ -1,7 +1,5 @@
 import { getAdsPublicConfig } from "@/lib/ads/config";
 
-export const instant = false;
-
 /**
  * AdSense (and other authorized sellers) read /ads.txt from the site root.
  * When a publisher id is configured we emit the standard Google line.

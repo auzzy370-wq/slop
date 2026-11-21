@@ -2,22 +2,26 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 import { NextResponse } from "next/server";
 import { requireAdminKey } from "@/lib/admin-guard";
+import { isHostedRuntime } from "@/lib/runtime";
 
 /**
  * Local / self-hosted mass upload.
  * Writes MP4s under public/uploads/{dramaId}/ep-{n}.mp4
- * On Vercel without Blob, prefer /api/admin/videos/blob instead.
+ * On a hosted runtime the project directory is read-only. Use R2.
  */
 export async function POST(request: Request) {
   const denied = requireAdminKey(request);
   if (denied) return denied;
 
-  if (process.env.VERCEL === "1" && !process.env.ALLOW_LOCAL_UPLOAD_ON_VERCEL) {
+  const allowDisk =
+    process.env.ALLOW_LOCAL_DISK_UPLOAD === "1" ||
+    process.env.ALLOW_LOCAL_UPLOAD_ON_VERCEL === "1";
+  if (isHostedRuntime() && !allowDisk) {
     return NextResponse.json(
       {
-        error: "use_blob",
+        error: "use_r2",
         message:
-          "On Vercel, set BLOB_READ_WRITE_TOKEN and use Blob uploads for mass MP4 import.",
+          "This host cannot store uploads on disk. Configure R2 (or Blob/Supabase) and upload there.",
       },
       { status: 400 },
     );

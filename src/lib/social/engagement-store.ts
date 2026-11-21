@@ -6,6 +6,7 @@ import {
   r2GetObjectText,
   r2PutObject,
 } from "@/lib/r2";
+import { isHostedRuntime } from "@/lib/runtime";
 
 export const SOCIAL_BLOB_PATH = "slop/social/engagement.json";
 /** Same key on R2 — Blob public reads are blocked on the suspended store. */
@@ -18,14 +19,8 @@ export type SocialEngagementStore = {
   updatedAt: string;
 };
 
-function isServerless() {
-  return Boolean(
-    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
-  );
-}
-
 function localPath() {
-  if (isServerless()) {
+  if (isHostedRuntime()) {
     return path.join("/tmp", "slop-data", "social-engagement.json");
   }
   return path.join(process.cwd(), "data", "social-engagement.json");

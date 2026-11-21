@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminKey } from "@/lib/admin-guard";
 import { isR2Configured } from "@/lib/r2";
 import { isSupabaseStorageConfigured } from "@/lib/supabase/storage";
+import { isHostedRuntime } from "@/lib/runtime";
 import { getFreeStoragePool } from "@/lib/storage/free-pool";
 
 /** Quick probe so the admin UI can tell free-tier pool + admin-key status. */
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
             : "none",
         order: [] as string[],
         adminKeyRequired:
-          Boolean(process.env.SLOP_ADMIN_KEY) || process.env.VERCEL === "1",
+          Boolean(process.env.SLOP_ADMIN_KEY) || isHostedRuntime(),
         error: "unauthorized",
         message:
           "Admin key missing or wrong. Paste SLOP_ADMIN_KEY into the Mass upload key field.",
@@ -76,7 +77,7 @@ export async function GET(request: Request) {
           ? supabase.bytes
           : blob.bytes,
     adminKeyRequired:
-      Boolean(process.env.SLOP_ADMIN_KEY) || process.env.VERCEL === "1",
+      Boolean(process.env.SLOP_ADMIN_KEY) || isHostedRuntime(),
     message: pool.message,
   });
 }

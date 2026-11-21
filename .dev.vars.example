@@ -1,0 +1,15 @@
+# Copy to .dev.vars for `npm run preview`. Do not commit .dev.vars.
+# Production uses the same names via `npx wrangler secret put <NAME>`.
+# Names and which ones are build-time vs runtime: docs/DEPLOY.md
+
+NEXTJS_ENV=development
+
+# R2_ACCOUNT_ID=
+# R2_ACCESS_KEY_ID=
+# R2_SECRET_ACCESS_KEY=
+# R2_BUCKET_NAME=
+# R2_PUBLIC_BASE_URL=
+# CRON_SECRET=
+# SLOP_ADMIN_KEY=
+# BLOB_READ_WRITE_TOKEN=
+# NEXT_PUBLIC_SITE_URL=

@@ -1,8 +1,6 @@
 import { Suspense } from "react";
 import { CategoryFeed } from "./category-feed";
 
-export const instant = false;
-
 export default async function CategoryPage({
   params,
 }: PageProps<"/categories/[slug]">) {

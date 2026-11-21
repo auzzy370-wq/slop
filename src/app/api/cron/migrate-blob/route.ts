@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { runAutoMigrate } from "@/lib/admin/auto-migrate";
+import { isHostedRuntime } from "@/lib/runtime";
 
 function formatBytes(n: number) {
   if (n < 1024) return `${n} B`;
@@ -18,12 +19,12 @@ function authorized(request: Request) {
   const headerKey = request.headers.get("x-slop-admin-key")?.trim();
   if (adminKey && headerKey && headerKey === adminKey) return true;
 
-  // Local / preview without secrets: only when neither is configured.
-  if (!cronSecret && !adminKey && process.env.VERCEL !== "1") return true;
+  // Local dev without secrets. Public hosts must set CRON_SECRET or SLOP_ADMIN_KEY.
+  if (!cronSecret && !adminKey && !isHostedRuntime()) return true;
   return false;
 }
 
-/** Vercel Cron + manual kick: auto-copy Blob episodes → R2 when both are ready. */
+/** Cron + manual kick: auto-copy Blob episodes → R2 when both are ready. */
 export async function GET(request: Request) {
   if (!authorized(request)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

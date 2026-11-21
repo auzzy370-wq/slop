@@ -16,8 +16,6 @@ import { MediaKillOnLeave } from "@/components/media-kill-on-leave";
 import { DailyDropReminder } from "@/components/feed/daily-drop-reminder";
 import "./globals.css";
 
-export const instant = false;
-
 const display = Space_Grotesk({
   variable: "--font-display",
   subsets: ["latin"],
