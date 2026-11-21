@@ -27,6 +27,22 @@ vercel deploy --prod --yes
 - `SLOP_ADMIN_KEY` — long random secret (unlocks admin write APIs)
 - Supabase / Stripe / PostHog / GA / social webhooks — only if you use them
 
+## One-time: move seed media to R2
+
+Vercel must not serve `public/videos`, `public/thumbnails`, `public/posters`, or `public/banners`. Those paths redirect to `R2_PUBLIC_BASE_URL` when that variable is set at **build** time. Run this before merging or deploying, from a checkout that can still see the files (or restore them from `origin/main`):
+
+```bash
+mkdir -p /tmp/slop-media
+git archive origin/main public/videos public/thumbnails public/posters public/banners | tar -x -C /tmp/slop-media
+# R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME, R2_PUBLIC_BASE_URL
+# in the shell or .env.local — never commit them
+node scripts/upload-public-media-to-r2.mjs --root /tmp/slop-media/public
+```
+
+Confirm one object in a browser, for example `{R2_PUBLIC_BASE_URL}/videos/blood-contract-ep1.mp4`. The bucket (or custom domain behind `R2_PUBLIC_BASE_URL`) has to be publicly readable. `R2_PUBLIC_BASE_URL` must be available to Production and Preview **builds**, not only runtime — the catalog and the redirects inline it.
+
+Admin uploads already go to R2 when it is configured. The daily `/api/cron/migrate-blob` cron keeps copying any older Vercel Blob episodes across.
+
 ## Production checklist
 
 - [x] `npm run build` succeeds

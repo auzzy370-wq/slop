@@ -26,7 +26,7 @@ Drama: Password Wife, Custody Weekend, Sister's Scar, Empty Chair Dinner, Voicem
 
 Definitions: `src/lib/series/originals/{definitions,batch2,catalog}.ts`.
 
-Playback files live under `/public/videos/{series}-ep{n}.mp4`.
+Playback files are `{R2_PUBLIC_BASE_URL}/videos/{series}-ep{n}.mp4`, with posters, thumbnails, and banners on the same host. When `R2_PUBLIC_BASE_URL` is unset, the app falls back to `public/videos`, `public/thumbnails`, `public/posters`, and `public/banners` on disk. Those binaries are not deployed (they are gitignored). Upload them once with `node scripts/upload-public-media-to-r2.mjs` before a production deploy.
 
 ```bash
 npx tsx scripts/export-original-scripts.ts

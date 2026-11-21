@@ -10,6 +10,7 @@ import {
   type RankedUploadFile,
 } from "@/lib/episodes/filename";
 import type { Drama, PublicationStatus, Video } from "@/lib/types";
+import { resolvePublicMediaUrl } from "@/lib/media-url";
 import { slugify, uid } from "@/lib/utils";
 import { useSlopStore } from "@/store/slop-store";
 
@@ -599,10 +600,11 @@ async function processQueue() {
           existing?.description ||
           `${drama.title} · Episode ${job.episodeNumber}`,
         videoUrl: url,
-        thumbnailUrl:
+        thumbnailUrl: resolvePublicMediaUrl(
           existing?.thumbnailUrl ||
-          drama.posterUrl ||
-          "/thumbnails/unsent-ep1.jpg",
+            drama.posterUrl ||
+            "/thumbnails/unsent-ep1.jpg",
+        ),
         durationSeconds,
         aspectRatio: "9:16",
         categoryIds: existing?.categoryIds?.length

@@ -49,5 +49,17 @@ next-env.d.ts
 /public/uploads/**
 !/public/uploads/.gitkeep
 
+# Seed video/poster library is served from Cloudflare R2, not Vercel.
+# Keep a local copy for dev when R2_PUBLIC_BASE_URL is unset.
+# Upload once with: node scripts/upload-public-media-to-r2.mjs
+/public/videos/**
+!/public/videos/.gitkeep
+/public/thumbnails/**
+!/public/thumbnails/.gitkeep
+/public/posters/**
+!/public/posters/.gitkeep
+/public/banners/**
+!/public/banners/.gitkeep
+
 # netlify local build output
 .netlify/

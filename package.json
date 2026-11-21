@@ -6,7 +6,8 @@
     "dev": "next dev --port 3456",
     "build": "next build",
     "start": "next start --port 3456",
-    "lint": "eslint"
+    "lint": "eslint",
+    "upload:r2": "node scripts/upload-public-media-to-r2.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1161.0",
