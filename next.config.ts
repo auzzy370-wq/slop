@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { initOpenNextCloudflareForDev } from "@opennextjs/cloudflare";
 
 /**
  * Public CDN base only — never the secret keys. Inlined so the client catalog
@@ -30,8 +31,10 @@ function r2RemotePattern(): Array<{
 const SEED_MEDIA_DIRS = ["videos", "thumbnails", "posters", "banners"] as const;
 
 const nextConfig: NextConfig = {
-  cacheComponents: true,
-  partialPrefetching: true,
+  // Cache Components hang or 500 on Cloudflare Workers (OpenNext tracks this
+  // in opennextjs-cloudflare#1318). Keep the standard Next renderer.
+  cacheComponents: false,
+  partialPrefetching: false,
   env: {
     NEXT_PUBLIC_R2_PUBLIC_BASE_URL: r2PublicBaseUrl,
   },
@@ -109,3 +112,5 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+initOpenNextCloudflareForDev();

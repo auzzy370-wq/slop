@@ -1,0 +1,23 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "slop",
+  "main": "cloudflare/worker.mjs",
+  "compatibility_date": "2026-11-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "slop"
+    }
+  ],
+  "vars": {
+    "CLOUDFLARE_WORKER": "1"
+  },
+  "triggers": {
+    "crons": ["0 11 * * *", "5 0 * * *"]
+  }
+}

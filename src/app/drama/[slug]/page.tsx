@@ -1,8 +1,6 @@
 import { Suspense } from "react";
 import { DramaDetail } from "./drama-detail";
 
-export const instant = false;
-
 export default async function DramaPage({
   params,
 }: PageProps<"/drama/[slug]">) {

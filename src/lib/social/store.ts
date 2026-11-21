@@ -1,9 +1,10 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { isHostedRuntime } from "@/lib/runtime";
 import type { SocialStoreData } from "./types";
 
 function resolveDataDir() {
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (isHostedRuntime()) {
     return path.join("/tmp", "slop-data");
   }
   return path.join(process.cwd(), "data");

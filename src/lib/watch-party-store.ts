@@ -5,6 +5,7 @@ import {
   r2GetObjectText,
   r2PutObject,
 } from "@/lib/r2";
+import { isHostedRuntime } from "@/lib/runtime";
 import type { WatchPartyState } from "@/lib/watch-party";
 
 const R2_KEY = "slop/social/watch-parties.json";
@@ -22,7 +23,7 @@ function empty(): PartyStore {
 }
 
 function localPath() {
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (isHostedRuntime()) {
     return path.join("/tmp", "slop-data", "watch-parties.json");
   }
   return path.join(process.cwd(), "data", "watch-parties.json");

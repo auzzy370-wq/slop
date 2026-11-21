@@ -5,6 +5,7 @@ import {
   r2GetObjectText,
   r2PutObject,
 } from "@/lib/r2";
+import { isHostedRuntime } from "@/lib/runtime";
 
 export const SITE_SETTINGS_PATH = "slop/catalog/site-settings.json";
 
@@ -25,15 +26,9 @@ export function defaultSiteSettings(): SiteSettings {
   };
 }
 
-function isServerless() {
-  return Boolean(
-    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
-  );
-}
-
-/** Local/dev path, or /tmp on Vercel (repo `data/` is read-only there). */
+/** Local/dev path, or /tmp on a hosted runtime (repo `data/` is read-only there). */
 function localPath() {
-  if (isServerless()) {
+  if (isHostedRuntime()) {
     return path.join("/tmp", "slop-data", "site-settings.json");
   }
   return path.join(process.cwd(), "data", "site-settings.json");
@@ -184,9 +179,9 @@ export async function saveSiteSettings(
   await writeLocal(next);
 
   if (!r2Ok && !blobOk) {
-    if (isServerless()) {
+    if (isHostedRuntime()) {
       throw new Error(
-        "Could not save site settings to cloud storage. Ensure Cloudflare R2 (R2_*) is configured — the Vercel filesystem is read-only.",
+        "Could not save site settings to cloud storage. Ensure Cloudflare R2 (R2_*) is configured — the hosted filesystem is read-only.",
       );
     }
     // Local-only dev without cloud is fine if /data wrote.

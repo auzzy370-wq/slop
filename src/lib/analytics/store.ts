@@ -1,14 +1,15 @@
 import { promises as fs } from "fs";
 import path from "path";
+import { isHostedRuntime } from "@/lib/runtime";
 import { emptyAnalyticsStore } from "./defaults";
 import type { AnalyticsStoreData } from "./types";
 
 /**
- * On Vercel/serverless the filesystem is ephemeral; use /tmp.
+ * On hosted runtimes the project directory is read-only; use /tmp.
  * Locally prefer ./data for persistence across restarts.
  */
 function resolveDataDir() {
-  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+  if (isHostedRuntime()) {
     return path.join("/tmp", "slop-data");
   }
   return path.join(process.cwd(), "data");

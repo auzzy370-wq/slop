@@ -5,6 +5,7 @@ import {
   r2GetObjectText,
   r2PutObject,
 } from "@/lib/r2";
+import { isHostedRuntime } from "@/lib/runtime";
 
 const R2_KEY = "slop/social/live-reactions.json";
 /** Keep reactions only while floats are still useful to show. */
@@ -40,14 +41,8 @@ function empty(): ReactionStore {
   };
 }
 
-function isServerless() {
-  return Boolean(
-    process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME,
-  );
-}
-
 function localPath() {
-  if (isServerless()) {
+  if (isHostedRuntime()) {
     return path.join("/tmp", "slop-data", "live-reactions.json");
   }
   return path.join(process.cwd(), "data", "live-reactions.json");

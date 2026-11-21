@@ -3,8 +3,6 @@ import { connection } from "next/server";
 import { resolveShareVideoBySlug } from "@/lib/resolve-share-video";
 import { VideoShareClient } from "./video-share-client";
 
-export const instant = false;
-
 export async function generateMetadata({
   params,
 }: PageProps<"/v/[slug]">): Promise<Metadata> {
